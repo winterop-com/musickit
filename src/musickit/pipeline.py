@@ -344,6 +344,12 @@ def _process_album(
             input_bytes=input_bytes,
         )
 
+    # Reserve the output path *now*, before the (potentially long) encode.
+    # If a later album normalises to the same path, it must hit the
+    # collision branch above whether or not this album ultimately succeeds —
+    # otherwise dry-run and real-run can disagree about what gets written.
+    written_dirs.add(out_dir)
+
     # Encode tracks into a sibling staging dir; only swap into the final
     # `out_dir` once every track has succeeded. This keeps the previous
     # complete output intact if a single ffmpeg/tag write fails halfway
@@ -476,7 +482,6 @@ def _process_album(
     if backup is not None:
         shutil.rmtree(backup, ignore_errors=True)
 
-    written_dirs.add(out_dir)
     output_bytes = 0
     for path in out_dir.iterdir():
         if path.is_file():

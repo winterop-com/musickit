@@ -1,7 +1,7 @@
 [project]
 name = "musickit"
 version = "0.1.0"
-description = "Convert FLAC/MP3 rips to Apple Lossless (ALAC) with clean tags + embedded covers."
+description = "Convert messy audio rips into a clean, tagged, organised library — uniform 256k AAC m4a by default (lossless ALAC also supported)."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
