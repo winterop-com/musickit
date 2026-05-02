@@ -63,7 +63,12 @@ class AlbumDir(BaseModel):
 
 
 def discover_albums(root: Path) -> list[AlbumDir]:
-    """Find every album under `root`. Merges `CD1`/`CD2`/etc. siblings."""
+    """Find every album under `root`. Merges `CD1`/`CD2`/etc. siblings.
+
+    A "Best Of Classical" wrapper with composer subfolders deliberately
+    is NOT coalesced into a single VA album — the per-composer-dir
+    output is the right shape for that layout. (One album per artist.)
+    """
     if not root.exists():
         return []
 

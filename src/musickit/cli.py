@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Annotated
 
@@ -95,6 +96,19 @@ def convert(
             ),
         ),
     ] = DEFAULT_COVER_MAX_EDGE,
+    acoustid_key: Annotated[
+        str,
+        typer.Option(
+            "--acoustid-key",
+            envvar="MUSICKIT_ACOUSTID_KEY",
+            help=(
+                "AcoustID API key (https://acoustid.org/api-key — free, ~30s registration). "
+                "When set, tagless tracks are fingerprinted via `fpcalc` and looked up "
+                "against AcoustID to recover title + artist. Requires `chromaprint` "
+                "(`brew install chromaprint`) for the fpcalc binary."
+            ),
+        ),
+    ] = "",
 ) -> None:
     """Re-encode every album under INPUT_DIR into OUTPUT_DIR."""
     console = Console()
@@ -118,6 +132,7 @@ def convert(
         allow_lossy_recompress=allow_lossy_recompress,
         workers=workers if workers > 0 else None,
         cover_max_edge=cover_max_edge,
+        acoustid_key=acoustid_key.strip() or os.environ.get("MUSICKIT_ACOUSTID_KEY") or None,
         console=console,
     )
     failed = [r for r in reports if not r.ok]

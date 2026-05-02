@@ -96,6 +96,7 @@ def run(
     allow_lossy_recompress: bool = False,
     workers: int | None = None,
     cover_max_edge: int = cover_mod.DEFAULT_MAX_EDGE,
+    acoustid_key: str | None = None,
     console: Console | None = None,
 ) -> list[AlbumReport]:
     """Convert every album under `input_root` into `fmt` under `output_root`.
@@ -149,6 +150,7 @@ def run(
                     allow_lossy_recompress,
                     worker_count,
                     cover_max_edge,
+                    acoustid_key,
                 )
             )
     else:
@@ -182,6 +184,7 @@ def run(
                         allow_lossy_recompress,
                         worker_count,
                         cover_max_edge,
+                        acoustid_key,
                     )
                 )
                 progress.advance(albums_task)
@@ -203,6 +206,7 @@ def _process_album(
     allow_lossy_recompress: bool,
     workers: int,
     cover_max_edge: int,
+    acoustid_key: str | None,
 ) -> AlbumReport:
     warnings: list[str] = []
     tracks: list[SourceTrack] = []
@@ -215,9 +219,28 @@ def _process_album(
             if disc_from_folder is not None:
                 track.disc_no = disc_from_folder
                 track.disc_total = album_dir.disc_total
+            # Pre-fill artist/title from a `NN. Artist - Title.mp3`-style filename
+            # when the source has no tags. Without this, `summarize_album` sees
+            # `track.artist == None` for every track, fails to detect the album
+            # as a compilation, and the output folder becomes `Unknown Artist/…`
+            # instead of `Various Artists/…` (the 7Os8Os9Os layout: 100 tagless
+            # MP3s named `NN. Artist - Title.mp3` and nothing else).
+            if not track.artist or not track.title:
+                parsed_artist, parsed_title = _parse_filename_for_va(path)
+                if parsed_artist and not track.artist:
+                    track.artist = parsed_artist
+                if parsed_title and not track.title:
+                    track.title = parsed_title
             tracks.append(track)
         except Exception as exc:
             warnings.append(f"failed to read {path.name}: {exc}")
+
+    # AcoustID enrichment for tagless tracks: fingerprint and look up against
+    # https://acoustid.org. Only runs when the user supplied an API key AND
+    # the track has no usable title/artist after the filename pre-fill —
+    # bringing the network into play only when local data has nothing to say.
+    if acoustid_key:
+        _enrich_with_acoustid(tracks, acoustid_key, workers, console, ctx, warnings)
 
     if not tracks:
         return AlbumReport(
@@ -260,7 +283,11 @@ def _process_album(
         except OSError:
             pass
 
-    artist_name = naming.artist_folder(summary.album_artist, summary.artist_fallback)
+    artist_name = naming.artist_folder(
+        summary.album_artist,
+        summary.artist_fallback,
+        is_compilation=summary.is_compilation,
+    )
     album_name = naming.album_folder(summary.album, summary.year)
     out_dir = output_root / artist_name / album_name
 
@@ -686,6 +713,61 @@ def _parse_filename_for_va(path: Path) -> tuple[str | None, str | None]:
 def _track_no_from_filename(path: Path) -> int | None:
     match = re.match(r"^\s*(\d{1,3})", path.stem)
     return int(match.group(1)) if match else None
+
+
+def _enrich_with_acoustid(
+    tracks: list[SourceTrack],
+    api_key: str,
+    workers: int,
+    console: Console,
+    ctx: _ProgressContext,
+    warnings: list[str],
+) -> None:
+    """Fingerprint + AcoustID lookup for tracks that still lack title/artist.
+
+    Mutates `tracks` in place: fills `track.title` / `track.artist` when a
+    confident match comes back. Failures are recorded as warnings; the
+    convert continues with whatever metadata it had.
+    """
+    candidates = [t for t in tracks if not t.title or not t.artist]
+    if not candidates:
+        return
+
+    from musickit.enrich.acoustid import AcoustIdProvider, FingerprintMissingError, fpcalc_available
+
+    if not fpcalc_available():
+        warnings.append("acoustid: `fpcalc` not on PATH — install chromaprint and rerun")
+        return
+
+    provider = AcoustIdProvider(api_key)
+
+    def lookup_one(track: SourceTrack) -> tuple[SourceTrack, str | None]:
+        try:
+            match = provider.lookup(track.path)
+        except FingerprintMissingError as exc:
+            return track, str(exc)
+        except Exception as exc:  # network blip, malformed JSON, etc. — non-fatal
+            return track, f"acoustid: {exc}"
+        if match is None:
+            return track, None
+        if match.title and not track.title:
+            track.title = match.title
+        if match.artist and not track.artist:
+            track.artist = match.artist
+        return track, None
+
+    pool_size = min(workers, len(candidates)) or 1
+    if ctx.verbose:
+        console.print(f"    [dim]acoustid: looking up {len(candidates)} tagless track(s)…[/dim]")
+    matched = 0
+    with ThreadPoolExecutor(max_workers=pool_size) as pool:
+        for track, err in pool.map(lookup_one, candidates):
+            if err:
+                warnings.append(err)
+            elif track.title and track.artist:
+                matched += 1
+    if matched:
+        warnings.append(f"acoustid: matched {matched}/{len(candidates)} tagless track(s)")
 
 
 def _format_bytes(n: int) -> str:

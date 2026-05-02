@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 import httpx
 
@@ -107,6 +108,83 @@ def test_coverartarchive_fetch_returns_empty_on_404() -> None:
     result = CoverArtArchiveProvider(client=client).fetch("missing-mbid")
     assert result.extra_covers == []
     assert any("no art" in n for n in result.notes)
+
+
+def test_acoustid_parses_best_recording_match(tmp_path: Path) -> None:
+    """A confident AcoustID hit fills in title + artist from the top recording."""
+    from pathlib import Path as _P
+
+    from musickit.enrich import acoustid as acoustid_mod
+    from musickit.enrich.acoustid import AcoustIdProvider, FingerprintResult
+
+    payload = {
+        "status": "ok",
+        "results": [
+            {
+                "score": 0.97,
+                "id": "<acoustid-uuid>",
+                "recordings": [
+                    {
+                        "id": "<recording-mbid>",
+                        "title": "Sweet",
+                        "artists": [{"id": "<artist-mbid>", "name": "Blockbuster"}],
+                    }
+                ],
+            }
+        ],
+    }
+
+    def http_handler(request: httpx.Request) -> httpx.Response:
+        assert "v2/lookup" in request.url.path
+        assert request.url.params.get("client") == "test-key"
+        assert "fingerprint" in request.url.params
+        return httpx.Response(200, json=payload)
+
+    def fake_fingerprint(_path: _P) -> FingerprintResult:
+        return FingerprintResult(fingerprint="AAAA", duration=180.0)
+
+    mock_client = _client_with(http_handler)
+    p = AcoustIdProvider("test-key", client=mock_client)
+    # Patch the module-level fingerprint() so we don't actually shell out to fpcalc.
+    original = acoustid_mod.fingerprint
+    acoustid_mod.fingerprint = fake_fingerprint  # type: ignore[assignment]
+    try:
+        match = p.lookup(tmp_path / "track.mp3")
+    finally:
+        acoustid_mod.fingerprint = original
+
+    assert match is not None
+    assert match.score == 0.97
+    assert match.title == "Sweet"
+    assert match.artist == "Blockbuster"
+    assert match.recording_id == "<recording-mbid>"
+
+
+def test_acoustid_returns_none_below_confidence_threshold(tmp_path: Path) -> None:
+    """A 0.5-confidence hit shouldn't poison title/artist with a weak match."""
+    from pathlib import Path as _P
+
+    from musickit.enrich import acoustid as acoustid_mod
+    from musickit.enrich.acoustid import AcoustIdProvider, FingerprintResult
+
+    payload = {"status": "ok", "results": [{"score": 0.5, "recordings": [{"title": "Wrong"}]}]}
+
+    def http_handler(_req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    def fake_fingerprint(_path: _P) -> FingerprintResult:
+        return FingerprintResult(fingerprint="AAAA", duration=180.0)
+
+    mock_client = _client_with(http_handler)
+    p = AcoustIdProvider("test-key", client=mock_client)
+    original = acoustid_mod.fingerprint
+    acoustid_mod.fingerprint = fake_fingerprint  # type: ignore[assignment]
+    try:
+        match = p.lookup(tmp_path / "track.mp3")
+    finally:
+        acoustid_mod.fingerprint = original
+
+    assert match is None
 
 
 def test_musichoarders_url_pre_fills_artist_and_album() -> None:

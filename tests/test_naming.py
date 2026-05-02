@@ -19,6 +19,12 @@ def test_clean_folder_album_name_strips_codec_and_year():
     assert clean_folder_album_name("Album Name (2012) [FLAC]") == ("Album Name", "2012")
     assert clean_folder_album_name("(1998) Artist - Album [16Bit-44.1kHz]") == ("Artist - Album", "1998")
     assert clean_folder_album_name("Plain Folder") == ("Plain Folder", None)
+    # Scene-site tags get stripped.
+    assert clean_folder_album_name("[nextorrent.com] 7Os8Os9Os") == ("7Os8Os9Os", None)
+    assert clean_folder_album_name("[example.org] Some Album (2020)") == ("Some Album", "2020")
+    # Non-domain bracketed annotations are preserved (might be meaningful).
+    assert clean_folder_album_name("Album [Live]") == ("Album [Live]", None)
+    assert clean_folder_album_name("Album [PMEDIA]") == ("Album [PMEDIA]", None)
 
 
 def test_va_aliases_collapse_to_various_artists():
@@ -41,6 +47,9 @@ def test_artist_folder_routes_va_to_canonical_name():
     # fallback path should still resolve to the canonical Various Artists folder.
     assert artist_folder(None, "VA") == VARIOUS_ARTISTS
     assert artist_folder(None, "Various") == VARIOUS_ARTISTS
+    # Compilation flag wins regardless of fallback: a tagless MP3 mix where
+    # every track is by a different real artist still belongs in `Various Artists`.
+    assert artist_folder(None, "Blockbuster", is_compilation=True) == VARIOUS_ARTISTS
 
 
 def test_album_folder_prefixes_year_for_chronological_sort():

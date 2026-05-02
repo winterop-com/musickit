@@ -46,7 +46,11 @@ _FOLDER_TAG_RE = re.compile(
     r"flac|mp3|aac|alac|wav|ape|ogg|opus|"
     r"\d+\s*bit(?:[-\s]\d+(?:\.\d+)?\s*kHz)?|"  # 24bit, 16Bit-44.1kHz
     r"\d+(?:\.\d+)?\s*kHz|"
-    r"hi-?res|lossless|web|cd\s*rip|vinyl"
+    r"hi-?res|lossless|web|cd\s*rip|vinyl|"
+    # Scene/release-site tags: bracketed `domain.tld` patterns like
+    # `[nextorrent.com]`, `[example.org]`. Limited to known TLDs so we don't
+    # strip catalog numbers or annotations like `[Live]` / `[Bonus]`.
+    r"[a-z0-9-]+\.(?:com|org|net|to|is|cc|me|info|xyz|biz|uk|de|ru|tv|io)"
     r")\s*[\]\)]?",
     re.IGNORECASE,
 )
@@ -98,14 +102,18 @@ def sanitize_component(value: str) -> str:
     return cleaned
 
 
-def artist_folder(album_artist: str | None, fallback_artist: str | None) -> str:
-    """Folder name for the artist level. Maps VA aliases to `Various Artists`.
+def artist_folder(album_artist: str | None, fallback_artist: str | None, *, is_compilation: bool = False) -> str:
+    """Folder name for the artist level. Maps VA / compilation albums to `Various Artists`.
 
-    Checks both the album-artist tag and the fallback (per-track artist majority)
-    against VA aliases — some compilation rips put `VA` as the per-track artist
-    while leaving `album_artist` empty.
+    Three triggers route to the canonical `Various Artists` folder:
+    - `album_artist` tag is a VA alias (`VA`, `V.A.`, `Various`, …)
+    - `fallback_artist` (per-track majority) is itself a VA alias — some rips
+      stamp `VA` as the per-track artist and leave `album_artist` empty
+    - `is_compilation` is True (album-level signal: distinct per-track artists
+      with no shared `album_artist` tag, e.g. an MP3 mix labelled only by
+      filename)
     """
-    if is_various_artists(album_artist) or is_various_artists(fallback_artist):
+    if is_compilation or is_various_artists(album_artist) or is_various_artists(fallback_artist):
         return VARIOUS_ARTISTS
     name = (album_artist or "").strip() or (fallback_artist or "").strip() or "Unknown Artist"
     return sanitize_component(name)
