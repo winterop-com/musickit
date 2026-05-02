@@ -1,0 +1,36 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Tooling caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.pyright/
+.coverage
+htmlcov/
+coverage.xml
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Project data — keep the dirs (.gitkeep) but never commit user audio or convert artifacts
+input/*
+output/*
+!input/.gitkeep
+!output/.gitkeep
+
+# Playwright MCP scratch
+.playwright-mcp/
+
+# Claude Code project state
+.claude/
