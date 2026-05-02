@@ -104,6 +104,24 @@ tests/            unit tests covering naming, discovery, metadata round-trips, c
 
 `pyproject.toml` and `Makefile` follow the same shape as `~/dev/chap-sdk/chapkit`: ruff (E/W/F/I/D, google docstrings, py313, line-length 120), mypy strict-ish, pyright `strict` with the same `report*` softeners, pytest + coverage.
 
+## Edge-case behaviours worth knowing
+
+### "Radio Show -" pseudo-artists
+
+Some rips deliberately tag the `album_artist` as a *programme* rather than a *person* — most commonly Armin van Buuren's *A State Of Trance* weekly show, where the rippers set `album_artist = "Radio Show - A State Of Trance"` on every episode. The convert trusts what's tagged, so those episodes land under `output/Radio Show - A State Of Trance/2025 - A State Of Trance 1254 (...)/` rather than mixed into `Armin van Buuren/`. This keeps weekly radio shows from polluting the main-artist library, but means a search for the actual artist won't find them.
+
+If you'd rather have them under the real artist, either:
+- **Re-tag the source** (`kid3`, `Mp3tag`, `mutagen`-cli) before converting — this is the canonical fix because the tag is the source of truth everywhere downstream.
+- **Override at convert time** — currently not implemented, but a `--artist-override "Radio Show - A State Of Trance=Armin van Buuren"` flag would slot in without touching source files. Roadmap.
+
+### Classical-style compilations (`Best Of / Beethoven, Mozart, …`)
+
+A wrapper folder with one sub-folder per composer — each sub-folder full of tracks tagged only with the composer name, no `ALBUM` tag — produces **one output album per composer-folder**, not a single merged "Various Artists" comp. We tried the merge once and concluded the per-composer artist folders were the better default (each composer is the artist; the wrapper "best-of" name isn't really meaningful as an album). If you want them coalesced under `Various Artists/<wrapper-name>/` instead, re-tag the source files with a shared `ALBUM` tag and `album_artist = "Various Artists"` and the existing pipeline does the right thing.
+
+### MP3-in-MP4 deliberately avoided
+
+When a source MP3 is processed under `--format auto`, the output is **transcoded to AAC** rather than stream-copied into an `.m4a` container. MP3-in-MP4 is a valid combination per the MP4 spec and `mutagen` reads its tags fine, but Finder / Music.app's metadata pipeline shortcuts based on the codec field and won't display tags reliably. Transcoding loses a tiny amount of audio fidelity (transparent on Bluetooth playback) in exchange for a tag schema every consumer can read.
+
 ## Roadmap
 
 Convert pipeline (this CLI's current scope) is complete. Planned future commands:
