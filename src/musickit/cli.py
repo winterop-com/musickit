@@ -109,6 +109,28 @@ def convert(
             ),
         ),
     ] = "",
+    overwrite: Annotated[
+        bool,
+        typer.Option(
+            "--overwrite/--no-overwrite",
+            help=(
+                "Replace an existing output album dir if its path is already on disk. "
+                "Default off — existing albums are preserved (the run merges new albums "
+                "alongside, never wipes prior conversions)."
+            ),
+        ),
+    ] = False,
+    remove_source: Annotated[
+        bool,
+        typer.Option(
+            "--remove-source/--no-remove-source",
+            help=(
+                "After each album succeeds, delete its source dir from INPUT_DIR to "
+                "free disk space. Per-album, only on success. Refuses to remove the "
+                "input root itself."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Re-encode every album under INPUT_DIR into OUTPUT_DIR."""
     console = Console()
@@ -133,6 +155,8 @@ def convert(
         workers=workers if workers > 0 else None,
         cover_max_edge=cover_max_edge,
         acoustid_key=acoustid_key.strip() or os.environ.get("MUSICKIT_ACOUSTID_KEY") or None,
+        overwrite=overwrite,
+        remove_source=remove_source,
         console=console,
     )
     failed = [r for r in reports if not r.ok]

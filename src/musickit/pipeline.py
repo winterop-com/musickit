@@ -97,6 +97,8 @@ def run(
     workers: int | None = None,
     cover_max_edge: int = cover_mod.DEFAULT_MAX_EDGE,
     acoustid_key: str | None = None,
+    overwrite: bool = False,
+    remove_source: bool = False,
     console: Console | None = None,
 ) -> list[AlbumReport]:
     """Convert every album under `input_root` into `fmt` under `output_root`.
@@ -151,6 +153,9 @@ def run(
                     worker_count,
                     cover_max_edge,
                     acoustid_key,
+                    overwrite,
+                    remove_source,
+                    input_root,
                 )
             )
     else:
@@ -185,6 +190,9 @@ def run(
                         worker_count,
                         cover_max_edge,
                         acoustid_key,
+                        overwrite,
+                        remove_source,
+                        input_root,
                     )
                 )
                 progress.advance(albums_task)
@@ -207,6 +215,9 @@ def _process_album(
     workers: int,
     cover_max_edge: int,
     acoustid_key: str | None,
+    overwrite: bool,
+    remove_source: bool,
+    input_root: Path,
 ) -> AlbumReport:
     warnings: list[str] = []
     tracks: list[SourceTrack] = []
@@ -351,6 +362,28 @@ def _process_album(
             cover_size=cover_size,
             warnings=warnings,
             error="duplicate output dir",
+            input_bytes=input_bytes,
+        )
+
+    # No-replace policy: if the album path already exists on disk from a prior
+    # run, skip rather than wiping it. Adding new albums to an existing artist
+    # folder is a *merge* — siblings stay untouched. To force a replacement,
+    # pass `--overwrite`.
+    if out_dir.exists() and not overwrite:
+        msg = f"album already exists at {out_dir} — skipped (pass --overwrite to replace)"
+        warnings.append(msg)
+        console.print(f"[yellow]⚠ skipping {artist_name} / {album_name}: already in output[/yellow]")
+        written_dirs.add(out_dir)
+        return AlbumReport(
+            input_dir=album_dir.path,
+            output_dir=out_dir,
+            artist=artist_name,
+            album=album_name,
+            track_count=len(tracks),
+            cover_source=cover.source if cover else None,
+            cover_size=cover_size,
+            warnings=warnings,
+            error="album already exists",
             input_bytes=input_bytes,
         )
 
@@ -516,6 +549,35 @@ def _process_album(
                 output_bytes += path.stat().st_size
             except OSError:
                 pass
+
+    # `--remove-source`: now that the album has succeeded the swap, free the
+    # source dir on disk. Computes the album's input footprint (covers
+    # single-dir, wrapped multi-disc, and the special anchored-at-first-disc
+    # case) so removing one album doesn't take down siblings.
+    if remove_source:
+        footprint = _input_footprint(album_dir)
+        try:
+            input_root_resolved = input_root.resolve()
+            footprint_resolved = footprint.resolve()
+        except OSError:
+            input_root_resolved = input_root
+            footprint_resolved = footprint
+        # Hard refuse to remove the input root itself (or anything outside it).
+        try:
+            footprint_resolved.relative_to(input_root_resolved)
+            inside_input = footprint_resolved != input_root_resolved
+        except ValueError:
+            inside_input = False
+        if not inside_input:
+            warnings.append(f"--remove-source: refusing to remove {footprint} (would touch input root or escape it)")
+        else:
+            try:
+                shutil.rmtree(footprint)
+                if ctx.verbose:
+                    console.print(f"    [dim]removed source: {footprint}[/dim]")
+            except OSError as exc:
+                warnings.append(f"--remove-source: failed to remove {footprint}: {exc}")
+
     console.print(f"[green]✓[/green] {artist_name} / {album_name} — {len(tracks)} tracks, cover: {cover_size}")
 
     return AlbumReport(
@@ -768,6 +830,28 @@ def _enrich_with_acoustid(
                 matched += 1
     if matched:
         warnings.append(f"acoustid: matched {matched}/{len(candidates)} tagless track(s)")
+
+
+def _input_footprint(album_dir: AlbumDir) -> Path:
+    """Return the on-disk dir to remove for `album_dir` under `--remove-source`.
+
+    Three cases:
+    - Single-disc album → the album's leaf dir (`album_dir.path`).
+    - Bare-leading multi-disc (`Album/CD1` + `Album/CD2`) → the wrapper
+      `Album/`, which is the anchor.
+    - Shared-prefix multi-disc (`wrapper/Album (CD1)` + `wrapper/Album (CD2)`)
+      → the `wrapper/` (common parent of all disc subfolders), so removing
+      one album doesn't strand its sibling disc on disk.
+    """
+    if album_dir.disc_total is None:
+        return album_dir.path
+    track_parents = {t.parent for t in album_dir.tracks}
+    if len(track_parents) <= 1:
+        return album_dir.path
+    parents_of_parents = {p.parent for p in track_parents}
+    if len(parents_of_parents) == 1:
+        return parents_of_parents.pop()
+    return album_dir.path
 
 
 def _format_bytes(n: int) -> str:

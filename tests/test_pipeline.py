@@ -63,6 +63,7 @@ def test_album_write_is_atomic_old_output_survives_failure(
         out_root,
         fmt=convert_mod.OutputFormat.ALAC,
         verbose=True,
+        overwrite=True,  # exercise the atomic-swap path; default no-replace would just skip
         console=Console(record=True, width=120),
     )
     assert len(reports) == 1
@@ -93,6 +94,7 @@ def test_album_write_swaps_in_on_full_success(album_inputs: Path) -> None:
         out_root,
         fmt=convert_mod.OutputFormat.ALAC,
         verbose=True,
+        overwrite=True,  # exercising the swap path; default no-replace would skip
         console=Console(record=True, width=120),
     )
     assert reports[0].ok is True
@@ -105,6 +107,85 @@ def test_album_write_swaps_in_on_full_success(album_inputs: Path) -> None:
     artist_dir = out_root / "Test Artist"
     assert not (artist_dir / ".2024 - Test Album.staging").exists()
     assert not (artist_dir / ".2024 - Test Album.backup").exists()
+
+
+def test_default_skips_when_album_already_exists_in_output(album_inputs: Path) -> None:
+    """Without --overwrite, a pre-existing album dir is preserved + the run skips."""
+    out_root = album_inputs / "output"
+    prior_album = out_root / "Test Artist" / "2024 - Test Album"
+    prior_album.mkdir(parents=True)
+    (prior_album / "EXISTING.m4a").write_text("not really an m4a, just a sentinel")
+
+    reports = pipeline.run(
+        album_inputs / "input",
+        out_root,
+        fmt=convert_mod.OutputFormat.ALAC,
+        verbose=True,
+        console=Console(record=True, width=120),
+    )
+    report = reports[0]
+    # Failed = "skipped because already exists" — surfaces in the summary as not-ok
+    # so the CLI exits non-zero (you'll know about it without grepping warnings).
+    assert report.ok is False
+    assert report.error == "album already exists"
+    # Prior contents untouched.
+    assert (prior_album / "EXISTING.m4a").exists()
+    # No new files leaked into the album.
+    assert sorted(p.name for p in prior_album.iterdir()) == ["EXISTING.m4a"]
+
+
+def test_remove_source_after_successful_album(album_inputs: Path) -> None:
+    """`--remove-source` deletes the source dir per album, on success only."""
+    input_root = album_inputs / "input"
+    out_root = album_inputs / "output"
+    src_album = input_root / "Artist Folder"
+    assert src_album.exists()  # sanity
+
+    reports = pipeline.run(
+        input_root,
+        out_root,
+        fmt=convert_mod.OutputFormat.ALAC,
+        remove_source=True,
+        verbose=True,
+        console=Console(record=True, width=120),
+    )
+    assert reports[0].ok is True
+    # Output exists, source dir is gone.
+    assert (out_root / "Test Artist" / "2024 - Test Album").is_dir()
+    assert not src_album.exists()
+
+
+def test_remove_source_refuses_to_delete_input_root(silent_flac_template: Path, tmp_path: Path) -> None:
+    """If the album footprint resolves to the input root itself, refuse."""
+    from mutagen.flac import FLAC
+
+    # Album is at the input ROOT (no enclosing artist/album dir).
+    input_root = tmp_path / "input"
+    input_root.mkdir()
+    dst = input_root / "01 - Track.flac"
+    shutil.copy2(silent_flac_template, dst)
+    flac = FLAC(dst)
+    flac["TITLE"] = "Track"
+    flac["ARTIST"] = "Solo"
+    flac["ALBUMARTIST"] = "Solo"
+    flac["ALBUM"] = "Album"
+    flac["DATE"] = "2024"
+    flac["TRACKNUMBER"] = "1"
+    flac.save()
+
+    out_root = tmp_path / "output"
+    reports = pipeline.run(
+        input_root,
+        out_root,
+        fmt=convert_mod.OutputFormat.ALAC,
+        remove_source=True,
+        verbose=True,
+        console=Console(record=True, width=120),
+    )
+    assert reports[0].ok is True
+    # Input root still there — refuse-to-remove kicked in.
+    assert input_root.exists()
+    assert any("refusing to remove" in w for w in reports[0].warnings)
 
 
 def test_collision_disambiguation_keeps_every_track(silent_flac_template: Path, tmp_path: Path) -> None:
