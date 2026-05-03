@@ -520,7 +520,11 @@ class MusickitApp(App[None]):
     def _populate_browser(self) -> None:
         browser = self.query_one(BrowserList)
         header = self.query_one(BrowserHeader)
-        prev_index = browser.index
+        # Invalidate the cursor BEFORE mutating children. Otherwise a stale
+        # index from the prior list (e.g. row 32 of a long album list) can
+        # leak into the new list (3-item artists view) and crash the next
+        # `↑`/`↓` keypress with an IndexError. `None` is the empty-list state.
+        browser.index = None
         browser.clear()
         if self._index is None or not self._index.albums:
             header.path = "Browse"
@@ -533,10 +537,14 @@ class MusickitApp(App[None]):
         else:
             header.path = f"Browse · [bold]{self._browse_artist}[/]"
             self._populate_browser_albums(browser, self._browse_artist)
-        if prev_index is not None and 0 <= prev_index < len(browser.children):
-            browser.index = prev_index
-        else:
-            browser.index = 0
+        # Land the cursor on the first navigable row.
+        # - Top level (artists): row 0.
+        # - Inside an artist: row 0 is `..` Back, so prefer row 1 (first album).
+        if len(browser.children) > 0:
+            if self._browse_artist is not None and len(browser.children) > 1:
+                browser.index = 1
+            else:
+                browser.index = 0
         self._fit_sidebar_width()
 
     def _fit_sidebar_width(self) -> None:
@@ -833,8 +841,7 @@ class MusickitApp(App[None]):
         if isinstance(focused, BrowserList):
             # Already in the browser → pop one level if drilled in.
             if self._browse_artist is not None:
-                self._browse_artist = None
-                self._populate_browser()
+                self._pop_browser_one_level()
             return
         if isinstance(focused, TrackList):
             # Hand focus back to the browser; cursor stays where it was.
@@ -842,6 +849,23 @@ class MusickitApp(App[None]):
             return
         # Nothing pane-focused → seek -5s.
         self._player.seek(max(0.0, self._player.position - 5.0))
+
+    def _pop_browser_one_level(self) -> None:
+        """Go from an artist's album list back to the artist list.
+
+        Restores the cursor onto the artist we just exited, which feels much
+        better than always snapping to row 0 of the artists list.
+        """
+        prior_artist = self._browse_artist
+        self._browse_artist = None
+        self._populate_browser()
+        if prior_artist is None:
+            return
+        browser = self.query_one(BrowserList)
+        for i, item in enumerate(browser.children):
+            if getattr(item, "entry_data", None) == prior_artist:
+                browser.index = i
+                break
 
     def action_right(self) -> None:
         """Context-aware →: drill into a browser entry, seek as fallback."""
@@ -876,8 +900,7 @@ class MusickitApp(App[None]):
     def action_browser_up(self) -> None:
         """Backspace: pop one level in the browser if drilled into an artist."""
         if self._browse_artist is not None:
-            self._browse_artist = None
-            self._populate_browser()
+            self._pop_browser_one_level()
 
     def action_rescan_library(self) -> None:
         """Re-walk the library root and refresh the browser.
