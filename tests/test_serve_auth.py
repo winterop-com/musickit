@@ -16,15 +16,38 @@ def _client(tmp_path: Path) -> TestClient:
 
 
 def test_ping_anonymous_returns_subsonic_error_40(tmp_path: Path) -> None:
-    response = _client(tmp_path).get("/rest/ping")
+    response = _client(tmp_path).get("/rest/ping", params={"f": "json"})
     body = response.json()
     inner = body["subsonic-response"]
     assert inner["status"] == "failed"
     assert inner["error"]["code"] == 40
 
 
-def test_ping_plain_password_round_trips(tmp_path: Path) -> None:
+def test_ping_returns_xml_when_f_param_omitted(tmp_path: Path) -> None:
+    """Subsonic spec default is XML — clients like Amperfy don't send f=json."""
     response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "p": "secret"})
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/xml")
+    body = response.content.decode("utf-8")
+    assert "<subsonic-response" in body
+    assert 'status="ok"' in body
+    assert "</subsonic-response>" in body or "/>" in body
+
+
+def test_ping_returns_xml_when_f_param_xml(tmp_path: Path) -> None:
+    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "p": "secret", "f": "xml"})
+    assert response.headers["content-type"].startswith("application/xml")
+
+
+def test_post_ping_works_too(tmp_path: Path) -> None:
+    """play:Sub uses POST; spec allows either method."""
+    response = _client(tmp_path).post("/rest/ping.view", params={"u": "mort", "p": "secret", "f": "json"})
+    assert response.status_code == 200
+    assert response.json()["subsonic-response"]["status"] == "ok"
+
+
+def test_ping_plain_password_round_trips(tmp_path: Path) -> None:
+    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "p": "secret", "f": "json"})
     body = response.json()
     inner = body["subsonic-response"]
     assert inner["status"] == "ok"
@@ -35,19 +58,19 @@ def test_ping_plain_password_round_trips(tmp_path: Path) -> None:
 def test_ping_enc_password_round_trips(tmp_path: Path) -> None:
     """`enc:<hex>` is what some clients send to avoid logging plain passwords."""
     enc = "enc:" + b"secret".hex()
-    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "p": enc})
+    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "p": enc, "f": "json"})
     assert response.json()["subsonic-response"]["status"] == "ok"
 
 
 def test_ping_token_auth_round_trips(tmp_path: Path) -> None:
     salt = "rocksalt"
     token = hashlib.md5(("secret" + salt).encode()).hexdigest()  # noqa: S324
-    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "t": token, "s": salt})
+    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "t": token, "s": salt, "f": "json"})
     assert response.json()["subsonic-response"]["status"] == "ok"
 
 
 def test_ping_wrong_password_returns_error_40(tmp_path: Path) -> None:
-    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "p": "nope"})
+    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "p": "nope", "f": "json"})
     body = response.json()["subsonic-response"]
     assert body["status"] == "failed"
     assert body["error"]["code"] == 40
@@ -56,25 +79,25 @@ def test_ping_wrong_password_returns_error_40(tmp_path: Path) -> None:
 def test_ping_wrong_token_returns_error_40(tmp_path: Path) -> None:
     salt = "rocksalt"
     bad_token = hashlib.md5(("wrong" + salt).encode()).hexdigest()  # noqa: S324
-    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "t": bad_token, "s": salt})
+    response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "t": bad_token, "s": salt, "f": "json"})
     assert response.json()["subsonic-response"]["status"] == "failed"
 
 
 def test_ping_view_alias_works(tmp_path: Path) -> None:
     """Older clients hit `/rest/ping.view`; newer ones hit `/rest/ping`. Both must work."""
-    response = _client(tmp_path).get("/rest/ping.view", params={"u": "mort", "p": "secret"})
+    response = _client(tmp_path).get("/rest/ping.view", params={"u": "mort", "p": "secret", "f": "json"})
     assert response.json()["subsonic-response"]["status"] == "ok"
 
 
 def test_get_license_returns_valid(tmp_path: Path) -> None:
-    response = _client(tmp_path).get("/rest/getLicense", params={"u": "mort", "p": "secret"})
+    response = _client(tmp_path).get("/rest/getLicense", params={"u": "mort", "p": "secret", "f": "json"})
     body = response.json()["subsonic-response"]
     assert body["status"] == "ok"
     assert body["license"]["valid"] is True
 
 
 def test_get_music_folders_returns_one_library(tmp_path: Path) -> None:
-    response = _client(tmp_path).get("/rest/getMusicFolders", params={"u": "mort", "p": "secret"})
+    response = _client(tmp_path).get("/rest/getMusicFolders", params={"u": "mort", "p": "secret", "f": "json"})
     body = response.json()["subsonic-response"]
     assert body["status"] == "ok"
     folders = body["musicFolders"]["musicFolder"]

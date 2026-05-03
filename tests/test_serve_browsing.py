@@ -50,7 +50,7 @@ def _client_with_index(tmp_path: Path, albums: list[LibraryAlbum]) -> TestClient
 
 
 def _params(**extra: str | int) -> dict[str, str | int]:
-    return {"u": "mort", "p": "secret", **extra}
+    return {"u": "mort", "p": "secret", "f": "json", **extra}
 
 
 # ---------------------------------------------------------------------------

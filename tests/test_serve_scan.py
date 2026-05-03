@@ -16,7 +16,7 @@ def _client(tmp_path: Path) -> TestClient:
 
 
 def _params(**extra: str | int) -> dict[str, str | int]:
-    return {"u": "mort", "p": "secret", **extra}
+    return {"u": "mort", "p": "secret", "f": "json", **extra}
 
 
 def test_get_scan_status_idle_by_default(tmp_path: Path) -> None:

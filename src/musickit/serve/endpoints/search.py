@@ -65,8 +65,8 @@ def _search(
     return {"artist": artists, "album": albums, "song": songs}
 
 
-@router.get("/search3")
-@router.get("/search3.view")
+@router.api_route("/search3", methods=["GET", "POST"])
+@router.api_route("/search3.view", methods=["GET", "POST"])
 async def search3(
     request: Request,
     query: str = Query(...),
@@ -91,8 +91,8 @@ async def search3(
     return envelope("searchResult3", result)
 
 
-@router.get("/search2")
-@router.get("/search2.view")
+@router.api_route("/search2", methods=["GET", "POST"])
+@router.api_route("/search2.view", methods=["GET", "POST"])
 async def search2(
     request: Request,
     query: str = Query(...),

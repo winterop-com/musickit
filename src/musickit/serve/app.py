@@ -7,15 +7,18 @@ shaped the same way with `status="failed"` + an error code/message.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from musickit.serve.auth import AuthError, verify
 from musickit.serve.config import ServeConfig
 from musickit.serve.index import IndexCache
+from musickit.serve.xml import to_xml
 
 API_VERSION = "1.16.1"
 SERVER_NAME = "musickit"
@@ -61,6 +64,12 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
     app.state.root = root
     app.state.cfg = cfg
     app.state.cache = IndexCache(root)
+
+    # Spec default is XML; clients opt into JSON via `?f=json`. Convert here
+    # so endpoints stay simple (return dicts; the middleware emits the right
+    # serialization). Binary responses (stream / cover) skip conversion via
+    # the content-type check below.
+    app.add_middleware(SubsonicFormatMiddleware)
 
     async def require_auth(
         request: Request,
@@ -115,3 +124,46 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
 
 class _SubsonicAuthError(Exception):
     """Internal — translated to a Subsonic error 40 response by the handler."""
+
+
+class SubsonicFormatMiddleware(BaseHTTPMiddleware):
+    """Convert JSON `/rest/*` responses to XML when `?f=json` is absent.
+
+    Subsonic's spec default is XML; many clients (Amperfy, play:Sub,
+    older DSub builds) don't pass `f=json` and silently fail to parse
+    a JSON body. Our endpoints return dicts → FastAPI serializes them
+    as JSON → this middleware re-serializes as XML when the client
+    didn't explicitly ask for JSON. Binary responses (audio, cover
+    images) are skipped via the content-type check.
+    """
+
+    async def dispatch(self, request: Request, call_next: Any) -> Response:  # noqa: D102
+        if not request.url.path.startswith("/rest/"):
+            return await call_next(request)  # type: ignore[no-any-return]
+        wants_json = request.query_params.get("f") == "json"
+        if wants_json:
+            return await call_next(request)  # type: ignore[no-any-return]
+
+        response = await call_next(request)
+        ct = response.headers.get("content-type", "")
+        if not ct.startswith("application/json"):
+            return response  # type: ignore[no-any-return]
+
+        body = b""
+        async for chunk in response.body_iterator:
+            body += chunk if isinstance(chunk, bytes) else chunk.encode("utf-8")
+        try:
+            data = json.loads(body)
+            xml_body = to_xml(data)
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # Not a Subsonic envelope after all — pass through as-is.
+            return Response(
+                content=body,
+                status_code=response.status_code,
+                media_type="application/json",
+            )
+        return Response(
+            content=xml_body,
+            status_code=response.status_code,
+            media_type="application/xml; charset=utf-8",
+        )

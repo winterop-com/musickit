@@ -17,7 +17,7 @@ from musickit.serve.ids import album_id, track_id
 
 
 def _params(**extra: str | int) -> dict[str, str | int]:
-    return {"u": "mort", "p": "secret", **extra}
+    return {"u": "mort", "p": "secret", "f": "json", **extra}
 
 
 def _client_with_index(tmp_path: Path, albums: list[LibraryAlbum]) -> TestClient:

@@ -13,15 +13,15 @@ from musickit.serve.app import envelope
 router = APIRouter()
 
 
-@router.get("/ping")
-@router.get("/ping.view")
+@router.api_route("/ping", methods=["GET", "POST"])
+@router.api_route("/ping.view", methods=["GET", "POST"])
 async def ping() -> dict:
     """Auth check — clients ping before doing anything else."""
     return envelope()
 
 
-@router.get("/getLicense")
-@router.get("/getLicense.view")
+@router.api_route("/getLicense", methods=["GET", "POST"])
+@router.api_route("/getLicense.view", methods=["GET", "POST"])
 async def get_license() -> dict:
     """Subsonic was paid software; clients still check this. Always return valid."""
     return envelope(
@@ -34,8 +34,8 @@ async def get_license() -> dict:
     )
 
 
-@router.get("/getMusicFolders")
-@router.get("/getMusicFolders.view")
+@router.api_route("/getMusicFolders", methods=["GET", "POST"])
+@router.api_route("/getMusicFolders.view", methods=["GET", "POST"])
 async def get_music_folders() -> dict:
     """One folder for the whole library — we don't multi-mount."""
     return envelope(

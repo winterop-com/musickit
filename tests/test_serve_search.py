@@ -11,7 +11,7 @@ from musickit.serve import ServeConfig, create_app
 
 
 def _params(**extra: str | int) -> dict[str, str | int]:
-    return {"u": "mort", "p": "secret", **extra}
+    return {"u": "mort", "p": "secret", "f": "json", **extra}
 
 
 def _track(album_path: Path, name: str, *, n: int) -> LibraryTrack:
