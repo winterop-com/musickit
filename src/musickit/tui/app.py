@@ -385,9 +385,10 @@ class KeyBar(Static):
         items = [
             ("space", "Play"),
             ("enter", "Open"),
+            ("←/→", "Nav"),
+            (",/.", "Seek"),
             ("n", "Next"),
             ("p", "Prev"),
-            ("←/→", "Seek"),
             ("s", "Shuffle"),
             ("r", "Repeat"),
             ("f", "Fullscreen"),
@@ -433,8 +434,13 @@ class MusickitApp(App[None]):
         Binding("p", "prev_track", "Prev", show=False),
         Binding("plus,equals_sign", "vol_up", "Vol+", show=False),
         Binding("minus", "vol_down", "Vol-", show=False),
-        Binding("left", "seek_back", "Seek -", show=False),
-        Binding("right", "seek_fwd", "Seek +", show=False),
+        # `←` / `→` are context-aware (see `action_left` / `action_right`):
+        # they navigate between panes when one is focused, and only fall back
+        # to seek when nothing's focused. Use `,` / `.` for always-on seek.
+        Binding("left", "left", "Left", show=False),
+        Binding("right", "right", "Right", show=False),
+        Binding("comma", "seek_back", "Seek -", show=False),
+        Binding("period", "seek_fwd", "Seek +", show=False),
         Binding("s", "toggle_shuffle", "Shuffle", show=False),
         Binding("r", "cycle_repeat", "Repeat", show=False),
         Binding("f", "toggle_fullscreen", "Fullscreen", show=False),
@@ -656,7 +662,6 @@ class MusickitApp(App[None]):
             tracklist.clear()
             self._marker_idx = None
             return
-        prev_cursor = tracklist.index
         tracklist.clear()
         album = self._current_album
         for i, track in enumerate(album.tracks):
@@ -665,8 +670,13 @@ class MusickitApp(App[None]):
             item.track_index = i  # type: ignore[attr-defined]
             tracklist.append(item)
         self._marker_idx = self._current_track_idx
-        if prev_cursor is not None and 0 <= prev_cursor < len(album.tracks):
-            tracklist.index = prev_cursor
+        # Land the cursor on the playing track if there is one, else the top.
+        # (`_repopulate_playlist` is only called on album change, so reusing
+        # the prior list's index would put the highlight on a stale row.)
+        if self._current_track_idx is not None and 0 <= self._current_track_idx < len(album.tracks):
+            tracklist.index = self._current_track_idx
+        elif album.tracks:
+            tracklist.index = 0
 
     def _refresh_play_marker(self) -> None:
         if self._current_album is None:
@@ -815,6 +825,33 @@ class MusickitApp(App[None]):
 
     def action_seek_back(self) -> None:
         self._player.seek(max(0.0, self._player.position - 5.0))
+
+    def action_left(self) -> None:
+        """Context-aware ←: navigate between panes, seek as fallback."""
+        focused = self.focused
+        if isinstance(focused, BrowserList):
+            # Already in the browser → pop one level if drilled in.
+            if self._browse_artist is not None:
+                self._browse_artist = None
+                self._populate_browser()
+            return
+        if isinstance(focused, TrackList):
+            # Hand focus back to the browser; cursor stays where it was.
+            self.query_one(BrowserList).focus()
+            return
+        # Nothing pane-focused → seek -5s.
+        self._player.seek(max(0.0, self._player.position - 5.0))
+
+    def action_right(self) -> None:
+        """Context-aware →: drill into a browser entry, seek as fallback."""
+        focused = self.focused
+        if isinstance(focused, BrowserList):
+            # Use the same dispatch as Enter so artist→albums and album→tracks work.
+            if focused.highlighted_child is not None:
+                self._handle_browser_selection(focused.highlighted_child)
+            return
+        # In the tracklist (or nothing focused) → seek +5s.
+        self._player.seek(self._player.position + 5.0)
 
     def action_vol_up(self) -> None:
         self._player.set_volume(min(100, self._player.volume + 5))
