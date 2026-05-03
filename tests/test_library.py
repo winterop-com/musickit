@@ -358,6 +358,33 @@ def test_fix_dry_run_does_not_write_or_rename(silent_flac_template: Path, tmp_pa
     assert "\xa9day" not in mp4.tags
 
 
+def test_fix_prefer_dirname_writes_tag_from_dir(silent_flac_template: Path, tmp_path: Path) -> None:
+    """`--prefer-dirname` inverts the mismatch fix: write tag ← dir name."""
+    root = tmp_path / "lib"
+    album_dir = root / "Artist" / "1983 - Now That's What I Call Music! 01"
+    _make_track(
+        album_dir,
+        silent_flac_template,
+        filename="01 - T.m4a",
+        album="Now That's What I Call Music",  # no `!`, no number — needs to follow the dir
+        year="1983",
+    )
+
+    def fake_lookup(album: str, artist: str) -> str | None:
+        return None
+
+    index = library.scan(root)
+    library.audit(index)
+    actions = library.fix_index(index, year_lookup=fake_lookup, prefer_dirname=True)
+
+    assert any("tag ← album=" in a for a in actions)
+    # Filesystem dir untouched — only the tag changed.
+    assert album_dir.is_dir()
+    mp4 = MP4(album_dir / "01 - T.m4a")
+    assert mp4.tags is not None
+    assert mp4.tags["\xa9alb"] == ["Now That's What I Call Music! 01"]
+
+
 def test_fix_renames_on_tag_path_mismatch(silent_flac_template: Path, tmp_path: Path) -> None:
     """Tag-says-X but dir-says-Y → rename dir to match the tag."""
     root = tmp_path / "lib"

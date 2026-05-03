@@ -410,6 +410,16 @@ def library(
         bool,
         typer.Option("--dry-run", help="With `--fix`: print planned actions but don't write or rename."),
     ] = False,
+    prefer_dirname: Annotated[
+        bool,
+        typer.Option(
+            "--prefer-dirname",
+            help=(
+                "With `--fix`: when tag and path disagree, write the tag from the dir name "
+                "(default is the opposite — rename the dir to match the tag)."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Walk a converted-output directory and print an Artist→Album→Track index.
 
@@ -424,7 +434,12 @@ def library(
     library_mod.audit(index)
 
     if fix:
-        actions = library_mod.fix_index(index, dry_run=fix_dry_run, console=console)
+        actions = library_mod.fix_index(
+            index,
+            dry_run=fix_dry_run,
+            console=console,
+            prefer_dirname=prefer_dirname,
+        )
         prefix = "[yellow]would apply[/yellow]" if fix_dry_run else "[cyan]applied[/cyan]"
         console.print(f"{prefix} {len(actions)} fix(es)")
         return
