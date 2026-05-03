@@ -61,18 +61,19 @@ class HeaderBlock(Static):
         if self.has_class("fullscreen"):
             return self.fullscreen_now_playing
         return (
-            f"[bold #ff69b4]musickit[/]   {self.title_line}\n"
-            f"[#ffd700]{self.time_line:<40}[/]{self.state_badge:>40}\n"
+            f"[bold cyan]musickit[/]   {self.title_line}\n"
+            f"[dim]{self.time_line:<40}[/]{self.state_badge:>40}\n"
             f"{self.volume_line}"
         )
 
 
 class Visualizer(Static):
-    """8-band spectrum bars driven by the audio callback's FFT output.
+    """24-band spectrum analyzer in classic VU style.
 
-    Each band gets its own hue (rainbow across the spectrum). Rows blend
-    intensity top-to-bottom, with a bright "peak" highlight on the topmost
-    active row of each bar.
+    Same green / yellow / red gradient across all bars, keyed off vertical
+    position (red top → yellow mid → green bottom). Sub-cell vertical
+    resolution via unicode partial blocks (`▁▂▃▄▅▆▇█`) on the top edge of
+    each bar so amplitude changes animate smoothly.
     """
 
     DEFAULT_CSS = """
@@ -86,38 +87,43 @@ class Visualizer(Static):
     }
     """
 
-    # Rainbow per-band base colors (low freq → high freq).
-    _BAND_COLORS = (
-        "#ff5f5f",  # red
-        "#ff8c00",  # orange
-        "#ffd700",  # gold
-        "#7fff00",  # chartreuse
-        "#00ced1",  # turquoise
-        "#1e90ff",  # dodger blue
-        "#9370db",  # medium purple
-        "#ff69b4",  # hot pink
-    )
+    _PARTIAL_BLOCKS = "▁▂▃▄▅▆▇█"  # 1/8th increments
+    _BAR_COLOR_RED = "#ff4040"
+    _BAR_COLOR_YELLOW = "#ffd23f"
+    _BAR_COLOR_GREEN = "#3fd76b"
 
-    levels = reactive([0.0] * 8)
+    levels = reactive([0.0] * 24)
 
     def render(self) -> str:
         rows = max(5, max(0, self.size.height - 2))
+        # 1/8 of rows are red, next 1/3 yellow, rest green (classic VU stack).
+        red_cutoff = max(1, rows // 5)  # top 20%
+        yellow_cutoff = red_cutoff + max(1, rows // 3)  # next 33%
         lines: list[str] = []
         for row_idx in range(rows):
-            # Row 0 = top (peak), row rows-1 = bottom.
-            threshold = 1.0 - (row_idx + 1) / rows
+            if row_idx < red_cutoff:
+                color = self._BAR_COLOR_RED
+            elif row_idx < yellow_cutoff:
+                color = self._BAR_COLOR_YELLOW
+            else:
+                color = self._BAR_COLOR_GREEN
+            row_top = 1.0 - row_idx / rows  # high-water mark this row covers
+            row_bottom = 1.0 - (row_idx + 1) / rows  # low-water mark
             line_parts: list[str] = []
-            for band_idx, level in enumerate(self.levels):
-                base = self._BAND_COLORS[band_idx % len(self._BAND_COLORS)]
-                if level >= threshold:
-                    # Topmost active row gets a "peak" highlight in white,
-                    # rest of the bar gets the band's hue.
-                    is_peak_row = (1.0 - level) <= (row_idx / rows) < (1.0 - level) + (1.0 / rows)
-                    color = "bold white" if is_peak_row else base
-                    line_parts.append(f"[{color}]████[/]")
+            for level in self.levels:
+                if level >= row_top:
+                    # Bar is fully filled at this row.
+                    line_parts.append(f"[{color}]███[/]")
+                elif level > row_bottom:
+                    # Bar's top edge falls inside this row — partial block.
+                    fraction = (level - row_bottom) / max(1e-6, row_top - row_bottom)
+                    block = self._PARTIAL_BLOCKS[
+                        min(len(self._PARTIAL_BLOCKS) - 1, int(fraction * len(self._PARTIAL_BLOCKS)))
+                    ]
+                    line_parts.append(f"[{color}]{block * 3}[/]")
                 else:
-                    line_parts.append("    ")
-                line_parts.append(" ")  # gap
+                    line_parts.append("   ")
+                line_parts.append(" ")  # gap between bars
             lines.append("".join(line_parts))
         return "\n".join(lines)
 
@@ -345,31 +351,31 @@ class MusickitApp(App[None]):
         label_widget.update(self._format_track_row(idx, track, self._current_album, marker=marker))
 
     def _format_track_row(self, idx: int, track: LibraryTrack, album: LibraryAlbum, *, marker: bool) -> str:
-        glyph = "[bold #7fff00]▶[/]" if marker else " "
+        glyph = "[bold #3fd76b]▶[/]" if marker else " "
         artist = track.artist or album.artist_dir
         title = track.title or track.path.stem
         if marker:
-            return f"{glyph} [bold #ffd700]{idx + 1:>2}.[/]  [#7fff00]{artist}[/] [#9370db]-[/] [bold]{title}[/]"
-        return f"{glyph} [#888888]{idx + 1:>2}.[/]  [#bbbbbb]{artist}[/] [#666666]-[/] {title}"
+            return f"{glyph} [#3fd76b]{idx + 1:>2}.[/]  [#3fd76b]{artist}[/] [dim]-[/] [bold]{title}[/]"
+        return f"{glyph} [dim]{idx + 1:>2}.[/]  {artist} [dim]-[/] {title}"
 
     def _update_playlist_header(self) -> None:
         if self._current_album is None:
             return
         header = self.query_one(PlaylistHeader)
         album = self._current_album
-        shuffle_color = "#7fff00" if self._shuffle else "#666666"
-        repeat_color = "#7fff00" if self._repeat is not RepeatMode.OFF else "#666666"
+        shuffle_color = "#3fd76b" if self._shuffle else "#666666"
+        repeat_color = "#3fd76b" if self._repeat is not RepeatMode.OFF else "#666666"
         idx_label = (
             f"{(self._current_track_idx or 0) + 1}/{len(album.tracks)}"
             if self._current_track_idx is not None
             else f"-/{len(album.tracks)}"
         )
         header.body = (
-            f"[bold #ff69b4]── Playlist ──[/]  "
+            f"[bold cyan]── Playlist ──[/]  "
             f"[{shuffle_color}]Shuffle: {'On' if self._shuffle else 'Off'}[/]  "
             f"[{repeat_color}]Repeat: {self._repeat.value}[/]  "
-            f"[#ffd700][{idx_label}][/]\n"
-            f"[bold #00ced1]── {album.album_dir} ──[/]"
+            f"[dim][{idx_label}][/]\n"
+            f"[dim]── {album.album_dir} ──[/]"
         )
 
     # ------------------------------------------------------------------
@@ -391,25 +397,23 @@ class MusickitApp(App[None]):
             album = self._current_album.album_dir if self._current_album else ""
             time_str = f"{_fmt_mmss(self._player.position)} / {_fmt_mmss(self._player.duration)}"
             header.title_line = (
-                f"[#00ced1]♪[/] [bold #ffffff]{title}[/] "
-                f"[#9370db]·[/] [#7fff00]{artist}[/] "
-                f"[#9370db]·[/] [dim]{album}[/dim]"
+                f"[cyan]♪[/] [bold]{title}[/]  [dim]·[/] [#3fd76b]{artist}[/]  [dim]·[/] [dim]{album}[/]"
             )
             header.time_line = time_str
             if self._player.is_paused:
-                state = "[bold #ffd700]⏸ Paused[/]"
+                state = "[bold #ffd23f]⏸ Paused[/]"
             elif self._player.is_playing:
-                state = "[bold #7fff00]▶ Playing[/]"
+                state = "[bold #3fd76b]▶ Playing[/]"
             else:
                 state = "[dim]⏹ Stopped[/dim]"
             header.state_badge = state
             progress = _progress_bar(self._player.position, self._player.duration, width=60)
             header.fullscreen_now_playing = (
-                f"[bold #00ced1]♪[/]  [bold #ffffff]{title}[/]\n"
-                f"   [#7fff00]{artist}[/]\n"
-                f"   [dim]{album}[/dim]\n\n"
+                f"[bold cyan]♪[/]  [bold]{title}[/]\n"
+                f"   [#3fd76b]{artist}[/]\n"
+                f"   [dim]{album}[/]\n\n"
                 f"   {progress}\n"
-                f"   [#ffd700]{time_str:<60}[/]{state:>20}"
+                f"   [dim]{time_str:<60}[/]{state:>20}"
             )
         header.volume_line = _volume_bar(self._player.volume)
         visualizer.levels = self._player.band_levels
@@ -586,11 +590,7 @@ def _fmt_mmss(seconds: float) -> str:
 
 def _volume_bar(volume: int, width: int = 20) -> str:
     filled = int(round(volume / 100.0 * width))
-    return (
-        f"[bold #ff8c00]VOL[/]  "
-        f"[#7fff00]{'█' * filled}[/][#3a3a3a]{'░' * (width - filled)}[/]  "
-        f"[bold #ffd700]{volume:3d}%[/]"
-    )
+    return f"[dim]VOL[/]  [#3fd76b]{'█' * filled}[/][#3a3a3a]{'░' * (width - filled)}[/]  [dim]{volume:3d}%[/]"
 
 
 def _progress_bar(position: float, duration: float, width: int = 60) -> str:
@@ -599,4 +599,4 @@ def _progress_bar(position: float, duration: float, width: int = 60) -> str:
         return f"[#3a3a3a]{'░' * width}[/]"
     ratio = max(0.0, min(1.0, position / duration))
     filled = int(round(ratio * width))
-    return f"[#00ced1]{'█' * filled}[/][#3a3a3a]{'░' * (width - filled)}[/]"
+    return f"[#3fd76b]{'█' * filled}[/][#3a3a3a]{'░' * (width - filled)}[/]"

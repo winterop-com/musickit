@@ -35,7 +35,7 @@ _CHANNELS = 2
 _DTYPE = "float32"
 _QUEUE_MAX_CHUNKS = 64
 _CHUNK_FRAMES = 1024  # frames per output callback iteration
-_VIS_BANDS = 8
+_VIS_BANDS = 24
 _VIS_DECAY = 0.85  # per-callback decay of the band level (smooths the bars)
 
 
