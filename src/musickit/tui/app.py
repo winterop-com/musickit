@@ -422,7 +422,12 @@ class MusickitApp(App[None]):
     #sidebar { width: 32; border-right: tall $primary 30%; }
     #main { width: 1fr; }
     #now-playing-row { height: auto; }
-    Screen.fullscreen #body { display: none; }
+    /* Fullscreen: keep the visualizer + now-playing visible, hide everything
+       library-related. Visualizer height is bumped to 1fr in
+       `action_toggle_fullscreen`. */
+    Screen.fullscreen #sidebar { display: none; }
+    Screen.fullscreen #track-header { display: none; }
+    Screen.fullscreen #track-scroll { display: none; }
     Screen.fullscreen #status { display: none; }
     """
 
