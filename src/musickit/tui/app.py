@@ -1,4 +1,4 @@
-"""Textual app: cliamp-styled now-playing + library tree + playlist."""
+"""Textual app: ncmpcpp-styled library + now-playing + spectrum visualizer."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
-from textual.widgets import Footer, ListItem, ListView, Static, Tree
+from textual.widgets import ListItem, ListView, Static, Tree
 
 from musickit import library as library_mod
 from musickit.tui.player import AudioPlayer
@@ -23,6 +23,23 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Palette (ncmpcpp-leaning: cyan headers, green meters, dim grey rules,
+# yellow=warning state, red=peaks). One central place so themes stay tight.
+# ---------------------------------------------------------------------------
+
+C_HEADER = "cyan"
+C_LABEL = "#7aa2f7"  # softer blue for "Artist:" / "Title:" labels
+C_PLAYING = "#9ece6a"  # green for "playing" state + meter fill
+C_PAUSED = "#e0af68"  # warm amber for paused
+C_PEAK = "#f7768e"  # peak / red zone in the visualizer
+C_WARM = "#e0af68"  # mid zone (yellow / amber)
+C_ACCENT = "#bb9af7"  # accent (e.g. "Favorites" style highlights)
+C_DIM = "#3a3a3a"
+C_MUTED = "#565f89"
+C_TIME = "#7aa2f7"
+
+
 class RepeatMode(str, Enum):
     """Cycle target for the `r` keybinding."""
 
@@ -31,40 +48,83 @@ class RepeatMode(str, Enum):
     TRACK = "Track"
 
 
-class HeaderBlock(Static):
-    """Top status block: app name, current track, time, state, volume.
+# ---------------------------------------------------------------------------
+# Widgets
+# ---------------------------------------------------------------------------
 
-    In fullscreen mode (`Screen.fullscreen`), this widget grows and renders
-    the now-playing info in a larger / centered layout.
-    """
+
+class TopBar(Static):
+    """Centered app title at the very top."""
 
     DEFAULT_CSS = """
-    HeaderBlock {
-        height: 4;
+    TopBar {
+        height: 1;
         padding: 0 1;
+        content-align: center middle;
         background: $boost;
     }
-    Screen.fullscreen HeaderBlock {
-        height: 8;
+    """
+
+    def render(self) -> str:
+        return "[bold cyan]musickit[/]"
+
+
+class SidebarStats(Static):
+    """`Library` category list: counts of tracks / albums / artists / folders."""
+
+    DEFAULT_CSS = """
+    SidebarStats {
+        height: auto;
+        padding: 1 1;
+    }
+    """
+
+    track_count = reactive(0)
+    album_count = reactive(0)
+    artist_count = reactive(0)
+    folder_count = reactive(0)
+
+    def render(self) -> str:
+        rows = [
+            f"[{C_HEADER}]Library[/]",
+            "[dim]──────────[/]",
+            f" [{C_ACCENT}]♪[/]  Tracks   [dim]{self.track_count:>5}[/]",
+            f" [{C_ACCENT}]◉[/]  Albums   [dim]{self.album_count:>5}[/]",
+            f" [{C_ACCENT}]☺[/]  Artists  [dim]{self.artist_count:>5}[/]",
+            f" [{C_ACCENT}]▦[/]  Folders  [dim]{self.folder_count:>5}[/]",
+        ]
+        return "\n".join(rows)
+
+
+class NowPlayingMeta(Static):
+    """Right-side metadata grid: Artist / Title / Album / Year / Genre / Format."""
+
+    DEFAULT_CSS = """
+    NowPlayingMeta {
+        height: auto;
         padding: 1 2;
     }
     """
 
-    title_line = reactive("")
-    time_line = reactive("00:00 / 00:00")
-    state_badge = reactive("⏹ Stopped")
-    volume_line = reactive("VOL " + "░" * 20 + "  100%")
-    progress_line = reactive("")
-    fullscreen_now_playing = reactive("")
+    artist = reactive("—")
+    title_text = reactive("—")
+    album = reactive("—")
+    year = reactive("—")
+    genre = reactive("—")
+    fmt = reactive("—")
 
     def render(self) -> str:
-        if self.has_class("fullscreen"):
-            return self.fullscreen_now_playing
-        return (
-            f"[bold cyan]musickit[/]   {self.title_line}\n"
-            f"[dim]{self.time_line:<40}[/]{self.state_badge:>40}\n"
-            f"{self.volume_line}"
-        )
+        rows = [
+            f"[{C_HEADER}]Now Playing[/]",
+            "[dim]──────────────────────────────────────────────[/]",
+            f"[{C_LABEL}]Artist:[/]  {self.artist}",
+            f"[{C_LABEL}]Title:[/]   [bold]{self.title_text}[/]",
+            f"[{C_LABEL}]Album:[/]   {self.album}",
+            f"[{C_LABEL}]Year:[/]    {self.year}",
+            f"[{C_LABEL}]Genre:[/]   {self.genre}",
+            f"[{C_LABEL}]Format:[/]  {self.fmt}",
+        ]
+        return "\n".join(rows)
 
 
 class Visualizer(Static):
@@ -78,9 +138,8 @@ class Visualizer(Static):
 
     DEFAULT_CSS = """
     Visualizer {
-        height: 7;
-        padding: 1 1;
-        background: $boost;
+        height: 6;
+        padding: 0 2;
     }
     Screen.fullscreen Visualizer {
         height: 1fr;
@@ -88,34 +147,28 @@ class Visualizer(Static):
     """
 
     _PARTIAL_BLOCKS = "▁▂▃▄▅▆▇█"  # 1/8th increments
-    _BAR_COLOR_RED = "#ff4040"
-    _BAR_COLOR_YELLOW = "#ffd23f"
-    _BAR_COLOR_GREEN = "#3fd76b"
 
     levels = reactive([0.0] * 24)
 
     def render(self) -> str:
-        rows = max(5, max(0, self.size.height - 2))
-        # 1/8 of rows are red, next 1/3 yellow, rest green (classic VU stack).
-        red_cutoff = max(1, rows // 5)  # top 20%
-        yellow_cutoff = red_cutoff + max(1, rows // 3)  # next 33%
+        rows = max(4, max(0, self.size.height - 1))
+        red_cutoff = max(1, rows // 5)
+        yellow_cutoff = red_cutoff + max(1, rows // 3)
         lines: list[str] = []
         for row_idx in range(rows):
             if row_idx < red_cutoff:
-                color = self._BAR_COLOR_RED
+                color = C_PEAK
             elif row_idx < yellow_cutoff:
-                color = self._BAR_COLOR_YELLOW
+                color = C_WARM
             else:
-                color = self._BAR_COLOR_GREEN
-            row_top = 1.0 - row_idx / rows  # high-water mark this row covers
-            row_bottom = 1.0 - (row_idx + 1) / rows  # low-water mark
+                color = C_PLAYING
+            row_top = 1.0 - row_idx / rows
+            row_bottom = 1.0 - (row_idx + 1) / rows
             line_parts: list[str] = []
             for level in self.levels:
                 if level >= row_top:
-                    # Bar is fully filled at this row.
                     line_parts.append(f"[{color}]███[/]")
                 elif level > row_bottom:
-                    # Bar's top edge falls inside this row — partial block.
                     fraction = (level - row_bottom) / max(1e-6, row_top - row_bottom)
                     block = self._PARTIAL_BLOCKS[
                         min(len(self._PARTIAL_BLOCKS) - 1, int(fraction * len(self._PARTIAL_BLOCKS)))
@@ -123,91 +176,185 @@ class Visualizer(Static):
                     line_parts.append(f"[{color}]{block * 3}[/]")
                 else:
                     line_parts.append("   ")
-                line_parts.append(" ")  # gap between bars
+                line_parts.append(" ")
             lines.append("".join(line_parts))
         return "\n".join(lines)
 
 
-class PlaylistHeader(Static):
-    """Static rule above the track list (shows shuffle/repeat/cursor state)."""
+class ProgressLine(Static):
+    """`mm:ss [▰▰▰▰░░░░] mm:ss   [playing]` bar."""
 
     DEFAULT_CSS = """
-    PlaylistHeader {
-        height: auto;
-        padding: 0 1;
-        color: $primary;
+    ProgressLine {
+        height: 1;
+        padding: 0 2;
     }
     """
 
-    body = reactive("[dim]Select an album in the library to populate the playlist.[/dim]")
+    position = reactive(0.0)
+    duration = reactive(0.0)
+    state = reactive("stopped")  # "playing" | "paused" | "stopped"
 
     def render(self) -> str:
-        return self.body
+        width = max(20, self.size.width - 30)
+        if self.duration <= 0:
+            bar = f"[{C_DIM}]{'─' * width}[/]"
+        else:
+            ratio = max(0.0, min(1.0, self.position / self.duration))
+            filled = int(round(ratio * width))
+            bar = f"[{C_TIME}]{'━' * filled}[/][{C_DIM}]{'─' * (width - filled)}[/]"
+        if self.state == "playing":
+            badge = f"[{C_PLAYING}][playing][/]"
+        elif self.state == "paused":
+            badge = f"[{C_PAUSED}][paused][/]"
+        else:
+            badge = "[dim][stopped][/]"
+        pos = _fmt_mmss(self.position)
+        dur = _fmt_mmss(self.duration)
+        return f"[{C_TIME}]{pos}[/]  {bar}  [{C_TIME}]{dur}[/]   {badge}"
+
+
+class TrackTableHeader(Static):
+    """Column headers for the track table (`#  Title  Artist  Time`)."""
+
+    DEFAULT_CSS = """
+    TrackTableHeader {
+        height: 2;
+        padding: 0 2;
+    }
+    """
+
+    def render(self) -> str:
+        return f"[{C_HEADER}]{'#':>3}  {'Title':<46}{'Artist':<28}{'Time':>6}[/]\n[dim]{'─' * 90}[/]"
 
 
 class TrackList(ListView):
-    """Focusable playlist. Enter on a row plays that track."""
+    """Focusable playlist (column-aligned rows)."""
 
     DEFAULT_CSS = """
     TrackList {
         padding: 0 1;
         height: 1fr;
     }
+    TrackList > ListItem.--highlight {
+        background: $primary 30%;
+    }
     """
 
 
-_TREE_DEFAULT_WIDTH = 36
-_TREE_MIN_WIDTH = 16
+class LibraryTree(Tree[object]):
+    """Artist → Album browse tree below the sidebar stats."""
+
+    DEFAULT_CSS = """
+    LibraryTree {
+        height: 1fr;
+    }
+    """
+
+
+class StatusBar(Static):
+    """Bottom single-line status: Vol / Repeat / Shuffle / Time."""
+
+    DEFAULT_CSS = """
+    StatusBar {
+        height: 1;
+        padding: 0 2;
+        background: $boost;
+    }
+    """
+
+    volume = reactive(100)
+    repeat = reactive("Off")
+    shuffle = reactive("Off")
+    position = reactive(0.0)
+    duration = reactive(0.0)
+    album_label = reactive("—")
+    cursor_label = reactive("0/0")
+
+    def render(self) -> str:
+        vol_filled = int(round(self.volume / 100.0 * 12))
+        vol_bar = f"[{C_PLAYING}]{'|' * vol_filled}[/][{C_DIM}]{'-' * (12 - vol_filled)}[/]"
+        repeat_color = C_PLAYING if self.repeat != "Off" else C_DIM
+        shuffle_color = C_PLAYING if self.shuffle != "Off" else C_DIM
+        time_str = f"{_fmt_mmss(self.position)} / {_fmt_mmss(self.duration)}"
+        # `\\[…\\]` to render literal brackets around the volume bar in cliamp/
+        # ncmpcpp style, without confusing Rich's tag parser.
+        return (
+            f"[{C_LABEL}]Vol:[/] [{C_PLAYING}]{self.volume}%[/] \\[{vol_bar}\\]    "
+            f"[{C_LABEL}]Repeat:[/] [{repeat_color}]{self.repeat.lower()}[/]    "
+            f"[{C_LABEL}]Shuffle:[/] [{shuffle_color}]{self.shuffle.lower()}[/]    "
+            f"[{C_LABEL}]Album:[/] [{C_ACCENT}]{self.album_label}[/] [dim]({self.cursor_label})[/]"
+            f"    [{C_LABEL}]Time:[/] [{C_TIME}]{time_str}[/]"
+        )
+
+
+class KeyBar(Static):
+    """Bottom keybinding hint bar (ncmpcpp-style numbered shortcuts)."""
+
+    DEFAULT_CSS = """
+    KeyBar {
+        height: 1;
+        padding: 0 2;
+    }
+    """
+
+    def render(self) -> str:
+        items = [
+            ("space", "Play"),
+            ("enter", "Open"),
+            ("n", "Next"),
+            ("p", "Prev"),
+            ("←/→", "Seek"),
+            ("s", "Shuffle"),
+            ("r", "Repeat"),
+            ("f", "Fullscreen"),
+            ("tab", "Focus"),
+            ("^←/→", "Resize"),
+            ("q", "Quit"),
+        ]
+        return "  ".join(f"[bold]{key}[/] [dim]{label}[/]" for key, label in items)
+
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+
+
+_TREE_DEFAULT_WIDTH = 32
+_TREE_MIN_WIDTH = 20
 _TREE_MAX_WIDTH = 80
 _TREE_RESIZE_STEP = 4
 
 
-class LibraryTree(Tree[object]):
-    """Left-hand artist/album tree (resize via `Ctrl+←` / `Ctrl+→`)."""
-
-    DEFAULT_CSS = """
-    LibraryTree {
-        width: 36;
-        border-right: solid $primary;
-    }
-    """
-
-
 class MusickitApp(App[None]):
-    """3-row Textual app: header / library | playlist / footer."""
+    """ncmpcpp-styled three-row Textual app."""
 
     CSS = """
-    Screen {
-        layout: vertical;
-    }
-    #body {
-        height: 1fr;
-    }
-    #playlist-pane {
-        width: 1fr;
-        padding: 0 1;
-    }
-    Screen.fullscreen #body {
-        display: none;
-    }
+    Screen { layout: vertical; }
+    #body { height: 1fr; }
+    #sidebar { width: 32; border-right: tall $primary 30%; }
+    #main { width: 1fr; }
+    #now-playing-row { height: auto; }
+    Screen.fullscreen #body { display: none; }
+    Screen.fullscreen #status { display: none; }
     """
 
     BINDINGS = [
-        Binding("q,ctrl+c", "quit", "Quit", show=True),
-        Binding("space", "toggle_pause", "Play/Pause", show=True),
-        Binding("enter", "play_selected", "Play", show=True),
-        Binding("n", "next_track", "Next", show=True),
-        Binding("p", "prev_track", "Prev", show=True),
+        Binding("q,ctrl+c", "quit", "Quit", show=False),
+        Binding("space", "toggle_pause", "Play/Pause", show=False),
+        Binding("enter", "play_selected", "Play", show=False),
+        Binding("n", "next_track", "Next", show=False),
+        Binding("p", "prev_track", "Prev", show=False),
         Binding("plus,equals_sign", "vol_up", "Vol+", show=False),
         Binding("minus", "vol_down", "Vol-", show=False),
-        Binding("left", "seek_back", "Seek -", show=True),
-        Binding("right", "seek_fwd", "Seek +", show=True),
-        Binding("s", "toggle_shuffle", "Shuffle", show=True),
-        Binding("r", "cycle_repeat", "Repeat", show=True),
-        Binding("f", "toggle_fullscreen", "Fullscreen", show=True),
-        Binding("tab", "focus_next", "Focus", show=True),
-        Binding("ctrl+left", "tree_narrower", "Tree-", show=True),
-        Binding("ctrl+right", "tree_wider", "Tree+", show=True),
+        Binding("left", "seek_back", "Seek -", show=False),
+        Binding("right", "seek_fwd", "Seek +", show=False),
+        Binding("s", "toggle_shuffle", "Shuffle", show=False),
+        Binding("r", "cycle_repeat", "Repeat", show=False),
+        Binding("f", "toggle_fullscreen", "Fullscreen", show=False),
+        Binding("tab", "focus_next", "Focus", show=False),
+        Binding("ctrl+left", "tree_narrower", "Tree-", show=False),
+        Binding("ctrl+right", "tree_wider", "Tree+", show=False),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -219,34 +366,50 @@ class MusickitApp(App[None]):
         self._player.on_track_failed = self._on_track_failed
         self._current_album: LibraryAlbum | None = None
         self._current_track_idx: int | None = None
-        # Last index that visibly carries the `▶` marker — needed so we can
-        # clear it without a full rebuild when the marker moves to a new row.
         self._marker_idx: int | None = None
         self._shuffle = False
         self._repeat = RepeatMode.OFF
-        self._end_pending = False  # set by callback thread, drained by UI tick
+        self._end_pending = False
 
     def compose(self) -> ComposeResult:
-        yield HeaderBlock(id="header")
-        yield Visualizer(id="visualizer")
+        yield TopBar(id="topbar")
         with Horizontal(id="body"):
-            yield LibraryTree("Library", id="tree")
-            with VerticalScroll(id="playlist-pane"):
-                yield PlaylistHeader(id="playlist-header")
-                yield TrackList(id="tracklist")
-        yield Footer()
+            with Vertical(id="sidebar"):
+                yield SidebarStats(id="stats")
+                yield LibraryTree("Browse", id="tree")
+            with Vertical(id="main"):
+                with Horizontal(id="now-playing-row"):
+                    yield NowPlayingMeta(id="meta")
+                yield Visualizer(id="visualizer")
+                yield ProgressLine(id="progress")
+                yield TrackTableHeader(id="track-header")
+                with VerticalScroll(id="track-scroll"):
+                    yield TrackList(id="tracklist")
+        yield StatusBar(id="status")
+        yield KeyBar(id="keybar")
 
     def on_mount(self) -> None:
         self.title = "musickit"
         self._index = library_mod.scan(self._root)
         library_mod.audit(self._index)
+        self._populate_sidebar_stats()
         self._populate_tree()
         self.set_interval(0.1, self._refresh_status)
         self.set_interval(0.05, self._drain_end_pending)
 
     # ------------------------------------------------------------------
-    # Tree population
+    # Sidebar / tree population
     # ------------------------------------------------------------------
+
+    def _populate_sidebar_stats(self) -> None:
+        if self._index is None:
+            return
+        stats = self.query_one(SidebarStats)
+        artists = {a.artist_dir for a in self._index.albums}
+        stats.track_count = sum(a.track_count for a in self._index.albums)
+        stats.album_count = len(self._index.albums)
+        stats.artist_count = len(artists)
+        stats.folder_count = len(self._index.albums)  # one folder per album
 
     def _populate_tree(self) -> None:
         tree = self.query_one(LibraryTree)
@@ -268,7 +431,6 @@ class MusickitApp(App[None]):
         if isinstance(data, library_mod.LibraryAlbum):
             self._set_current_album(data, track_idx=None)
             self._repopulate_playlist()
-            # Hand focus to the track list so Enter plays the track right away.
             tracklist = self.query_one(TrackList)
             tracklist.focus()
 
@@ -279,7 +441,6 @@ class MusickitApp(App[None]):
             self._repopulate_playlist()
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Enter on a track row plays that track."""
         idx = getattr(event.item, "track_index", None)
         if idx is not None and isinstance(idx, int):
             self._current_track_idx = idx
@@ -294,19 +455,11 @@ class MusickitApp(App[None]):
         self._current_track_idx = track_idx
 
     def _repopulate_playlist(self) -> None:
-        """Full rebuild — only call when the album changes.
-
-        Track-change-within-same-album should call `_refresh_play_marker`
-        instead so we don't clear+rebuild the whole list (visible flash).
-        """
-        header = self.query_one(PlaylistHeader)
         tracklist = self.query_one(TrackList)
         if self._current_album is None:
-            header.body = "[dim]Select an album in the library to populate the playlist.[/dim]"
             tracklist.clear()
             self._marker_idx = None
             return
-        self._update_playlist_header()
         prev_cursor = tracklist.index
         tracklist.clear()
         album = self._current_album
@@ -320,25 +473,17 @@ class MusickitApp(App[None]):
             tracklist.index = prev_cursor
 
     def _refresh_play_marker(self) -> None:
-        """Move the `▶` marker to `self._current_track_idx` without rebuilding.
-
-        Touches only the previously-marked row and the new row's Static labels.
-        Eliminates the full-rebuild flash when starting a new track in the
-        same album (mouse click was the most visible offender).
-        """
         if self._current_album is None:
             return
         album = self._current_album
         old, new = self._marker_idx, self._current_track_idx
         if old == new:
-            self._update_playlist_header()
             return
         if old is not None and 0 <= old < len(album.tracks):
             self._update_track_row_label(old, marker=False)
         if new is not None and 0 <= new < len(album.tracks):
             self._update_track_row_label(new, marker=True)
         self._marker_idx = new
-        self._update_playlist_header()
 
     def _update_track_row_label(self, idx: int, *, marker: bool) -> None:
         if self._current_album is None:
@@ -351,71 +496,67 @@ class MusickitApp(App[None]):
         label_widget.update(self._format_track_row(idx, track, self._current_album, marker=marker))
 
     def _format_track_row(self, idx: int, track: LibraryTrack, album: LibraryAlbum, *, marker: bool) -> str:
-        glyph = "[bold #3fd76b]▶[/]" if marker else " "
-        artist = track.artist or album.artist_dir
-        title = track.title or track.path.stem
+        glyph = f"[bold {C_PLAYING}]▶[/]" if marker else " "
+        artist = (track.artist or album.artist_dir)[:26]
+        title = (track.title or track.path.stem)[:44]
+        time_str = _fmt_mmss(0)  # we don't store per-track duration in light scan; placeholder
         if marker:
-            return f"{glyph} [#3fd76b]{idx + 1:>2}.[/]  [#3fd76b]{artist}[/] [dim]-[/] [bold]{title}[/]"
-        return f"{glyph} [dim]{idx + 1:>2}.[/]  {artist} [dim]-[/] {title}"
-
-    def _update_playlist_header(self) -> None:
-        if self._current_album is None:
-            return
-        header = self.query_one(PlaylistHeader)
-        album = self._current_album
-        shuffle_color = "#3fd76b" if self._shuffle else "#666666"
-        repeat_color = "#3fd76b" if self._repeat is not RepeatMode.OFF else "#666666"
-        idx_label = (
-            f"{(self._current_track_idx or 0) + 1}/{len(album.tracks)}"
-            if self._current_track_idx is not None
-            else f"-/{len(album.tracks)}"
-        )
-        header.body = (
-            f"[bold cyan]── Playlist ──[/]  "
-            f"[{shuffle_color}]Shuffle: {'On' if self._shuffle else 'Off'}[/]  "
-            f"[{repeat_color}]Repeat: {self._repeat.value}[/]  "
-            f"[dim][{idx_label}][/]\n"
-            f"[dim]── {album.album_dir} ──[/]"
-        )
+            num = f"[{C_PLAYING}]{idx + 1:>3}[/]"
+            artist_cell = f"[{C_PLAYING}]{artist}[/]"
+            title_cell = f"[bold]{title}[/]"
+        else:
+            num = f"[dim]{idx + 1:>3}[/]"
+            artist_cell = artist
+            title_cell = title
+        return f"{num} {glyph} {title_cell:<44}{artist_cell:<26} [dim]{time_str:>6}[/]"
 
     # ------------------------------------------------------------------
-    # Header / status refresh
+    # Status refresh
     # ------------------------------------------------------------------
 
     def _refresh_status(self) -> None:
-        header = self.query_one(HeaderBlock)
+        meta = self.query_one(NowPlayingMeta)
+        progress = self.query_one(ProgressLine)
+        status = self.query_one(StatusBar)
         visualizer = self.query_one(Visualizer)
         track = self._currently_playing_track()
         if track is None:
-            header.title_line = "[dim]nothing queued[/dim]"
-            header.time_line = "00:00 / 00:00"
-            header.state_badge = "⏹ Stopped"
-            header.fullscreen_now_playing = "[dim]nothing queued — press f to exit[/dim]"
+            meta.title_text = "—"
+            meta.artist = "—"
+            meta.album = "—"
+            meta.year = "—"
+            meta.genre = "—"
+            meta.fmt = "—"
+            progress.position = 0.0
+            progress.duration = 0.0
+            progress.state = "stopped"
         else:
-            artist = track.artist or "?"
-            title = track.title or track.path.stem
-            album = self._current_album.album_dir if self._current_album else ""
-            time_str = f"{_fmt_mmss(self._player.position)} / {_fmt_mmss(self._player.duration)}"
-            header.title_line = (
-                f"[cyan]♪[/] [bold]{title}[/]  [dim]·[/] [#3fd76b]{artist}[/]  [dim]·[/] [dim]{album}[/]"
-            )
-            header.time_line = time_str
+            meta.title_text = track.title or track.path.stem
+            meta.artist = track.artist or self._current_album.artist_dir if self._current_album else "—"
+            meta.album = self._current_album.album_dir if self._current_album else "—"
+            meta.year = track.year or "—"
+            meta.genre = "—"  # not tracked in light scan
+            meta.fmt = track.path.suffix.lstrip(".").upper()
+            progress.position = self._player.position
+            progress.duration = self._player.duration
             if self._player.is_paused:
-                state = "[bold #ffd23f]⏸ Paused[/]"
+                progress.state = "paused"
             elif self._player.is_playing:
-                state = "[bold #3fd76b]▶ Playing[/]"
+                progress.state = "playing"
             else:
-                state = "[dim]⏹ Stopped[/dim]"
-            header.state_badge = state
-            progress = _progress_bar(self._player.position, self._player.duration, width=60)
-            header.fullscreen_now_playing = (
-                f"[bold cyan]♪[/]  [bold]{title}[/]\n"
-                f"   [#3fd76b]{artist}[/]\n"
-                f"   [dim]{album}[/]\n\n"
-                f"   {progress}\n"
-                f"   [dim]{time_str:<60}[/]{state:>20}"
-            )
-        header.volume_line = _volume_bar(self._player.volume)
+                progress.state = "stopped"
+        status.volume = self._player.volume
+        status.repeat = self._repeat.value
+        status.shuffle = "On" if self._shuffle else "Off"
+        status.position = self._player.position
+        status.duration = self._player.duration
+        if self._current_album is not None:
+            status.album_label = self._current_album.album_dir
+            cur = (self._current_track_idx or 0) + 1 if self._current_track_idx is not None else 0
+            status.cursor_label = f"{cur}/{len(self._current_album.tracks)}"
+        else:
+            status.album_label = "—"
+            status.cursor_label = "0/0"
         visualizer.levels = self._player.band_levels
 
     def _drain_end_pending(self) -> None:
@@ -431,11 +572,10 @@ class MusickitApp(App[None]):
         return None
 
     # ------------------------------------------------------------------
-    # Actions / bindings
+    # Actions
     # ------------------------------------------------------------------
 
     def action_play_selected(self) -> None:
-        """Play whatever is highlighted (track row or album node)."""
         tracklist = self.query_one(TrackList)
         tree = self.query_one(LibraryTree)
         focused = self.focused
@@ -483,46 +623,34 @@ class MusickitApp(App[None]):
 
     def action_toggle_shuffle(self) -> None:
         self._shuffle = not self._shuffle
-        self._update_playlist_header()
 
     def action_cycle_repeat(self) -> None:
         order = [RepeatMode.OFF, RepeatMode.ALBUM, RepeatMode.TRACK]
         self._repeat = order[(order.index(self._repeat) + 1) % len(order)]
-        self._update_playlist_header()
 
     def action_tree_wider(self) -> None:
-        self._resize_tree(_TREE_RESIZE_STEP)
+        self._resize_sidebar(_TREE_RESIZE_STEP)
 
     def action_tree_narrower(self) -> None:
-        self._resize_tree(-_TREE_RESIZE_STEP)
+        self._resize_sidebar(-_TREE_RESIZE_STEP)
 
-    def action_toggle_fullscreen(self) -> None:
-        """Hide the library / playlist and let the visualizer fill the screen."""
-        header = self.query_one(HeaderBlock)
-        visualizer = self.query_one(Visualizer)
-        body = self.query_one("#body")
-        going_fullscreen = not header.has_class("fullscreen")
-        if going_fullscreen:
-            header.add_class("fullscreen")
-            header.styles.height = 8
-            visualizer.styles.height = "1fr"
-            body.styles.display = "none"
-        else:
-            header.remove_class("fullscreen")
-            header.styles.height = 4
-            visualizer.styles.height = 7
-            body.styles.display = "block"
-
-    def _resize_tree(self, delta: int) -> None:
-        tree = self.query_one(LibraryTree)
-        # Tree.styles.width is a Scalar; pull the integer cell value, clamp, set.
-        current = tree.styles.width
+    def _resize_sidebar(self, delta: int) -> None:
+        sidebar = self.query_one("#sidebar")
+        current = sidebar.styles.width
         try:
             current_cells = int(current.value) if current is not None else _TREE_DEFAULT_WIDTH
         except (TypeError, ValueError):
             current_cells = _TREE_DEFAULT_WIDTH
         new_width = max(_TREE_MIN_WIDTH, min(_TREE_MAX_WIDTH, current_cells + delta))
-        tree.styles.width = new_width
+        sidebar.styles.width = new_width
+
+    def action_toggle_fullscreen(self) -> None:
+        if self.screen.has_class("fullscreen"):
+            self.screen.remove_class("fullscreen")
+            self.query_one(Visualizer).styles.height = 6
+        else:
+            self.screen.add_class("fullscreen")
+            self.query_one(Visualizer).styles.height = "1fr"
 
     # ------------------------------------------------------------------
     # Playback orchestration
@@ -533,8 +661,6 @@ class MusickitApp(App[None]):
         if track is None:
             return
         self._player.play(track.path)
-        # Same album → only update markers (no flash). Different album path
-        # is handled in `on_tree_node_selected` which already repopulates.
         self._refresh_play_marker()
 
     def _advance_track(self, *, force: bool = False) -> None:
@@ -561,13 +687,12 @@ class MusickitApp(App[None]):
             self._current_track_idx = 0
             self._play_current()
             return
-        # End of album, no repeat — stop and clear marker.
         self._player.stop()
         self._current_track_idx = None
         self._refresh_play_marker()
 
     # ------------------------------------------------------------------
-    # Player callbacks (run on background threads)
+    # Player callbacks
     # ------------------------------------------------------------------
 
     def _on_track_end(self) -> None:
@@ -586,17 +711,3 @@ class MusickitApp(App[None]):
 def _fmt_mmss(seconds: float) -> str:
     seconds = max(0, int(seconds))
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
-
-
-def _volume_bar(volume: int, width: int = 20) -> str:
-    filled = int(round(volume / 100.0 * width))
-    return f"[dim]VOL[/]  [#3fd76b]{'█' * filled}[/][#3a3a3a]{'░' * (width - filled)}[/]  [dim]{volume:3d}%[/]"
-
-
-def _progress_bar(position: float, duration: float, width: int = 60) -> str:
-    """Solid/empty bar showing playback progress."""
-    if duration <= 0:
-        return f"[#3a3a3a]{'░' * width}[/]"
-    ratio = max(0.0, min(1.0, position / duration))
-    filled = int(round(ratio * width))
-    return f"[#3fd76b]{'█' * filled}[/][#3a3a3a]{'░' * (width - filled)}[/]"
