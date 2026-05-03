@@ -23,6 +23,8 @@ import av.error
 import numpy as np
 import sounddevice as sd  # type: ignore[import-untyped]
 
+from musickit.tui.audio_io import get_metadata_value, open_container
+
 if TYPE_CHECKING:
     from av.audio.frame import AudioFrame
     from av.audio.resampler import AudioResampler
@@ -122,7 +124,7 @@ class AudioPlayer:
     def _open_and_swap(self, source: Path | str, gen: int) -> None:
         """Worker thread: connect to `source`, then atomically take over playback."""
         try:
-            container, stream = _open_container(source)
+            container, stream = open_container(source)
         except Exception as exc:
             log.warning("failed to open %s: %s", source, exc)
             if gen == self._opener_gen and self.on_track_failed is not None:
@@ -161,8 +163,8 @@ class AudioPlayer:
 
         self._duration = float(stream.duration * stream.time_base) if stream.duration else 0.0
         self._is_live = self._duration <= 0
-        self._stream_station_name = _get_metadata_value(container, "icy-name")
-        self._stream_title = _get_metadata_value(container, "StreamTitle")
+        self._stream_station_name = get_metadata_value(container, "icy-name")
+        self._stream_title = get_metadata_value(container, "StreamTitle")
         if self.on_metadata_change is not None:
             try:
                 self.on_metadata_change()
@@ -338,7 +340,7 @@ class AudioPlayer:
                         return
 
     def _poll_stream_metadata(self, container: InputContainer) -> None:
-        new_title = _get_metadata_value(container, "StreamTitle")
+        new_title = get_metadata_value(container, "StreamTitle")
         if new_title and new_title != self._stream_title:
             self._stream_title = new_title
             if self.on_metadata_change is not None:
@@ -484,44 +486,3 @@ class AudioPlayer:
             self._cached_edges = np.clip(edges, 1, n_bins)
             self._cached_edges_n = n_bins
         return self._cached_edges
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _open_container(source: Path | str) -> tuple[InputContainer, Any]:
-    """Open `source` (local path or URL) and return `(container, audio_stream)`.
-
-    Caller owns the container. For URLs, `icy=1` opt-in is enabled so
-    Icecast/Shoutcast metadata (station name + StreamTitle) shows up in
-    `container.metadata`.
-    """
-    target = str(source)
-    is_url = target.startswith(("http://", "https://"))
-    options: dict[str, str] = {"icy": "1"} if is_url else {}
-    container = av.open(target, options=options) if options else av.open(target)
-    audio_streams = [s for s in container.streams if s.type == "audio"]
-    if not audio_streams:
-        container.close()
-        raise ValueError(f"no audio stream in {source}")
-    return container, audio_streams[0]
-
-
-def _get_metadata_value(container: InputContainer, key: str) -> str | None:
-    """Fetch a single ICY/general metadata value from a container.
-
-    Checks both the container-level `metadata` (most ICY headers) and the
-    first audio stream's metadata (PyAV exposes some fields on the stream
-    side). Returns None if missing/blank.
-    """
-    for source in (container.metadata, *(s.metadata for s in container.streams)):
-        if not source:
-            continue
-        value = source.get(key)
-        if value:
-            text = str(value).strip()
-            if text:
-                return text
-    return None
