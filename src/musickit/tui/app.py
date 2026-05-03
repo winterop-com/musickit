@@ -32,11 +32,11 @@ class RepeatMode(str, Enum):
 
 
 class HeaderBlock(Static):
-    """Top status block: app name, current track, time, state, VU bar, volume."""
+    """Top status block: app name, current track, time, state, volume."""
 
     DEFAULT_CSS = """
     HeaderBlock {
-        height: 5;
+        height: 4;
         padding: 0 1;
         background: $boost;
     }
@@ -45,15 +45,47 @@ class HeaderBlock(Static):
     title_line = reactive("")
     time_line = reactive("00:00 / 00:00")
     state_badge = reactive("⏹ Stopped")
-    vu_bars = reactive("")
     volume_line = reactive("VOL " + "░" * 20 + "  100%")
 
     def render(self) -> str:
         return (
             f"[bold cyan]musickit[/bold cyan]   {self.title_line}\n"
             f"{self.time_line:<40}{self.state_badge:>40}\n"
-            f"{self.vu_bars:<40}{self.volume_line:>40}"
+            f"{self.volume_line}"
         )
+
+
+class Visualizer(Static):
+    """8-band spectrum bars driven by the audio callback's FFT output."""
+
+    DEFAULT_CSS = """
+    Visualizer {
+        height: 7;
+        padding: 1 1;
+        background: $boost;
+    }
+    """
+
+    levels = reactive([0.0] * 8)
+
+    def render(self) -> str:
+        rows = 5
+        bar_width = 5  # cells per bar (block + spacing)
+        lines: list[str] = []
+        for row_idx in range(rows):
+            # Row 0 = top (peak), row rows-1 = bottom.
+            threshold = 1.0 - (row_idx + 1) / rows
+            line_parts: list[str] = []
+            for level in self.levels:
+                if level >= threshold:
+                    color = "yellow" if row_idx == 0 else "green"
+                    line_parts.append(f"[{color}]████[/]")
+                else:
+                    line_parts.append("    ")
+                line_parts.append(" ")  # gap
+            lines.append("".join(line_parts))
+        del bar_width  # consumed implicitly via the four-block + space format
+        return "\n".join(lines)
 
 
 class PlaylistHeader(Static):
@@ -84,14 +116,18 @@ class TrackList(ListView):
     """
 
 
+_TREE_DEFAULT_WIDTH = 36
+_TREE_MIN_WIDTH = 16
+_TREE_MAX_WIDTH = 80
+_TREE_RESIZE_STEP = 4
+
+
 class LibraryTree(Tree[object]):
-    """Left-hand artist/album tree."""
+    """Left-hand artist/album tree (resize via `[` and `]`)."""
 
     DEFAULT_CSS = """
     LibraryTree {
-        width: 28;
-        min-width: 24;
-        max-width: 40;
+        width: 36;
         border-right: solid $primary;
     }
     """
@@ -126,6 +162,8 @@ class MusickitApp(App[None]):
         Binding("s", "toggle_shuffle", "Shuffle", show=True),
         Binding("r", "cycle_repeat", "Repeat", show=True),
         Binding("tab", "focus_next", "Focus", show=True),
+        Binding("left_square_bracket", "tree_narrower", "Tree-", show=True),
+        Binding("right_square_bracket", "tree_wider", "Tree+", show=True),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -143,6 +181,7 @@ class MusickitApp(App[None]):
 
     def compose(self) -> ComposeResult:
         yield HeaderBlock(id="header")
+        yield Visualizer(id="visualizer")
         with Horizontal(id="body"):
             yield LibraryTree("Library", id="tree")
             with VerticalScroll(id="playlist-pane"):
@@ -247,6 +286,7 @@ class MusickitApp(App[None]):
 
     def _refresh_status(self) -> None:
         header = self.query_one(HeaderBlock)
+        visualizer = self.query_one(Visualizer)
         track = self._currently_playing_track()
         if track is None:
             header.title_line = "[dim]nothing queued[/dim]"
@@ -265,7 +305,7 @@ class MusickitApp(App[None]):
             else:
                 header.state_badge = "[dim]⏹ Stopped[/dim]"
         header.volume_line = _volume_bar(self._player.volume)
-        header.vu_bars = _vu_bar(self._player.position, self._player.is_playing)
+        visualizer.levels = self._player.band_levels
 
     def _drain_end_pending(self) -> None:
         if self._end_pending:
@@ -339,6 +379,23 @@ class MusickitApp(App[None]):
         self._repeat = order[(order.index(self._repeat) + 1) % len(order)]
         self._render_playlist()
 
+    def action_tree_wider(self) -> None:
+        self._resize_tree(_TREE_RESIZE_STEP)
+
+    def action_tree_narrower(self) -> None:
+        self._resize_tree(-_TREE_RESIZE_STEP)
+
+    def _resize_tree(self, delta: int) -> None:
+        tree = self.query_one(LibraryTree)
+        # Tree.styles.width is a Scalar; pull the integer cell value, clamp, set.
+        current = tree.styles.width
+        try:
+            current_cells = int(current.value) if current is not None else _TREE_DEFAULT_WIDTH
+        except (TypeError, ValueError):
+            current_cells = _TREE_DEFAULT_WIDTH
+        new_width = max(_TREE_MIN_WIDTH, min(_TREE_MAX_WIDTH, current_cells + delta))
+        tree.styles.width = new_width
+
     # ------------------------------------------------------------------
     # Playback orchestration
     # ------------------------------------------------------------------
@@ -403,13 +460,3 @@ def _fmt_mmss(seconds: float) -> str:
 def _volume_bar(volume: int, width: int = 20) -> str:
     filled = int(round(volume / 100.0 * width))
     return f"VOL {'█' * filled}{'░' * (width - filled)}  {volume:3d}%"
-
-
-def _vu_bar(position: float, playing: bool) -> str:
-    """Cosmetic VU bar — driven by position (no real audio analysis in v1)."""
-    if not playing:
-        return "▁▁▁▁▁▁▁▁"
-    # Pseudo-random-but-deterministic-per-frame bar heights.
-    seed = int(position * 10) % 8
-    chars = "▁▂▃▄▅▆▇█"
-    return "".join(chars[(seed + i) % len(chars)] for i in range(8))

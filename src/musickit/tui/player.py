@@ -35,6 +35,8 @@ _CHANNELS = 2
 _DTYPE = "float32"
 _QUEUE_MAX_CHUNKS = 64
 _CHUNK_FRAMES = 1024  # frames per output callback iteration
+_VIS_BANDS = 8
+_VIS_DECAY = 0.85  # per-callback decay of the band level (smooths the bars)
 
 
 class AudioPlayer:
@@ -60,6 +62,9 @@ class AudioPlayer:
         self._frames_played: int = 0
         self._duration: float = 0.0
         self._current_path: Path | None = None
+        # 8-band amplitude levels (0.0–1.0), driven by the audio callback.
+        # The UI thread reads these every render tick to draw the visualizer.
+        self._band_levels: list[float] = [0.0] * _VIS_BANDS
         # Filled per-`play()`:
         self._queue: queue.Queue[np.ndarray | None] | None = None
         self._decoder_thread: threading.Thread | None = None
@@ -119,6 +124,7 @@ class AudioPlayer:
         """Stop playback and join the decoder thread."""
         with self._lock:
             self._stopped = True
+            self._band_levels = [0.0] * _VIS_BANDS
         if self._stream is not None:
             try:
                 self._stream.stop()
@@ -180,6 +186,16 @@ class AudioPlayer:
     @property
     def current_path(self) -> Path | None:
         return self._current_path
+
+    @property
+    def band_levels(self) -> list[float]:
+        """8 amplitude bins (0.0–1.0) for the spectrum visualizer.
+
+        Updated by the audio callback (cheap FFT per chunk). Read by the UI
+        thread on its render tick. No lock needed — list reads are atomic for
+        small fixed-size lists in CPython, and we're rendering for visuals.
+        """
+        return list(self._band_levels)
 
     # ------------------------------------------------------------------
     # Decoder thread
@@ -307,6 +323,35 @@ class AudioPlayer:
         if size < frames:
             outdata[size:].fill(0)
         self._frames_played += size
+        self._update_band_levels(chunk[:size])
+
+    def _update_band_levels(self, chunk: np.ndarray) -> None:
+        """Cheap 8-band peak meter via real FFT (~50µs on 1024 samples).
+
+        Mix to mono, take rfft, split bins into 8 log-ish bands, and decay-blend
+        with the previous frame so bars don't strobe. The output isn't a
+        calibrated dB reading — it's a smooth visual representation of where
+        the audio energy is.
+        """
+        if chunk.size == 0:
+            return
+        mono = chunk.mean(axis=1) if chunk.ndim == 2 else chunk
+        spectrum = np.abs(np.fft.rfft(mono))
+        # Log-spaced band edges across the spectrum.
+        n_bins = spectrum.shape[0]
+        edges = np.geomspace(1, n_bins, _VIS_BANDS + 1).astype(int)
+        edges = np.clip(edges, 1, n_bins)
+        new_levels: list[float] = []
+        for i in range(_VIS_BANDS):
+            lo, hi = edges[i], max(edges[i] + 1, edges[i + 1])
+            band = spectrum[lo:hi]
+            peak = float(band.max()) if band.size else 0.0
+            # Normalize: 1024-sample float32 audio peaks ~ chunk_size/2 in spectrum.
+            new_levels.append(min(1.0, peak / 32.0))
+        # Decay blend so the bars don't flicker frame-to-frame.
+        for i, level in enumerate(new_levels):
+            prev = self._band_levels[i]
+            self._band_levels[i] = max(level, prev * _VIS_DECAY)
 
 
 # ---------------------------------------------------------------------------
