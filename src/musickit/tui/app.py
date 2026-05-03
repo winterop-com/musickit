@@ -8,6 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -301,6 +302,39 @@ class BrowserInfo(Static):
         return self.body or "[dim]Highlight an album to see audit warnings.[/]"
 
 
+class ScanOverlay(Static):
+    """Centered overlay shown during the initial library scan / rescans.
+
+    Sits on top of the body via Textual's `layer:` CSS feature so it doesn't
+    require recomposing the layout each time. Hidden when there's no scan in
+    flight.
+    """
+
+    DEFAULT_CSS = """
+    ScanOverlay {
+        layer: overlay;
+        dock: top;
+        offset: 0 8;
+        width: 1fr;
+        height: auto;
+        padding: 2 4;
+        background: $boost;
+        border: tall $primary 50%;
+        content-align: center middle;
+        text-align: center;
+        display: none;
+    }
+    ScanOverlay.visible {
+        display: block;
+    }
+    """
+
+    body = reactive("[bold cyan]Scanning library…[/]")
+
+    def render(self) -> str:
+        return self.body
+
+
 class StatusBar(Static):
     """Bottom single-line status: Vol / Repeat / Shuffle / Time."""
 
@@ -446,19 +480,21 @@ class MusickitApp(App[None]):
                     yield TrackList(id="tracklist")
         yield StatusBar(id="status")
         yield KeyBar(id="keybar")
+        yield ScanOverlay(id="scan-overlay")
 
     def on_mount(self) -> None:
         self.title = "musickit"
-        self._index = library_mod.scan(self._root)
-        library_mod.audit(self._index)
-        self._populate_sidebar_stats()
-        self._populate_browser()
         # Visualizer animates at ~30 FPS so bars feel responsive to the audio.
         # Other status (time, progress, meta) only needs ~4 FPS — saves redraw
         # work since the surrounding text doesn't change frame-to-frame.
         self.set_interval(1 / 30, self._refresh_visualizer)
         self.set_interval(0.25, self._refresh_status)
         self.set_interval(0.05, self._drain_end_pending)
+        # Kick off the initial scan in a worker thread so the TUI is
+        # responsive immediately. The overlay covers the body until the
+        # first index lands.
+        self._show_scan_overlay("[bold cyan]Scanning library…[/]")
+        self._scan_library_async(initial=True)
 
     # ------------------------------------------------------------------
     # Sidebar / tree population
@@ -812,17 +848,53 @@ class MusickitApp(App[None]):
         kept in memory. Use this binding (Ctrl+R / F5) when you've moved
         files around outside the TUI and want the changes reflected.
         """
-        if self._index is None:
-            return
-        # Remember where we were so the user doesn't get teleported to root.
+        self._show_scan_overlay("[bold cyan]Rescanning library…[/]")
+        self._scan_library_async(initial=False)
+
+    # ------------------------------------------------------------------
+    # Async library scan
+    # ------------------------------------------------------------------
+
+    def _show_scan_overlay(self, body: str) -> None:
+        overlay = self.query_one(ScanOverlay)
+        overlay.body = body
+        overlay.add_class("visible")
+
+    def _hide_scan_overlay(self) -> None:
+        overlay = self.query_one(ScanOverlay)
+        overlay.remove_class("visible")
+
+    @work(thread=True, exclusive=True, group="scan")
+    def _scan_library_async(self, *, initial: bool) -> None:
+        """Run `library.scan` in a worker thread; route progress + result back."""
         prior_artist = self._browse_artist
-        self._index = library_mod.scan(self._root)
-        library_mod.audit(self._index)
-        # If the artist we were inside no longer exists post-scan, drop to root.
+
+        def on_album(album_dir: Path, idx: int, total: int) -> None:
+            self.call_from_thread(self._on_scan_progress, album_dir, idx, total)
+
+        new_index = library_mod.scan(self._root, on_album=on_album)
+        library_mod.audit(new_index)
+        self.call_from_thread(self._on_scan_complete, new_index, prior_artist, initial)
+
+    def _on_scan_progress(self, album_dir: Path, idx: int, total: int) -> None:
+        overlay = self.query_one(ScanOverlay)
+        name = album_dir.name
+        if len(name) > 50:
+            name = name[:49] + "…"
+        bar_width = 30
+        ratio = idx / max(1, total)
+        filled = int(round(ratio * bar_width))
+        bar = f"[{C_PLAYING}]{'█' * filled}[/][{C_DIM}]{'░' * (bar_width - filled)}[/]"
+        overlay.body = f"[bold cyan]Scanning library…[/]\n\n{bar}\n[dim]{idx} / {total}[/]\n\n[dim]{name}[/]"
+
+    def _on_scan_complete(self, new_index: LibraryIndex, prior_artist: str | None, initial: bool) -> None:
+        del initial  # current behaviour is the same for first-mount and rescan
+        self._index = new_index
         if prior_artist is not None and not any(a.artist_dir == prior_artist for a in self._index.albums):
             self._browse_artist = None
         self._populate_sidebar_stats()
         self._populate_browser()
+        self._hide_scan_overlay()
 
     def _resize_sidebar(self, delta: int) -> None:
         sidebar = self.query_one("#sidebar")
