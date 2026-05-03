@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -76,16 +76,29 @@ class LibraryIndex(BaseModel):
     albums: list[LibraryAlbum] = []
 
 
-def scan(root: Path) -> LibraryIndex:
+def scan(
+    root: Path,
+    *,
+    on_album: Callable[[Path, int, int], None] | None = None,
+) -> LibraryIndex:
     """Walk `root` and build a `LibraryIndex` from every album dir found.
 
     An album dir = any directory directly containing ≥1 supported audio file.
     Multi-disc albums in this layout are flat (single dir with `01-NN`/`02-NN`
     filenames), so no merge logic is needed here — `convert` already produced
     them that way.
+
+    `on_album(album_dir, idx, total)` is called once per album right before its
+    tracks are read, where `idx` is 1-indexed and `total` is the album count
+    (known from the cheap pre-walk in `_iter_album_dirs`). The CLI uses this
+    to drive a progress bar over slow filesystems / network drives.
     """
+    album_dirs = _iter_album_dirs(root)
+    total = len(album_dirs)
     albums: list[LibraryAlbum] = []
-    for album_dir in _iter_album_dirs(root):
+    for idx, album_dir in enumerate(album_dirs, start=1):
+        if on_album is not None:
+            on_album(album_dir, idx, total)
         album = _scan_album(album_dir)
         albums.append(album)
     albums.sort(key=lambda a: (a.artist_dir.lower(), a.album_dir.lower()))

@@ -379,6 +379,7 @@ def retag(
 
 @app.command()
 def library(
+    ctx: typer.Context,
     target_dir: Annotated[
         Path,
         typer.Argument(exists=True, file_okay=False, help="Library root to scan."),
@@ -418,7 +419,8 @@ def library(
     closes the loop on the deterministic warnings.
     """
     console = Console()
-    index = library_mod.scan(target_dir.resolve())
+    verbose = bool(ctx.obj and ctx.obj.get("verbose"))
+    index = _scan_with_progress(console, target_dir.resolve(), verbose=verbose)
     library_mod.audit(index)
 
     if fix:
@@ -436,6 +438,52 @@ def library(
         return
 
     _render_tree(console, index)
+
+
+def _scan_with_progress(console: Console, root: Path, *, verbose: bool) -> library_mod.LibraryIndex:
+    """Wrap `library.scan` with a progress bar (or per-album lines if -v).
+
+    Large libraries on slow drives (network, USB) can take seconds to minutes;
+    we want feedback either way. Default is a transient rich.Progress spinner
+    that reports `Scanning <album>  N/M`. Verbose prints one line per album so
+    the output survives in scrollback for debugging.
+    """
+    from pathlib import PurePath
+
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+
+    if verbose:
+
+        def on_album_verbose(album_dir: Path, idx: int, total: int) -> None:
+            try:
+                rel: PurePath = album_dir.relative_to(root)
+            except ValueError:
+                rel = album_dir
+            console.print(f"[dim]({idx}/{total})[/] scanning {rel}")
+
+        return library_mod.scan(root, on_album=on_album_verbose)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("[cyan]Scanning library", total=None)
+
+        def on_album(album_dir: Path, idx: int, total: int) -> None:
+            if progress.tasks[task].total is None:
+                progress.update(task, total=total)
+            name = album_dir.name
+            if len(name) > 40:
+                name = name[:39] + "…"
+            progress.update(task, advance=1, description=f"[cyan]Scanning[/] {name}")
+
+        return library_mod.scan(root, on_album=on_album)
 
 
 def _render_tree(console: Console, index: library_mod.LibraryIndex) -> None:
