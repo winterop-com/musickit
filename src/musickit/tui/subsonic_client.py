@@ -105,6 +105,13 @@ class SubsonicClient:
             params["size"] = size
         return f"{self.base_url}/rest/getCoverArt?{urlencode(params)}"
 
+    def close(self) -> None:
+        """Close the underlying httpx connection pool. Idempotent."""
+        try:
+            self.http.close()
+        except Exception:  # pragma: no cover — best effort on shutdown
+            pass
+
 
 def build_index(
     client: SubsonicClient,

@@ -156,3 +156,10 @@ def test_cover_url_with_size(tmp_path: Path) -> None:
     url = sc.cover_url("al_xxx", size=300)
     assert "id=al_xxx" in url
     assert "size=300" in url
+
+
+def test_close_is_idempotent_and_safe(tmp_path: Path) -> None:
+    """Calling close() twice (or on a never-used client) must not raise — it runs at app shutdown."""
+    sc = _subsonic(_serve_test_client(tmp_path))
+    sc.close()
+    sc.close()  # second call after the http client is already closed

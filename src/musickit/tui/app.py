@@ -165,6 +165,21 @@ class MusickitApp(App[None]):
         state["theme"] = theme
         save_state(state)
 
+    async def on_unmount(self) -> None:
+        """Close the audio stream + Subsonic httpx pool on app exit.
+
+        Without this the process hangs after `q`: PortAudio's C thread holds
+        the interpreter alive (Ctrl-C can't reach Python at that point) and
+        httpx leaves connection-pool sockets open. Stopping the player closes
+        the OutputStream cleanly; closing the client drops the pool.
+        """
+        try:
+            self._player.stop()
+        except Exception:  # pragma: no cover — best effort on shutdown
+            pass
+        if self._subsonic_client is not None:
+            self._subsonic_client.close()
+
     def compose(self) -> ComposeResult:
         yield TopBar(id="topbar")
         with Horizontal(id="body"):
