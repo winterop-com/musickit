@@ -902,19 +902,23 @@ class MusickitApp(App[None]):
         prior_artist = self._browse_artist
         self._browse_artist = None
         self._populate_browser()
-        if prior_artist is None:
+        if prior_artist is None or self._index is None:
             return
-        browser = self.query_one(BrowserList)
-        prior_idx: int | None = None
-        for i, item in enumerate(browser.children):
-            if getattr(item, "entry_data", None) == prior_artist:
-                prior_idx = i
-                break
-        if prior_idx is not None:
-            # `_populate_browser` already scheduled `_set_browser_cursor(0)`.
-            # Schedule another one with the prior-artist index so it wins
-            # (`call_after_refresh` runs in order; last wins).
-            self.call_after_refresh(self._set_browser_cursor, prior_idx)
+        # Compute the row index from the data model (artist names sorted
+        # case-insensitively, same key `_populate_browser_artists` uses) —
+        # NOT from `browser.children`. Right after a clear()+append() cycle,
+        # `browser.children` may still report the OLD items, so an index
+        # derived from it would be wrong by the time the deferred cursor
+        # set actually runs.
+        artist_names = sorted({a.artist_dir for a in self._index.albums}, key=str.lower)
+        try:
+            prior_idx = artist_names.index(prior_artist)
+        except ValueError:
+            return
+        # `_populate_browser` already scheduled `_set_browser_cursor(0)`.
+        # Schedule another with the prior-artist index — `call_after_refresh`
+        # is FIFO so the later schedule wins.
+        self.call_after_refresh(self._set_browser_cursor, prior_idx)
 
     def action_right(self) -> None:
         """Context-aware →: drill into a browser entry, seek as fallback."""
