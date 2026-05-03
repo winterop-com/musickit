@@ -666,6 +666,14 @@ class MusickitApp(App[None]):
         browser = self.query_one(BrowserList)
         focused = self.focused
         if focused is tracklist and tracklist.highlighted_child is not None:
+            # Radio rows carry both `station` and `track_index`. The station
+            # check has to come first — falling through to `_play_current`
+            # in radio view would no-op (no `_current_album`) and the user's
+            # Enter press would be silently swallowed.
+            station = getattr(tracklist.highlighted_child, "station", None)
+            if isinstance(station, radio_mod.RadioStation):
+                self._play_station(station)
+                return
             idx = getattr(tracklist.highlighted_child, "track_index", None)
             if isinstance(idx, int):
                 self._current_track_idx = idx

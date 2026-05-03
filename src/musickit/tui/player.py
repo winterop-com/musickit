@@ -131,8 +131,8 @@ class AudioPlayer:
                 self.on_track_failed(source, str(exc))
             return
         if gen != self._opener_gen:
-            # A newer play() call superseded us while we were connecting —
-            # discard this open without touching playback.
+            # Either a newer play() OR a stop() superseded us while we were
+            # connecting — discard this open without touching playback.
             try:
                 container.close()
             except Exception:  # pragma: no cover
@@ -140,8 +140,9 @@ class AudioPlayer:
             return
         # Tear the OLD playback down only now that the NEW container is
         # ready. Keeps the previous track audible during the HTTP connect
-        # for stream-to-stream switches.
-        self.stop()
+        # for stream-to-stream switches. Use the internal teardown so we
+        # don't bump _opener_gen and invalidate ourselves.
+        self._teardown_playback()
         if gen != self._opener_gen:
             try:
                 container.close()
@@ -196,7 +197,22 @@ class AudioPlayer:
                 self.on_track_failed(source, f"audio device unavailable: {exc}")
 
     def stop(self) -> None:
-        """Stop playback and join the decoder thread."""
+        """Stop playback, join the decoder thread, AND invalidate any pending opener.
+
+        Bumping `_opener_gen` here ensures that `play(slow_url); stop()` doesn't
+        let the slow opener finish and start playback after the user asked us
+        to stop. `_open_and_swap` calls `_teardown_playback()` directly during
+        track transitions so it doesn't invalidate itself.
+        """
+        self._opener_gen += 1
+        self._teardown_playback()
+
+    def _teardown_playback(self) -> None:
+        """Tear down the audio output stream + decoder thread + queue.
+
+        Internal helper — does NOT bump `_opener_gen`. Used by both public
+        `stop()` and `_open_and_swap` to swap in a new container.
+        """
         with self._lock:
             self._stopped = True
             self._band_levels = [0.0] * _VIS_BANDS

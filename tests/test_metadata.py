@@ -67,6 +67,57 @@ def test_read_flac_picks_up_basic_tags(silent_flac: Path) -> None:
     assert track.replaygain["replaygain_album_gain"] == "-11.34 dB"
 
 
+def test_read_mp3_without_id3_tags_still_populates_duration(silent_flac: Path, tmp_path: Path) -> None:
+    """A tagless MP3 must still report duration — dedup keys on it.
+
+    Regression: `_read_mp3` previously bailed on `ID3NoHeaderError` BEFORE
+    reading `MP3.info.length`, so tagless rips silently bypassed the
+    duplicate detector (which requires both durations to be set).
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("ffmpeg") is None:
+        import pytest
+
+        pytest.skip("ffmpeg not on PATH")
+
+    mp3_path = tmp_path / "tagless.mp3"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(silent_flac),
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            "-write_id3v1",
+            "0",
+            "-id3v2_version",
+            "0",
+            str(mp3_path),
+        ],
+        check=True,
+    )
+
+    # Sanity: confirm we actually produced a no-tags MP3.
+    from mutagen.id3 import ID3
+    from mutagen.id3._util import ID3NoHeaderError
+
+    with __import__("pytest").raises(ID3NoHeaderError):
+        ID3(mp3_path)
+
+    track = read_source(mp3_path)
+    assert track.duration_s is not None and track.duration_s > 0, "tagless MP3 must still populate duration"
+    assert track.title is None  # confirms no tag side-effects sneaked in
+
+
 def test_summarize_album_majority_votes_and_detects_va() -> None:
     tracks = [
         SourceTrack(

@@ -114,18 +114,19 @@ def _read_flac(path: Path, *, light: bool = False, measure_pictures: bool = Fals
 
 def _read_mp3(path: Path, *, light: bool = False, measure_pictures: bool = False) -> SourceTrack:
     track = SourceTrack(path=path)
+    # Read duration FIRST, unconditionally — even tagless MP3s have a valid
+    # MPEG header. dedup keys on (track_no, title, artist, duration) and skips
+    # the comparison when duration is missing, so a tagless rip with no
+    # duration silently bypasses dedup. Reading MP3() doesn't require ID3.
+    try:
+        mp3 = MP3(path)
+        track.duration_s = float(getattr(mp3.info, "length", 0.0) or 0.0)
+    except Exception:  # pragma: no cover — broken file; duration stays 0
+        pass
     try:
         id3 = ID3(path)
     except ID3NoHeaderError:
         return track
-    # Pull duration directly from the same MP3() open we'll use below for
-    # validation — avoids the second mutagen open we used to do in
-    # `read_source` for `info.length`.
-    try:
-        mp3 = MP3(path)
-        track.duration_s = float(getattr(mp3.info, "length", 0.0) or 0.0)
-    except Exception:  # pragma: no cover — duration is best-effort
-        pass
 
     track.title = _id3_text(id3, "TIT2")
     track.artist = _id3_text(id3, "TPE1")
@@ -156,9 +157,6 @@ def _read_mp3(path: Path, *, light: bool = False, measure_pictures: bool = False
             # leave 0 (the cover-pick code prefers a folder.jpg of known size).
             track.embedded_picture_pixels = _measure_pixels(track.embedded_picture)
 
-    if not light:
-        # Bit rate/duration aren't part of the tag bundle, but reading MP3() also validates the file.
-        MP3(path)
     return track
 
 

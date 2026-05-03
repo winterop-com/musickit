@@ -172,6 +172,46 @@ def test_player_stop_is_safe_when_never_played(fake_stream: type[_FakeOutputStre
     player.stop()  # must not raise
 
 
+def test_stop_cancels_pending_async_open(monkeypatch: pytest.MonkeyPatch, fake_stream: type[_FakeOutputStream]) -> None:
+    """`play(slow_url); stop()` must NOT start playback after the slow open returns.
+
+    Regression: stop() previously didn't bump _opener_gen, so the opener
+    thread's stale-gen check still passed and _setup_playback fired post-stop.
+    """
+    from musickit.tui import player as player_mod
+    from musickit.tui.player import AudioPlayer
+
+    open_started = threading.Event()
+    release = threading.Event()
+
+    def slow_open(_source: object) -> tuple[Any, Any]:
+        open_started.set()
+        # Block until the test releases — simulating a slow HTTP connect.
+        release.wait(timeout=5.0)
+        # Return a no-op container/stream pair. _setup_playback would call
+        # `stream.duration`, `container.metadata` etc. — but it should never
+        # be reached because stop() bumped the generation.
+        raise AssertionError("opener completed but stop() should have invalidated it")
+
+    monkeypatch.setattr(player_mod, "open_container", slow_open)
+
+    player = AudioPlayer()
+    failures: list[str] = []
+    player.on_track_failed = lambda _p, msg: failures.append(msg)
+
+    player.play("http://slow-stream.example/test")
+    assert open_started.wait(timeout=2.0), "opener thread never ran"
+
+    player.stop()
+    release.set()
+
+    # Give the opener thread a moment to wake up post-stop and (correctly) bail.
+    time.sleep(0.2)
+    # No on_track_failed: the opener bails silently when its gen is stale,
+    # rather than firing a failure callback.
+    assert failures == []
+
+
 def test_player_seek_clamps_to_duration(silent_m4a: Path, fake_stream: type[_FakeOutputStream]) -> None:
     from musickit.tui.player import AudioPlayer
 
