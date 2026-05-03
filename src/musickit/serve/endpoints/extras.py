@@ -182,3 +182,50 @@ async def unstar() -> dict:
 async def get_playlists() -> dict:
     """No playlist support yet — return empty list."""
     return envelope("playlists", {"playlist": []})
+
+
+# ---------------------------------------------------------------------------
+# Users — single-user server. Feishin / Supersonic / others probe getUser
+# right after login to learn the role flags.
+# ---------------------------------------------------------------------------
+
+
+def _user_payload(username: str) -> dict[str, Any]:
+    """All-roles-true. Single-user server, the user owns the box."""
+    return {
+        "username": username,
+        "email": f"{username}@musickit.local",
+        "scrobblingEnabled": True,
+        "adminRole": True,
+        "settingsRole": True,
+        "downloadRole": True,
+        "uploadRole": False,
+        "playlistRole": True,
+        "coverArtRole": True,
+        "commentRole": False,
+        "podcastRole": False,
+        "streamRole": True,
+        "jukeboxRole": False,
+        "shareRole": False,
+        "videoConversionRole": False,
+        "folder": [1],
+    }
+
+
+@router.api_route("/getUser", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getUser.view", methods=["GET", "POST", "HEAD"])
+async def get_user(request: Request, username: str | None = Query(default=None)) -> dict:
+    """Return user details. The single configured user has every role."""
+    cfg = request.app.state.cfg
+    target = username or cfg.username
+    if target != cfg.username:
+        return error_envelope(70, f"User not found: {target}")
+    return envelope("user", _user_payload(cfg.username))
+
+
+@router.api_route("/getUsers", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getUsers.view", methods=["GET", "POST", "HEAD"])
+async def get_users(request: Request) -> dict:
+    """Return all users — just the one we host."""
+    cfg = request.app.state.cfg
+    return envelope("users", {"user": [_user_payload(cfg.username)]})

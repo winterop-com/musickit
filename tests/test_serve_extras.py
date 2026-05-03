@@ -119,3 +119,31 @@ def test_head_on_ping_returns_200(tmp_path: Path) -> None:
     """play:Sub does HEAD /rest/stream.view to estimate Content-Length; HEAD must be allowed."""
     response = _client(tmp_path).head("/rest/ping", params=_params())
     assert response.status_code == 200
+
+
+def test_get_user_returns_configured_user_with_all_roles(tmp_path: Path) -> None:
+    body = _client(tmp_path).get("/rest/getUser", params=_params(username="mort")).json()
+    user = body["subsonic-response"]["user"]
+    assert user["username"] == "mort"
+    assert user["adminRole"] is True
+    assert user["streamRole"] is True
+    assert user["playlistRole"] is True
+
+
+def test_get_user_defaults_to_authenticated_username(tmp_path: Path) -> None:
+    """Feishin doesn't always send `username=`; fall back to the auth'd user."""
+    body = _client(tmp_path).get("/rest/getUser", params=_params()).json()
+    assert body["subsonic-response"]["user"]["username"] == "mort"
+
+
+def test_get_user_unknown_returns_70(tmp_path: Path) -> None:
+    body = _client(tmp_path).get("/rest/getUser", params=_params(username="someone-else")).json()
+    assert body["subsonic-response"]["status"] == "failed"
+    assert body["subsonic-response"]["error"]["code"] == 70
+
+
+def test_get_users_returns_list_of_one(tmp_path: Path) -> None:
+    body = _client(tmp_path).get("/rest/getUsers", params=_params()).json()
+    users = body["subsonic-response"]["users"]["user"]
+    assert len(users) == 1
+    assert users[0]["username"] == "mort"
