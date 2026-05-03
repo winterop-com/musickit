@@ -61,6 +61,14 @@ def serve(
     fastapi_app = create_app(root=target_dir.resolve(), cfg=cfg)
     _print_startup_banner(host=host, port=port, root=target_dir.resolve())
 
+    # Block on the initial scan so the first client request hits a populated
+    # cache. Big libraries take seconds to walk; the banner above tells the
+    # user it's happening.
+    typer.echo("scanning library…")
+    fastapi_app.state.cache.rebuild()
+    cache = fastapi_app.state.cache
+    typer.echo(f"  {cache.artist_count} artists, {cache.album_count} albums, {cache.track_count} tracks\n")
+
     import uvicorn
 
     uvicorn.run(fastapi_app, host=host, port=port, log_level="info")

@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from musickit.serve.auth import AuthError, verify
 from musickit.serve.config import ServeConfig
+from musickit.serve.index import IndexCache
 
 API_VERSION = "1.16.1"
 SERVER_NAME = "musickit"
@@ -59,6 +60,7 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
     )
     app.state.root = root
     app.state.cfg = cfg
+    app.state.cache = IndexCache(root)
 
     async def require_auth(
         request: Request,
@@ -82,9 +84,14 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
 
     # Mount endpoint groups. Imports happen lazily to keep the module graph
     # shallow and to avoid pulling FastAPI into pure-data modules.
+    from musickit.serve.endpoints.browsing import router as browsing_router
+    from musickit.serve.endpoints.scan import router as scan_router
     from musickit.serve.endpoints.system import router as system_router
 
-    app.include_router(system_router, prefix="/rest", dependencies=[Depends(require_auth)])
+    auth_dep = [Depends(require_auth)]
+    app.include_router(system_router, prefix="/rest", dependencies=auth_dep)
+    app.include_router(browsing_router, prefix="/rest", dependencies=auth_dep)
+    app.include_router(scan_router, prefix="/rest", dependencies=auth_dep)
     return app
 
 
