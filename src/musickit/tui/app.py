@@ -357,6 +357,7 @@ class KeyBar(Static):
             ("s", "Shuffle"),
             ("r", "Repeat"),
             ("f", "Fullscreen"),
+            ("^r", "Rescan"),
             ("tab", "Focus"),
             ("^←/→", "Resize"),
             ("q", "Quit"),
@@ -407,6 +408,7 @@ class MusickitApp(App[None]):
         Binding("ctrl+left", "tree_narrower", "Tree-", show=False),
         Binding("ctrl+right", "tree_wider", "Tree+", show=False),
         Binding("backspace", "browser_up", "Up", show=False),
+        Binding("ctrl+r,f5", "rescan_library", "Rescan", show=False),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -802,6 +804,25 @@ class MusickitApp(App[None]):
         if self._browse_artist is not None:
             self._browse_artist = None
             self._populate_browser()
+
+    def action_rescan_library(self) -> None:
+        """Re-walk the library root and refresh the browser.
+
+        There's no on-disk DB — the index is built fresh on `on_mount` and
+        kept in memory. Use this binding (Ctrl+R / F5) when you've moved
+        files around outside the TUI and want the changes reflected.
+        """
+        if self._index is None:
+            return
+        # Remember where we were so the user doesn't get teleported to root.
+        prior_artist = self._browse_artist
+        self._index = library_mod.scan(self._root)
+        library_mod.audit(self._index)
+        # If the artist we were inside no longer exists post-scan, drop to root.
+        if prior_artist is not None and not any(a.artist_dir == prior_artist for a in self._index.albums):
+            self._browse_artist = None
+        self._populate_sidebar_stats()
+        self._populate_browser()
 
     def _resize_sidebar(self, delta: int) -> None:
         sidebar = self.query_one("#sidebar")
