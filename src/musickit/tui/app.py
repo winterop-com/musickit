@@ -891,19 +891,20 @@ class MusickitApp(App[None]):
         self._player.seek(max(0.0, self._player.position - 5.0))
 
     def action_left(self) -> None:
-        """Context-aware ←: navigate between panes, seek as fallback."""
+        """←: navigation only — never seek.
+
+        Seek lives on `<` / `>` (always-on, focus-independent). Mixing seek
+        into ←/→ caused audible jumps when a track was playing — right after
+        Enter on an album the focus moves to TrackList, and the old fallback
+        would seek every right arrow.
+        """
         focused = self.focused
         if isinstance(focused, BrowserList):
-            # Already in the browser → pop one level if drilled in.
             if self._browse_artist is not None:
                 self._pop_browser_one_level()
             return
         if isinstance(focused, TrackList):
-            # Hand focus back to the browser; cursor stays where it was.
             self.query_one(BrowserList).focus()
-            return
-        # Nothing pane-focused → seek -5s.
-        self._player.seek(max(0.0, self._player.position - 5.0))
 
     def _pop_browser_one_level(self) -> None:
         """Go from an artist's album list back to the artist list.
@@ -933,15 +934,10 @@ class MusickitApp(App[None]):
         self.call_after_refresh(self._set_browser_cursor, prior_idx)
 
     def action_right(self) -> None:
-        """Context-aware →: drill into a browser entry, seek as fallback."""
+        """→: drill into the browser only — never seek (use `>`)."""
         focused = self.focused
-        if isinstance(focused, BrowserList):
-            # Use the same dispatch as Enter so artist→albums and album→tracks work.
-            if focused.highlighted_child is not None:
-                self._handle_browser_selection(focused.highlighted_child)
-            return
-        # In the tracklist (or nothing focused) → seek +5s.
-        self._player.seek(self._player.position + 5.0)
+        if isinstance(focused, BrowserList) and focused.highlighted_child is not None:
+            self._handle_browser_selection(focused.highlighted_child)
 
     def action_vol_up(self) -> None:
         self._player.set_volume(min(100, self._player.volume + 5))

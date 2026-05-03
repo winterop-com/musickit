@@ -326,32 +326,35 @@ class AudioPlayer:
         self._update_band_levels(chunk[:size])
 
     def _update_band_levels(self, chunk: np.ndarray) -> None:
-        """Cheap 8-band peak meter via real FFT (~50µs on 1024 samples).
+        """Cheap N-band peak meter via real FFT (~50µs on 1024 samples).
 
-        Mix to mono, take rfft, split bins into 8 log-ish bands, and decay-blend
-        with the previous frame so bars don't strobe. The output isn't a
-        calibrated dB reading — it's a smooth visual representation of where
-        the audio energy is.
+        Mix to mono, take rfft, split bins into log-ish bands, and decay-blend
+        with the previous frame so bars don't strobe. Band edges are cached
+        per spectrum-size — runs hot in the audio callback, so skip the
+        `np.geomspace` call when the chunk size hasn't changed.
         """
         if chunk.size == 0:
             return
         mono = chunk.mean(axis=1) if chunk.ndim == 2 else chunk
         spectrum = np.abs(np.fft.rfft(mono))
-        # Log-spaced band edges across the spectrum.
         n_bins = spectrum.shape[0]
-        edges = np.geomspace(1, n_bins, _VIS_BANDS + 1).astype(int)
-        edges = np.clip(edges, 1, n_bins)
-        new_levels: list[float] = []
+        edges = self._band_edges_for(n_bins)
         for i in range(_VIS_BANDS):
             lo, hi = edges[i], max(edges[i] + 1, edges[i + 1])
-            band = spectrum[lo:hi]
-            peak = float(band.max()) if band.size else 0.0
-            # Normalize: 1024-sample float32 audio peaks ~ chunk_size/2 in spectrum.
-            new_levels.append(min(1.0, peak / 32.0))
-        # Decay blend so the bars don't flicker frame-to-frame.
-        for i, level in enumerate(new_levels):
+            peak = float(spectrum[lo:hi].max()) if hi > lo else 0.0
+            level = min(1.0, peak / 32.0)
             prev = self._band_levels[i]
             self._band_levels[i] = max(level, prev * _VIS_DECAY)
+
+    _cached_edges: np.ndarray | None = None
+    _cached_edges_n: int = 0
+
+    def _band_edges_for(self, n_bins: int) -> np.ndarray:
+        if self._cached_edges is None or self._cached_edges_n != n_bins:
+            edges = np.geomspace(1, n_bins, _VIS_BANDS + 1).astype(int)
+            self._cached_edges = np.clip(edges, 1, n_bins)
+            self._cached_edges_n = n_bins
+        return self._cached_edges
 
 
 # ---------------------------------------------------------------------------
