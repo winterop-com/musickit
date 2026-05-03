@@ -12,7 +12,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
-from textual.widgets import ListItem, ListView, Static, Tree
+from textual.widgets import ListItem, ListView, Static
 
 from musickit import library as library_mod
 from musickit.tui.player import AudioPlayer
@@ -242,14 +242,63 @@ class TrackList(ListView):
     """
 
 
-class LibraryTree(Tree[object]):
-    """Artist → Album browse tree below the sidebar stats."""
+class BrowserHeader(Static):
+    """Path header above the browser list (`Browse` or `Browse · <Artist>`)."""
 
     DEFAULT_CSS = """
-    LibraryTree {
-        height: 1fr;
+    BrowserHeader {
+        height: 2;
+        padding: 1 1 0 1;
     }
     """
+
+    path = reactive("Browse")
+
+    def render(self) -> str:
+        return f"[{C_HEADER}]{self.path}[/]\n[dim]──────────[/]"
+
+
+class BrowserList(ListView):
+    """Flat-list directory browser. Enter on a row drills in or goes up.
+
+    Replaces the older Tree-based navigator. Two levels deep:
+      - root: list of artist dirs
+      - inside an artist: a `..` entry + that artist's album dirs
+    Selecting an album row hands focus to the playlist (right column)
+    so Enter on a track plays it immediately.
+    """
+
+    DEFAULT_CSS = """
+    BrowserList {
+        height: 1fr;
+        padding: 0 1;
+        overflow-x: hidden;
+    }
+    BrowserList > ListItem {
+        height: 1;
+    }
+    BrowserList > ListItem.--highlight {
+        background: $primary 30%;
+    }
+    """
+
+
+class BrowserInfo(Static):
+    """Detail panel below the browser. Shows audit warnings for the highlighted album."""
+
+    DEFAULT_CSS = """
+    BrowserInfo {
+        height: auto;
+        max-height: 8;
+        padding: 1 1;
+        background: $boost;
+    }
+    """
+
+    body = reactive("")
+
+    def render(self) -> str:
+        return self.body or "[dim]Highlight an album to see audit warnings.[/]"
 
 
 class StatusBar(Static):
@@ -324,6 +373,8 @@ _TREE_DEFAULT_WIDTH = 32
 _TREE_MIN_WIDTH = 20
 _TREE_MAX_WIDTH = 80
 _TREE_RESIZE_STEP = 4
+# Decoration overhead per browser row: ` ▸ ` prefix + ` (NN)` suffix + padding ≈ 8 cells.
+_BROWSER_DECORATION_PAD = 8
 
 
 class MusickitApp(App[None]):
@@ -355,6 +406,7 @@ class MusickitApp(App[None]):
         Binding("tab", "focus_next", "Focus", show=False),
         Binding("ctrl+left", "tree_narrower", "Tree-", show=False),
         Binding("ctrl+right", "tree_wider", "Tree+", show=False),
+        Binding("backspace", "browser_up", "Up", show=False),
     ]
 
     def __init__(self, root: Path) -> None:
@@ -370,13 +422,18 @@ class MusickitApp(App[None]):
         self._shuffle = False
         self._repeat = RepeatMode.OFF
         self._end_pending = False
+        # Browser navigation state: None = at top level (artists);
+        # a string = drilled into that artist's albums.
+        self._browse_artist: str | None = None
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="topbar")
         with Horizontal(id="body"):
             with Vertical(id="sidebar"):
                 yield SidebarStats(id="stats")
-                yield LibraryTree("Browse", id="tree")
+                yield BrowserHeader(id="browser-header")
+                yield BrowserList(id="browser")
+                yield BrowserInfo(id="browser-info")
             with Vertical(id="main"):
                 with Horizontal(id="now-playing-row"):
                     yield NowPlayingMeta(id="meta")
@@ -393,7 +450,7 @@ class MusickitApp(App[None]):
         self._index = library_mod.scan(self._root)
         library_mod.audit(self._index)
         self._populate_sidebar_stats()
-        self._populate_tree()
+        self._populate_browser()
         self.set_interval(0.1, self._refresh_status)
         self.set_interval(0.05, self._drain_end_pending)
 
@@ -411,40 +468,137 @@ class MusickitApp(App[None]):
         stats.artist_count = len(artists)
         stats.folder_count = len(self._index.albums)  # one folder per album
 
-    def _populate_tree(self) -> None:
-        tree = self.query_one(LibraryTree)
-        tree.root.expand()
+    def _populate_browser(self) -> None:
+        browser = self.query_one(BrowserList)
+        header = self.query_one(BrowserHeader)
+        prev_index = browser.index
+        browser.clear()
         if self._index is None or not self._index.albums:
-            tree.root.add_leaf("(no albums)")
+            header.path = "Browse"
+            browser.append(ListItem(Static("[dim](no albums)[/]")))
+            self._fit_sidebar_width()
             return
+        if self._browse_artist is None:
+            header.path = "Browse"
+            self._populate_browser_artists(browser)
+        else:
+            header.path = f"Browse · [bold]{self._browse_artist}[/]"
+            self._populate_browser_albums(browser, self._browse_artist)
+        if prev_index is not None and 0 <= prev_index < len(browser.children):
+            browser.index = prev_index
+        else:
+            browser.index = 0
+        self._fit_sidebar_width()
+
+    def _fit_sidebar_width(self) -> None:
+        """Size the sidebar to fit the longest visible browser entry, capped at the max."""
+        if self._index is None:
+            return
+        if self._browse_artist is None:
+            longest = max((len(a.artist_dir) for a in self._index.albums), default=0)
+        else:
+            longest = max(
+                (len(a.album_dir) for a in self._index.albums if a.artist_dir == self._browse_artist),
+                default=0,
+            )
+        # Also factor in the sidebar-stats labels — they shouldn't get truncated.
+        target = max(_TREE_DEFAULT_WIDTH, longest + _BROWSER_DECORATION_PAD)
+        target = min(_TREE_MAX_WIDTH, max(_TREE_MIN_WIDTH, target))
+        sidebar = self.query_one("#sidebar")
+        sidebar.styles.width = target
+
+    def _populate_browser_artists(self, browser: BrowserList) -> None:
+        assert self._index is not None
         by_artist: dict[str, list[LibraryAlbum]] = {}
         for album in self._index.albums:
             by_artist.setdefault(album.artist_dir, []).append(album)
+        max_name = _TREE_MAX_WIDTH - _BROWSER_DECORATION_PAD
         for artist in sorted(by_artist, key=str.lower):
-            artist_node = tree.root.add(artist, expand=False)
-            for album in by_artist[artist]:
-                warn = " ⚠" if album.warnings else ""
-                artist_node.add_leaf(f"{album.album_dir}{warn}", data=album)
+            count = len(by_artist[artist])
+            name = _truncate(artist, max_name)
+            label = f" [{C_ACCENT}]▸[/] {name}  [dim]({count})[/]"
+            item = ListItem(Static(label))
+            item.entry_kind = "artist"  # type: ignore[attr-defined]
+            item.entry_data = artist  # type: ignore[attr-defined]
+            browser.append(item)
 
-    def on_tree_node_selected(self, event: Tree.NodeSelected[object]) -> None:
-        data = event.node.data
-        if isinstance(data, library_mod.LibraryAlbum):
-            self._set_current_album(data, track_idx=None)
-            self._repopulate_playlist()
-            tracklist = self.query_one(TrackList)
-            tracklist.focus()
-
-    def on_tree_node_highlighted(self, event: Tree.NodeHighlighted[object]) -> None:
-        data = event.node.data
-        if isinstance(data, library_mod.LibraryAlbum) and self._current_album is not data:
-            self._set_current_album(data, track_idx=None)
-            self._repopulate_playlist()
+    def _populate_browser_albums(self, browser: BrowserList, artist: str) -> None:
+        assert self._index is not None
+        # `..` to go back up.
+        up_item = ListItem(Static(f" [{C_ACCENT}]..[/]  [dim]Back[/]"))
+        up_item.entry_kind = "up"  # type: ignore[attr-defined]
+        up_item.entry_data = None  # type: ignore[attr-defined]
+        browser.append(up_item)
+        artist_albums = sorted(
+            (a for a in self._index.albums if a.artist_dir == artist),
+            key=lambda a: a.album_dir.lower(),
+        )
+        max_name = _TREE_MAX_WIDTH - _BROWSER_DECORATION_PAD
+        for album in artist_albums:
+            warn = f" [{C_PEAK}]⚠[/]" if album.warnings else ""
+            name = _truncate(album.album_dir, max_name)
+            label = f" [{C_ACCENT}]♪[/] {name}{warn}"
+            item = ListItem(Static(label))
+            item.entry_kind = "album"  # type: ignore[attr-defined]
+            item.entry_data = album  # type: ignore[attr-defined]
+            browser.append(item)
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        idx = getattr(event.item, "track_index", None)
-        if idx is not None and isinstance(idx, int):
-            self._current_track_idx = idx
-            self._play_current()
+        """Dispatch by which ListView fired the event."""
+        browser = self.query_one(BrowserList)
+        tracklist = self.query_one(TrackList)
+        if event.list_view is browser:
+            self._handle_browser_selection(event.item)
+        elif event.list_view is tracklist:
+            idx = getattr(event.item, "track_index", None)
+            if isinstance(idx, int):
+                self._current_track_idx = idx
+                self._play_current()
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        """Show audit warnings for the highlighted album in the info panel."""
+        browser = self.query_one(BrowserList)
+        if event.list_view is not browser:
+            return
+        info = self.query_one(BrowserInfo)
+        item = event.item
+        if item is None:
+            info.body = ""
+            return
+        kind = getattr(item, "entry_kind", None)
+        data = getattr(item, "entry_data", None)
+        if kind == "album" and isinstance(data, library_mod.LibraryAlbum):
+            if data.warnings:
+                lines = [f"[{C_PEAK}]⚠ {len(data.warnings)} warning(s)[/]"]
+                for w in data.warnings:
+                    lines.append(f"[{C_WARM}]·[/] {w}")
+                info.body = "\n".join(lines)
+            else:
+                info.body = f"[{C_PLAYING}]✓ no warnings[/]"
+        elif kind == "artist" and isinstance(data, str):
+            assert self._index is not None
+            albums = [a for a in self._index.albums if a.artist_dir == data]
+            flagged = sum(1 for a in albums if a.warnings)
+            if flagged:
+                info.body = f"[{C_LABEL}]{data}[/]\n[dim]{len(albums)} album(s)[/] [{C_PEAK}]· {flagged} flagged[/]"
+            else:
+                info.body = f"[{C_LABEL}]{data}[/]\n[dim]{len(albums)} album(s)[/]"
+        else:
+            info.body = ""
+
+    def _handle_browser_selection(self, item: ListItem) -> None:
+        kind = getattr(item, "entry_kind", None)
+        data = getattr(item, "entry_data", None)
+        if kind == "up":
+            self._browse_artist = None
+            self._populate_browser()
+        elif kind == "artist" and isinstance(data, str):
+            self._browse_artist = data
+            self._populate_browser()
+        elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
+            self._set_current_album(data, track_idx=None)
+            self._repopulate_playlist()
+            self.query_one(TrackList).focus()
 
     # ------------------------------------------------------------------
     # Playlist rendering
@@ -577,19 +731,22 @@ class MusickitApp(App[None]):
 
     def action_play_selected(self) -> None:
         tracklist = self.query_one(TrackList)
-        tree = self.query_one(LibraryTree)
+        browser = self.query_one(BrowserList)
         focused = self.focused
+        # Enter inside the playlist plays the highlighted track.
         if focused is tracklist and tracklist.highlighted_child is not None:
             idx = getattr(tracklist.highlighted_child, "track_index", None)
             if isinstance(idx, int):
                 self._current_track_idx = idx
                 self._play_current()
                 return
-        node = tree.cursor_node
-        if node is not None and isinstance(node.data, library_mod.LibraryAlbum):
-            self._set_current_album(node.data, track_idx=0)
-            self._play_current()
+        # Enter inside the browser drills in / goes up — see `on_list_view_selected`
+        # which fires for `Selected` events; this catches keyboard activation
+        # when ListView doesn't fire `Selected` (e.g. deselected highlight).
+        if focused is browser and browser.highlighted_child is not None:
+            self._handle_browser_selection(browser.highlighted_child)
             return
+        # Fallback: if an album is loaded, just play from the current cursor.
         if self._current_album is None:
             return
         if self._current_track_idx is None:
@@ -633,6 +790,12 @@ class MusickitApp(App[None]):
 
     def action_tree_narrower(self) -> None:
         self._resize_sidebar(-_TREE_RESIZE_STEP)
+
+    def action_browser_up(self) -> None:
+        """Backspace: pop one level in the browser if drilled into an artist."""
+        if self._browse_artist is not None:
+            self._browse_artist = None
+            self._populate_browser()
 
     def _resize_sidebar(self, delta: int) -> None:
         sidebar = self.query_one("#sidebar")
@@ -711,3 +874,10 @@ class MusickitApp(App[None]):
 def _fmt_mmss(seconds: float) -> str:
     seconds = max(0, int(seconds))
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
+
+
+def _truncate(value: str, max_len: int) -> str:
+    """Cap `value` at `max_len` cells, ending with `…` when truncated."""
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 1] + "…"

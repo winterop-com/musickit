@@ -29,9 +29,9 @@ def _make_track(album_dir: Path, silent_flac: Path, *, filename: str, title: str
 
 
 @pytest.mark.asyncio
-async def test_app_populates_tree_from_index(silent_flac_template: Path, tmp_path: Path) -> None:
-    """App.run_test() boots, scans the library, populates the artist tree."""
-    from musickit.tui.app import LibraryTree, MusickitApp
+async def test_app_populates_browser_with_artists(silent_flac_template: Path, tmp_path: Path) -> None:
+    """App boots and populates the browser pane with artist rows at root."""
+    from musickit.tui.app import BrowserList, MusickitApp
 
     root = tmp_path / "lib"
     _make_track(
@@ -50,11 +50,12 @@ async def test_app_populates_tree_from_index(silent_flac_template: Path, tmp_pat
     )
 
     async with MusickitApp(root).run_test() as pilot:
-        # Force one event loop pass so on_mount has run.
         await pilot.pause()
-        tree = pilot.app.query_one(LibraryTree)
-        artist_labels = {str(node.label) for node in tree.root.children}
-        assert artist_labels == {"Imagine Dragons", "Linkin Park"}
+        browser = pilot.app.query_one(BrowserList)
+        kinds = [getattr(c, "entry_kind", None) for c in browser.children]
+        assert kinds == ["artist", "artist"]
+        names = sorted(str(getattr(c, "entry_data", "")) for c in browser.children)
+        assert names == ["Imagine Dragons", "Linkin Park"]
 
 
 @pytest.mark.asyncio
@@ -72,14 +73,54 @@ async def test_app_quits_on_q(silent_flac_template: Path, tmp_path: Path) -> Non
 
 @pytest.mark.asyncio
 async def test_app_renders_empty_library(tmp_path: Path) -> None:
-    """No albums under the root → tree shows the empty placeholder, no crash."""
-    from musickit.tui.app import LibraryTree, MusickitApp
+    """No albums under the root → browser shows the empty placeholder, no crash."""
+    from musickit.tui.app import BrowserList, MusickitApp
 
     root = tmp_path / "lib"
     root.mkdir()
 
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
-        tree = pilot.app.query_one(LibraryTree)
-        labels = [str(c.label) for c in tree.root.children]
-        assert labels == ["(no albums)"]
+        browser = pilot.app.query_one(BrowserList)
+        # Single placeholder ListItem.
+        assert len(browser.children) == 1
+
+
+@pytest.mark.asyncio
+async def test_browser_drills_into_artist_and_back(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Selecting an artist row replaces the list with that artist's albums.
+
+    Selecting `..` pops back to the artist list.
+    """
+    from musickit.tui.app import BrowserList, MusickitApp
+
+    root = tmp_path / "lib"
+    _make_track(
+        root / "Imagine Dragons" / "2012 - Night Visions",
+        silent_flac_template,
+        filename="01 - Radioactive.m4a",
+        title="Radioactive",
+        artist="Imagine Dragons",
+    )
+    _make_track(
+        root / "Imagine Dragons" / "2015 - Smoke + Mirrors",
+        silent_flac_template,
+        filename="01 - Shots.m4a",
+        title="Shots",
+        artist="Imagine Dragons",
+    )
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        browser = pilot.app.query_one(BrowserList)
+        # Drill into the only artist.
+        pilot.app._handle_browser_selection(browser.children[0])  # type: ignore[attr-defined]
+        await pilot.pause()
+        kinds = [getattr(c, "entry_kind", None) for c in browser.children]
+        assert kinds[0] == "up"
+        assert kinds[1:] == ["album", "album"]
+        # Pop back via the `..` row.
+        pilot.app._handle_browser_selection(browser.children[0])  # type: ignore[attr-defined]
+        await pilot.pause()
+        kinds = [getattr(c, "entry_kind", None) for c in browser.children]
+        assert kinds == ["artist"]
