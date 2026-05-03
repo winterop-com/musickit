@@ -722,11 +722,17 @@ class MusickitApp(App[None]):
 
     def _repopulate_playlist(self) -> None:
         tracklist = self.query_one(TrackList)
+        # Same pattern as the browser: invalidate the cursor BEFORE clearing
+        # children, then defer the new cursor placement via
+        # `call_after_refresh` so it lands after the new ListItems mount.
+        # Without the defer, the second album in a row often shows no
+        # highlighted track because the previous album's children are still
+        # mid-unmount when the synchronous `index =` runs.
+        tracklist.index = None
+        tracklist.clear()
         if self._current_album is None:
-            tracklist.clear()
             self._marker_idx = None
             return
-        tracklist.clear()
         album = self._current_album
         for i, track in enumerate(album.tracks):
             label = self._format_track_row(i, track, album, marker=(i == self._current_track_idx))
@@ -734,13 +740,18 @@ class MusickitApp(App[None]):
             item.track_index = i  # type: ignore[attr-defined]
             tracklist.append(item)
         self._marker_idx = self._current_track_idx
-        # Land the cursor on the playing track if there is one, else the top.
-        # (`_repopulate_playlist` is only called on album change, so reusing
-        # the prior list's index would put the highlight on a stale row.)
         if self._current_track_idx is not None and 0 <= self._current_track_idx < len(album.tracks):
-            tracklist.index = self._current_track_idx
+            target = self._current_track_idx
         elif album.tracks:
-            tracklist.index = 0
+            target = 0
+        else:
+            return
+        self.call_after_refresh(self._set_tracklist_cursor, target)
+
+    def _set_tracklist_cursor(self, target: int) -> None:
+        tracklist = self.query_one(TrackList)
+        if 0 <= target < len(tracklist.children):
+            tracklist.index = target
 
     def _refresh_play_marker(self) -> None:
         if self._current_album is None:
