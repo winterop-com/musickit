@@ -67,6 +67,12 @@ class AudioPlayer:
         # `update_band_levels()` reads it and runs FFT off the audio thread.
         self._band_levels: list[float] = [0.0] * _VIS_BANDS
         self._latest_chunk: np.ndarray | None = None
+        # Carry state for the audio callback: sounddevice's `frames` per
+        # call is a hint, not a guarantee, and may differ from our
+        # decoder's chunk size. We keep the partially-consumed current
+        # chunk between callbacks so no PCM is dropped or zero-padded.
+        self._current_chunk: np.ndarray | None = None
+        self._chunk_offset: int = 0
         # Filled per-`play()`:
         self._queue: queue.Queue[np.ndarray | None] | None = None
         self._decoder_thread: threading.Thread | None = None
@@ -87,6 +93,8 @@ class AudioPlayer:
         self._stopped = False
         self._current_path = path
         self._queue = queue.Queue(maxsize=_QUEUE_MAX_CHUNKS)
+        self._current_chunk = None
+        self._chunk_offset = 0
 
         try:
             container, stream = _open_container(path)
@@ -145,6 +153,8 @@ class AudioPlayer:
             self._decoder_thread.join(timeout=2.0)
         self._decoder_thread = None
         self._queue = None
+        self._current_chunk = None
+        self._chunk_offset = 0
 
     def toggle_pause(self) -> None:
         with self._lock:
@@ -306,30 +316,44 @@ class AudioPlayer:
         if paused:
             outdata.fill(0)
             return
-        try:
-            chunk = self._queue.get_nowait()
-        except queue.Empty:
-            outdata.fill(0)
-            return
-        if chunk is None:
-            # End-of-stream sentinel.
-            outdata.fill(0)
-            if not self._end_fired:
-                self._end_fired = True
-                if self.on_track_end is not None:
-                    # Fire on a separate thread so the callback returns promptly.
-                    threading.Thread(target=self.on_track_end, daemon=True).start()
-            return
-        size = min(chunk.shape[0], frames)
-        outdata[:size] = chunk[:size] * volume
-        if size < frames:
-            outdata[size:].fill(0)
-        self._frames_played += size
-        # Stash the just-played chunk so the UI thread can compute FFT bands
-        # off the audio thread. The audio callback's job is to deliver PCM
-        # on time; doing FFT work here was a real CPU-spike risk on slow
-        # machines and could slow playback.
-        self._latest_chunk = chunk[:size]
+        # Drain across however many decoder chunks are needed to fill `frames`.
+        # `frames` is sounddevice's request size and is NOT guaranteed to
+        # equal the decoder's chunk size (`_CHUNK_FRAMES`) — `blocksize` is a
+        # hint. Pulling exactly one chunk per callback caused dropped samples
+        # (chunk too big) or silence padding (chunk too small), perceptually
+        # producing slow/stuttery playback. Carry partially-consumed chunks
+        # between callbacks via `self._current_chunk` + `self._chunk_offset`.
+        written = 0
+        while written < frames:
+            if self._current_chunk is None or self._chunk_offset >= self._current_chunk.shape[0]:
+                try:
+                    next_chunk = self._queue.get_nowait()
+                except queue.Empty:
+                    outdata[written:].fill(0)
+                    self._frames_played += written
+                    return
+                if next_chunk is None:
+                    # End-of-stream sentinel — fill remainder with silence.
+                    outdata[written:].fill(0)
+                    self._frames_played += written
+                    if not self._end_fired:
+                        self._end_fired = True
+                        if self.on_track_end is not None:
+                            # Fire on a separate thread so the callback returns promptly.
+                            threading.Thread(target=self.on_track_end, daemon=True).start()
+                    return
+                self._current_chunk = next_chunk
+                self._chunk_offset = 0
+            chunk = self._current_chunk
+            available = chunk.shape[0] - self._chunk_offset
+            take = min(available, frames - written)
+            outdata[written : written + take] = chunk[self._chunk_offset : self._chunk_offset + take] * volume
+            self._chunk_offset += take
+            written += take
+        self._frames_played += written
+        # Stash the most recently delivered window for the UI thread's FFT.
+        if self._current_chunk is not None and self._chunk_offset > 0:
+            self._latest_chunk = self._current_chunk[max(0, self._chunk_offset - frames) : self._chunk_offset]
 
     def update_band_levels(self) -> None:
         """Compute FFT band levels from the most recently played chunk.
