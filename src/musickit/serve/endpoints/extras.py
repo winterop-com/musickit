@@ -247,15 +247,33 @@ async def get_open_subsonic_extensions() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Genres — Feishin / Supersonic show a "Genres" tab and probe this every
-# few seconds even when empty. We don't index genre data yet (LibraryTrack
-# doesn't carry it), so return an empty list. Wiring this through the scan
-# is a future addition.
+# Genres — counted from the library scan. `getGenres` returns one entry per
+# distinct genre with songCount + albumCount; clients render a "Genres" tab.
 # ---------------------------------------------------------------------------
 
 
 @router.api_route("/getGenres", methods=["GET", "POST", "HEAD"])
 @router.api_route("/getGenres.view", methods=["GET", "POST", "HEAD"])
-async def get_genres() -> dict:
-    """Return empty genres — we don't index genre data yet."""
-    return envelope("genres", {"genre": []})
+async def get_genres(request: Request) -> dict:
+    """Distinct genres + per-genre song / album counts."""
+    cache = _get_cache(request)
+    song_counts: dict[str, int] = {}
+    album_genres: dict[str, set[str]] = {}  # genre → set of album IDs
+    for album_id_str, album in cache.albums_by_id.items():
+        seen_in_album: set[str] = set()
+        for track in album.tracks:
+            name = track.genre or album.tag_genre
+            if not name:
+                continue
+            song_counts[name] = song_counts.get(name, 0) + 1
+            seen_in_album.add(name)
+        # Also count album-level tag_genre even when no track had it explicitly.
+        if album.tag_genre:
+            seen_in_album.add(album.tag_genre)
+        for name in seen_in_album:
+            album_genres.setdefault(name, set()).add(album_id_str)
+    payload = [
+        {"value": name, "songCount": song_counts.get(name, 0), "albumCount": len(albums)}
+        for name, albums in sorted(album_genres.items(), key=lambda kv: kv[0].casefold())
+    ]
+    return envelope("genres", {"genre": payload})

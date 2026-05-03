@@ -228,6 +228,93 @@ def test_get_album_list2_by_year_descending(tmp_path: Path) -> None:
     assert years == sorted(years, reverse=True)
 
 
+def test_get_album_list2_by_genre_filters_correctly(tmp_path: Path) -> None:
+    """byGenre must filter by track/album genre, not album_artist (which was the old bug)."""
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    rock = LibraryAlbum(
+        path=tmp_path / "Beck" / "Sea Change",
+        artist_dir="Beck",
+        album_dir="Sea Change",
+        tag_album="Sea Change",
+        tag_genre="Rock",
+        track_count=1,
+        tracks=[
+            LibraryTrack(
+                path=tmp_path / "Beck" / "Sea Change" / "01.m4a",
+                title="Lost Cause",
+                artist="Beck",
+                album="Sea Change",
+                genre="Rock",
+                track_no=1,
+                duration_s=180.0,
+            )
+        ],
+    )
+    pop = LibraryAlbum(
+        path=tmp_path / "ABBA" / "Arrival",
+        artist_dir="ABBA",
+        album_dir="Arrival",
+        tag_album="Arrival",
+        tag_genre="Pop",
+        track_count=1,
+        tracks=[
+            LibraryTrack(
+                path=tmp_path / "ABBA" / "Arrival" / "01.m4a",
+                title="Dancing Queen",
+                artist="ABBA",
+                album="Arrival",
+                genre="Pop",
+                track_no=1,
+                duration_s=180.0,
+            )
+        ],
+    )
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=[rock, pop]))  # noqa: SLF001
+
+    body = (
+        TestClient(app)
+        .get(
+            "/rest/getAlbumList2",
+            params=_params(type="byGenre", genre="Rock", size=10),
+        )
+        .json()
+    )
+    names = [a["name"] for a in body["subsonic-response"]["albumList2"]["album"]]
+    assert names == ["Sea Change"]
+
+
+def test_album_payload_includes_genre(tmp_path: Path) -> None:
+    """getAlbum response carries the genre field per Subsonic spec."""
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    rock_album = LibraryAlbum(
+        path=tmp_path / "Beck" / "Sea Change",
+        artist_dir="Beck",
+        album_dir="Sea Change",
+        tag_album="Sea Change",
+        tag_genre="Rock",
+        track_count=1,
+        tracks=[
+            LibraryTrack(
+                path=tmp_path / "Beck" / "Sea Change" / "01.m4a",
+                title="Lost Cause",
+                artist="Beck",
+                album="Sea Change",
+                genre="Rock",
+                track_no=1,
+                duration_s=180.0,
+            )
+        ],
+    )
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=[rock_album]))  # noqa: SLF001
+    al_id = album_id(rock_album)
+    body = TestClient(app).get("/rest/getAlbum", params=_params(id=al_id)).json()
+    album = body["subsonic-response"]["album"]
+    assert album["genre"] == "Rock"
+    assert album["song"][0]["genre"] == "Rock"
+
+
 def test_get_album_list2_unknown_type_falls_back_to_alphabetical(tmp_path: Path) -> None:
     client = _client_with_index(tmp_path, _two_artists(tmp_path))
     body = client.get(

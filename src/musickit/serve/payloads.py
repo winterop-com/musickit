@@ -61,6 +61,8 @@ def album_payload(album: LibraryAlbum, *, with_songs: bool) -> dict[str, Any]:
             payload["year"] = int(album.tag_year)
         except ValueError:
             pass
+    if album.tag_genre:
+        payload["genre"] = album.tag_genre
     if with_songs:
         payload["song"] = [song_payload(album, t) for t in album.tracks]
     return payload
@@ -101,6 +103,9 @@ def song_payload(album: LibraryAlbum, track: LibraryTrack) -> dict[str, Any]:
             payload["year"] = int(track.year)
         except ValueError:
             pass
+    track_genre = track.genre or album.tag_genre
+    if track_genre:
+        payload["genre"] = track_genre
     return payload
 
 

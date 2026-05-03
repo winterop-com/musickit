@@ -157,7 +157,69 @@ def test_get_open_subsonic_extensions_returns_empty(tmp_path: Path) -> None:
     assert inner["openSubsonicExtensions"] == []
 
 
-def test_get_genres_returns_empty(tmp_path: Path) -> None:
-    """Feishin polls genres repeatedly; 200 with empty list keeps the log clean."""
+def test_get_genres_returns_empty_when_no_genre_data(tmp_path: Path) -> None:
+    """Library with no genre tags → empty genres list (still 200)."""
     body = _client(tmp_path).get("/rest/getGenres", params=_params()).json()
     assert body["subsonic-response"]["genres"] == {"genre": []}
+
+
+def test_get_genres_counts_songs_and_albums(tmp_path: Path) -> None:
+    """Distinct genres get one entry each with songCount + albumCount."""
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    rock_album = LibraryAlbum(
+        path=tmp_path / "Beck" / "Sea Change",
+        artist_dir="Beck",
+        album_dir="Sea Change",
+        tag_album="Sea Change",
+        tag_genre="Rock",
+        track_count=2,
+        tracks=[
+            LibraryTrack(
+                path=tmp_path / "Beck" / "Sea Change" / "01.m4a",
+                title="Lost Cause",
+                artist="Beck",
+                album="Sea Change",
+                genre="Rock",
+                track_no=1,
+                duration_s=180.0,
+            ),
+            LibraryTrack(
+                path=tmp_path / "Beck" / "Sea Change" / "02.m4a",
+                title="The Golden Age",
+                artist="Beck",
+                album="Sea Change",
+                genre="Rock",
+                track_no=2,
+                duration_s=180.0,
+            ),
+        ],
+    )
+    pop_album = LibraryAlbum(
+        path=tmp_path / "ABBA" / "Arrival",
+        artist_dir="ABBA",
+        album_dir="Arrival",
+        tag_album="Arrival",
+        tag_genre="Pop",
+        track_count=1,
+        tracks=[
+            LibraryTrack(
+                path=tmp_path / "ABBA" / "Arrival" / "01.m4a",
+                title="Dancing Queen",
+                artist="ABBA",
+                album="Arrival",
+                genre="Pop",
+                track_no=1,
+                duration_s=180.0,
+            ),
+        ],
+    )
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=[rock_album, pop_album]))  # noqa: SLF001
+
+    body = TestClient(app).get("/rest/getGenres", params=_params()).json()
+    genres = body["subsonic-response"]["genres"]["genre"]
+    by_name = {g["value"]: g for g in genres}
+    assert by_name["Rock"]["songCount"] == 2
+    assert by_name["Rock"]["albumCount"] == 1
+    assert by_name["Pop"]["songCount"] == 1
+    assert by_name["Pop"]["albumCount"] == 1

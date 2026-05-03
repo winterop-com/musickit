@@ -20,6 +20,7 @@ class LibraryTrack(BaseModel):
     year: str | None = None
     track_no: int | None = None
     disc_no: int | None = None
+    genre: str | None = None
     duration_s: float = 0.0
     has_cover: bool = False
     cover_pixels: int = 0
@@ -40,6 +41,7 @@ class LibraryAlbum(BaseModel):
     tag_album: str | None = None
     tag_year: str | None = None
     tag_album_artist: str | None = None
+    tag_genre: str | None = None
     track_count: int = 0
     disc_count: int = 1
     is_compilation: bool = False

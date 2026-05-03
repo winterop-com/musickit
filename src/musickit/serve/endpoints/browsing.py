@@ -142,7 +142,12 @@ async def get_album_list2(  # noqa: PLR0912 — Subsonic's `type` enum has many 
         if not genre:
             return error_envelope(10, "byGenre requires genre")
         target = genre.casefold()
-        albums = [a for a in albums if any((t.album_artist or "").casefold() == target for t in a.tracks)]
+        albums = [
+            a
+            for a in albums
+            if (a.tag_genre and a.tag_genre.casefold() == target)
+            or any((t.genre or "").casefold() == target for t in a.tracks)
+        ]
         albums.sort(key=lambda a: (a.tag_album or a.album_dir).casefold())
     elif type == "alphabeticalByArtist":
         albums.sort(key=lambda a: (a.artist_dir.casefold(), (a.tag_album or a.album_dir).casefold()))
