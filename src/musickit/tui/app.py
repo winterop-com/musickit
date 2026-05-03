@@ -386,7 +386,7 @@ class KeyBar(Static):
             ("space", "Play"),
             ("enter", "Open"),
             ("←/→", "Nav"),
-            (",/.", "Seek"),
+            ("</>", "Seek"),
             ("n", "Next"),
             ("p", "Prev"),
             ("s", "Shuffle"),
@@ -436,11 +436,12 @@ class MusickitApp(App[None]):
         Binding("minus", "vol_down", "Vol-", show=False),
         # `←` / `→` are context-aware (see `action_left` / `action_right`):
         # they navigate between panes when one is focused, and only fall back
-        # to seek when nothing's focused. Use `,` / `.` for always-on seek.
+        # to seek when nothing's focused. Use `<` / `>` for always-on seek
+        # (Shift+`,`/`.` — the "arrow" shifted variants of those keys).
         Binding("left", "left", "Left", show=False),
         Binding("right", "right", "Right", show=False),
-        Binding("comma", "seek_back", "Seek -", show=False),
-        Binding("period", "seek_fwd", "Seek +", show=False),
+        Binding("less_than_sign", "seek_back", "Seek -", show=False),
+        Binding("greater_than_sign", "seek_fwd", "Seek +", show=False),
         Binding("s", "toggle_shuffle", "Shuffle", show=False),
         Binding("r", "cycle_repeat", "Repeat", show=False),
         Binding("f", "toggle_fullscreen", "Fullscreen", show=False),
