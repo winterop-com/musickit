@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import random
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,6 +13,7 @@ from typing import TYPE_CHECKING
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.command import DiscoveryHit, Hit, Hits, Provider
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import ListItem, ListView, Static
@@ -424,8 +426,70 @@ _TREE_RESIZE_STEP = 4
 _BROWSER_DECORATION_PAD = 8
 
 
+class MusickitCommands(Provider):
+    """Custom Ctrl+P palette entries for playback / navigation actions.
+
+    Textual's default palette only surfaces App-level keybindings. Adding
+    a Provider lets us list player verbs in the searchable picker so the
+    user doesn't have to remember `n` / `p` / `<` / `>` / `s` / `r` etc.
+    """
+
+    @property
+    def _commands(self) -> list[tuple[str, str, str]]:
+        return [
+            ("Play / Pause", "action_toggle_pause", "Toggle playback (Space)"),
+            ("Next track", "action_next_track", "Skip to next (n)"),
+            ("Previous track", "action_prev_track", "Go to previous (p)"),
+            ("Seek forward 5s", "action_seek_fwd", "+5 seconds (>)"),
+            ("Seek backward 5s", "action_seek_back", "-5 seconds (<)"),
+            ("Volume up", "action_vol_up", "+5% (+)"),
+            ("Volume down", "action_vol_down", "-5% (-)"),
+            ("Toggle shuffle", "action_toggle_shuffle", "On / Off (s)"),
+            ("Cycle repeat mode", "action_cycle_repeat", "Off → Album → Track (r)"),
+            ("Toggle fullscreen", "action_toggle_fullscreen", "Hide library, expand visualizer (f)"),
+            ("Toggle help panel", "action_toggle_help", "Show / hide the keybindings reference (?)"),
+            ("Rescan library", "action_rescan_library", "Re-walk the library root (Ctrl+R)"),
+            ("Quit", "action_quit", "Exit musickit (q)"),
+        ]
+
+    async def discover(self) -> Hits:
+        """Run the same commands when the palette is opened with no query."""
+        for name, action_name, help_text in self._commands:
+            yield DiscoveryHit(
+                name,
+                self._action(action_name),
+                help=help_text,
+            )
+
+    async def search(self, query: str) -> Hits:
+        matcher = self.matcher(query)
+        for name, action_name, help_text in self._commands:
+            score = matcher.match(name)
+            if score > 0:
+                yield Hit(
+                    score,
+                    matcher.highlight(name),
+                    self._action(action_name),
+                    help=help_text,
+                )
+
+    def _action(self, action_name: str) -> Callable[[], None]:
+        app = self.app
+
+        def runner() -> None:
+            method = getattr(app, action_name, None)
+            if callable(method):
+                method()
+
+        return runner
+
+
 class MusickitApp(App[None]):
     """ncmpcpp-styled three-row Textual app."""
+
+    # Append our provider to Textual's defaults (system commands + bindings)
+    # so the palette surfaces the playback verbs.
+    COMMANDS = App.COMMANDS | {MusickitCommands}
 
     CSS = """
     Screen { layout: vertical; }
@@ -440,6 +504,16 @@ class MusickitApp(App[None]):
     Screen.fullscreen #track-header { display: none; }
     Screen.fullscreen #track-scroll { display: none; }
     Screen.fullscreen #status { display: none; }
+    /* Command palette is a modal screen — keep it card-sized instead of
+       sprawling across the full width. Targets Textual's internal layout. */
+    CommandPalette {
+        align: center top;
+    }
+    CommandPalette > Vertical {
+        width: 80;
+        max-width: 90%;
+        margin-top: 4;
+    }
     """
 
     BINDINGS = [
