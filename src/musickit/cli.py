@@ -492,5 +492,24 @@ def _render_audit_table(
     console.print(table)
 
 
+@app.command()
+def tui(
+    target_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, help="Library root to browse + play."),
+    ] = Path("./output"),
+) -> None:
+    """Browse and play the converted library in a Textual TUI.
+
+    Layout: top status block (current track + time + state + volume), left
+    library tree (artist → album), right playlist with a marker on the
+    playing row, bottom keybinding hints. Decoding via PyAV (in-process,
+    no external player). Audio output via sounddevice/PortAudio (bundled).
+    """
+    from musickit.tui.app import MusickitApp
+
+    MusickitApp(target_dir.resolve()).run()
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
