@@ -122,7 +122,7 @@ def _scan_album(album_dir: Path) -> LibraryAlbum:
     tracks: list[LibraryTrack] = []
     for audio_path in audio_files:
         try:
-            source = read_source(audio_path)
+            source = read_source(audio_path, light=True)
         except Exception:
             continue
         track = LibraryTrack(
@@ -134,10 +134,12 @@ def _scan_album(album_dir: Path) -> LibraryAlbum:
             year=_year_only(source.date),
             track_no=source.track_no,
             disc_no=source.disc_no,
+            # `light` mode uses a presence-only sentinel (b"") for embedded
+            # pictures — skipping the byte copy and Pillow decode but still
+            # reporting cover presence accurately.
             has_cover=source.embedded_picture is not None,
             cover_pixels=source.embedded_picture_pixels,
         )
-        # Drop the cover bytes immediately — at thousands of tracks this matters.
         source.embedded_picture = None
         tracks.append(track)
 

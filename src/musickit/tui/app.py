@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.reactive import reactive
-from textual.widgets import Footer, Static, Tree
+from textual.widgets import Footer, ListItem, ListView, Static, Tree
 
 from musickit import library as library_mod
 from musickit.tui.player import AudioPlayer
@@ -56,19 +56,32 @@ class HeaderBlock(Static):
         )
 
 
-class PlaylistView(Static):
-    """Playlist pane: cliamp-style album header + indented track rows."""
+class PlaylistHeader(Static):
+    """Static rule above the track list (shows shuffle/repeat/cursor state)."""
 
     DEFAULT_CSS = """
-    PlaylistView {
+    PlaylistHeader {
+        height: auto;
         padding: 0 1;
+        color: $primary;
     }
     """
 
-    body = reactive("")
+    body = reactive("[dim]Select an album in the library to populate the playlist.[/dim]")
 
     def render(self) -> str:
-        return self.body or "[dim]Select an artist to populate the playlist.[/dim]"
+        return self.body
+
+
+class TrackList(ListView):
+    """Focusable playlist. Enter on a row plays that track."""
+
+    DEFAULT_CSS = """
+    TrackList {
+        padding: 0 1;
+        height: 1fr;
+    }
+    """
 
 
 class LibraryTree(Tree[object]):
@@ -76,7 +89,9 @@ class LibraryTree(Tree[object]):
 
     DEFAULT_CSS = """
     LibraryTree {
-        width: 32;
+        width: 28;
+        min-width: 24;
+        max-width: 40;
         border-right: solid $primary;
     }
     """
@@ -91,6 +106,10 @@ class MusickitApp(App[None]):
     }
     #body {
         height: 1fr;
+    }
+    #playlist-pane {
+        width: 1fr;
+        padding: 0 1;
     }
     """
 
@@ -126,7 +145,9 @@ class MusickitApp(App[None]):
         yield HeaderBlock(id="header")
         with Horizontal(id="body"):
             yield LibraryTree("Library", id="tree")
-            yield PlaylistView(id="playlist")
+            with VerticalScroll(id="playlist-pane"):
+                yield PlaylistHeader(id="playlist-header")
+                yield TrackList(id="tracklist")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -161,12 +182,22 @@ class MusickitApp(App[None]):
         if isinstance(data, library_mod.LibraryAlbum):
             self._set_current_album(data, track_idx=None)
             self._render_playlist()
+            # Hand focus to the track list so Enter plays the track right away.
+            tracklist = self.query_one(TrackList)
+            tracklist.focus()
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted[object]) -> None:
         data = event.node.data
         if isinstance(data, library_mod.LibraryAlbum) and self._current_album is not data:
             self._set_current_album(data, track_idx=None)
             self._render_playlist()
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Enter on a track row plays that track."""
+        idx = getattr(event.item, "track_index", None)
+        if idx is not None and isinstance(idx, int):
+            self._current_track_idx = idx
+            self._play_current()
 
     # ------------------------------------------------------------------
     # Playlist rendering
@@ -177,9 +208,11 @@ class MusickitApp(App[None]):
         self._current_track_idx = track_idx
 
     def _render_playlist(self) -> None:
-        playlist = self.query_one(PlaylistView)
+        header = self.query_one(PlaylistHeader)
+        tracklist = self.query_one(TrackList)
         if self._current_album is None:
-            playlist.body = ""
+            header.body = "[dim]Select an album in the library to populate the playlist.[/dim]"
+            tracklist.clear()
             return
         album = self._current_album
         shuffle = "On" if self._shuffle else "Off"
@@ -189,15 +222,24 @@ class MusickitApp(App[None]):
             if self._current_track_idx is not None
             else f"-/{len(album.tracks)}"
         )
-        rule = f"── Playlist ── [Shuffle: {shuffle}] [Repeat: {repeat}] [{idx_label}] ──"
-        album_rule = f"── {album.album_dir} ──"
-        rows: list[str] = [rule, "", album_rule]
+        header.body = (
+            f"[bold]── Playlist ──[/bold] [Shuffle: {shuffle}] [Repeat: {repeat}] [{idx_label}]\n"
+            f"[bold cyan]── {album.album_dir} ──[/bold cyan]"
+        )
+        # Repopulate the listview. Preserve highlighted index when possible.
+        prev_index = tracklist.index
+        tracklist.clear()
         for i, track in enumerate(album.tracks):
-            marker = "[bold green]▶[/bold green]" if i == self._current_track_idx else " "
+            marker = "▶" if i == self._current_track_idx else " "
             artist = track.artist or album.artist_dir
             title = track.title or track.path.stem
-            rows.append(f"{marker} {i + 1:>2}.  {artist} - {title}")
-        playlist.body = "\n".join(rows)
+            label = f"{marker} {i + 1:>2}.  {artist} - {title}"
+            item = ListItem(Static(label))
+            # Stash the index on the item so the on_list_view_selected handler can recover it.
+            item.track_index = i  # type: ignore[attr-defined]
+            tracklist.append(item)
+        if prev_index is not None and 0 <= prev_index < len(album.tracks):
+            tracklist.index = prev_index
 
     # ------------------------------------------------------------------
     # Header / status refresh
@@ -242,14 +284,24 @@ class MusickitApp(App[None]):
     # ------------------------------------------------------------------
 
     def action_play_selected(self) -> None:
-        # If the focused tree node is an album, start at track 1.
+        """Play whatever is highlighted (track row or album node)."""
+        tracklist = self.query_one(TrackList)
         tree = self.query_one(LibraryTree)
+        focused = self.focused
+        if focused is tracklist and tracklist.highlighted_child is not None:
+            idx = getattr(tracklist.highlighted_child, "track_index", None)
+            if isinstance(idx, int):
+                self._current_track_idx = idx
+                self._play_current()
+                return
         node = tree.cursor_node
         if node is not None and isinstance(node.data, library_mod.LibraryAlbum):
             self._set_current_album(node.data, track_idx=0)
-        elif self._current_album is None:
+            self._play_current()
             return
-        elif self._current_track_idx is None:
+        if self._current_album is None:
+            return
+        if self._current_track_idx is None:
             self._current_track_idx = 0
         self._play_current()
 
