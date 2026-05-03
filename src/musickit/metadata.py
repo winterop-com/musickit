@@ -31,7 +31,7 @@ from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4, MP4Cover
 from pydantic import BaseModel, ConfigDict, Field
 
-from musickit.naming import is_various_artists
+from musickit.naming import is_various_artists, smart_title_case
 
 SUPPORTED_AUDIO_EXTS: frozenset[str] = frozenset(
     {".flac", ".mp3", ".m4a", ".m4b", ".mp4", ".aac", ".ogg", ".opus", ".wav", ".aiff", ".aif"}
@@ -43,18 +43,43 @@ SUPPORTED_AUDIO_EXTS: frozenset[str] = frozenset(
 # - middle:      `Album (CD2) Live In Madrid` (Cranberries layout)
 # - bare paren:  `Album (1)` where the number is the disc index, no keyword
 _DISC_KEYWORD_RE = re.compile(
-    r"\s*[\[\(\-]?\s*(?:cd|disc|disk)[\s\-_]*\d+\s*[\]\)]?",
+    # Period in the separator class so `Absolute Music 51 [CD.1]` strips cleanly.
+    r"\s*[\[\(\-]?\s*(?:cd|disc|disk)[\s\-_.]*\d+\s*[\]\)]?",
     re.IGNORECASE,
 )
 _DISC_SUFFIX_RE = re.compile(
-    r"\s*[\[\(\-]?\s*(?:cd|disc|disk)[\s\-_]*\d+\s*[\]\)]?\s*$",
+    r"\s*[\[\(\-]?\s*(?:cd|disc|disk)[\s\-_.]*\d+\s*[\]\)]?\s*$",
     re.IGNORECASE,
 )
 _BARE_DISC_PAREN_RE = re.compile(r"\s*\(\s*\d{1,2}\s*\)\s*$")
 
 
+# Dot-as-word-separator scene-rip vandalism (`VA.-.Absolute.Music.60`).
+# Replace dot only when surrounded by ≥2-char alphanumeric sequences on both
+# sides — preserves `R.E.M.` (single-letter acronym), `St. Vincent` (space
+# after dot), `Mr. Big` (same), and `vol.1`-style values are still 2/1-side
+# so leave alone.
+_SCENE_DOT_SEP_RE = re.compile(r"(?<=\w{2})\.(?=\w{2})")
+# Underscore-as-word-separator: same shape, for `Absolute_Music_45`-style
+# names. Bracketed by 2-letter word chunks on both sides so we don't touch
+# legitimate identifiers (`__init__`, snake-case file fragments) — though
+# album titles almost never carry those.
+_SCENE_USCORE_SEP_RE = re.compile(r"(?<=\w{2})_(?=\w{2})")
+_VA_PREFIX_IN_ALBUM_RE = re.compile(r"^\s*(?:VA|Various)[\s.\-]+", re.IGNORECASE)
+
+
 def clean_album_title(album: str | None) -> str | None:
-    """Strip `[CDx]`, `(Disc x)`, `(Disc N) ...` and trailing `(N)` from an album title."""
+    """Clean disc markers, scene-rip dot-separators, and `VA -` prefixes from an album tag.
+
+    Strips:
+    - trailing `[CDx]` / `(Disc x)` / ` - CD 1` / `[CD.1]` markers
+    - embedded `(CDx)` markers (Cranberries `Roses (CD2) Live In Madrid` shape)
+    - trailing `(1)` / `(2)` (bare-paren disc index, no keyword)
+    - dots / underscores used as word-separator instead of spaces
+      (`Absolute.Music.60`, `Absolute_Music_45` → `Absolute Music 60/45`);
+      preserves single-letter acronyms like `R.E.M.`
+    - leading `VA - ` / `VA.-.` / `Various -` prefixes once the dots are space
+    """
     if not album:
         return album
     cleaned = album
@@ -73,6 +98,13 @@ def clean_album_title(album: str | None) -> str | None:
     bare = _BARE_DISC_PAREN_RE.sub("", cleaned).strip(" -")
     if bare:
         cleaned = bare
+    # Dots/underscores as separator: replace between multi-letter chunks with space.
+    cleaned = _SCENE_DOT_SEP_RE.sub(" ", cleaned)
+    cleaned = _SCENE_USCORE_SEP_RE.sub(" ", cleaned)
+    # Strip leading VA prefix (now that dots are spaces, `VA.-.Foo` reads
+    # as `VA - Foo` / `VA.-.Foo`; either way the prefix should go).
+    cleaned = _VA_PREFIX_IN_ALBUM_RE.sub("", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -")
     return cleaned or album
 
 
@@ -132,15 +164,26 @@ class MusicBrainzIds(BaseModel):
 
 
 def read_source(path: Path) -> SourceTrack:
-    """Read tags + embedded cover from a single audio file."""
+    """Read tags + embedded cover from a single audio file.
+
+    Source values that arrive entirely lowercase are smart-title-cased here
+    so downstream filenames + tags display consistently. Anything with real
+    casing (`AC/DC`, `ABBA`, `iPhone`, `R.E.M.`) is left alone.
+    """
     suffix = path.suffix.lower()
     if suffix == ".flac":
-        return _read_flac(path)
-    if suffix == ".mp3":
-        return _read_mp3(path)
-    if suffix in (".m4a", ".mp4", ".m4b"):
-        return _read_mp4(path)
-    return _read_generic(path)
+        track = _read_flac(path)
+    elif suffix == ".mp3":
+        track = _read_mp3(path)
+    elif suffix in (".m4a", ".mp4", ".m4b"):
+        track = _read_mp4(path)
+    else:
+        track = _read_generic(path)
+    track.title = smart_title_case(track.title)
+    track.artist = smart_title_case(track.artist)
+    track.album = smart_title_case(track.album)
+    track.album_artist = smart_title_case(track.album_artist)
+    return track
 
 
 def summarize_album(tracks: list[SourceTrack]) -> AlbumSummary:
@@ -152,7 +195,10 @@ def summarize_album(tracks: list[SourceTrack]) -> AlbumSummary:
     """
     disc_one_tracks = [t for t in tracks if t.disc_no == 1]
     album_source = disc_one_tracks if disc_one_tracks else tracks
-    album = clean_album_title(_majority(t.album for t in album_source))
+    # Album name should be unanimous within a real album. Require quorum so a
+    # single stray tagged track (foreign album mixed into the rip) can't
+    # impersonate the whole-album value when most tracks have no album tag.
+    album = clean_album_title(_majority((t.album for t in album_source), quorum=True))
     album_artist = _majority(t.album_artist for t in tracks)
     year = _majority(t.date for t in tracks)
     genre = _majority(t.genre for t in tracks)
@@ -358,6 +404,198 @@ def write_id3_tags(
         id3.add(APIC(encoding=3, mime=mime, type=3, desc="Front cover", data=cover_bytes))
 
     id3.save(path, v2_version=4)
+
+
+def embed_cover_only(path: Path, *, cover_bytes: bytes, cover_mime: str) -> None:
+    """Replace the cover of an existing audio file without touching other tags.
+
+    Supports `.m4a/.mp4/.m4b`, `.mp3`, and `.flac`. Used by `musickit cover`
+    to retrofit album art onto already-converted files. All previous pictures
+    are dropped first so we don't end up with multiple covers.
+    """
+    suffix = path.suffix.lower()
+    if suffix in (".m4a", ".mp4", ".m4b"):
+        mp4 = MP4(path)
+        if mp4.tags is None:
+            mp4.add_tags()
+        tags = mp4.tags
+        assert tags is not None
+        cover_format = MP4Cover.FORMAT_PNG if cover_mime.lower().endswith("png") else MP4Cover.FORMAT_JPEG
+        tags["covr"] = [MP4Cover(cover_bytes, imageformat=cover_format)]
+        mp4.save()
+        return
+    if suffix == ".mp3":
+        try:
+            id3 = ID3(path)
+        except ID3NoHeaderError:
+            id3 = ID3()
+        for apic_key in list(id3.keys()):
+            if apic_key.startswith("APIC"):
+                del id3[apic_key]
+        mime = "image/png" if cover_mime.lower().endswith("png") else "image/jpeg"
+        id3.add(APIC(encoding=3, mime=mime, type=3, desc="Front cover", data=cover_bytes))
+        id3.save(path, v2_version=4)
+        return
+    if suffix == ".flac":
+        from mutagen.flac import Picture  # local import — only needed for FLAC
+
+        flac = FLAC(path)
+        flac.clear_pictures()
+        picture = Picture()
+        picture.type = 3  # front cover
+        picture.mime = "image/png" if cover_mime.lower().endswith("png") else "image/jpeg"
+        picture.data = cover_bytes
+        flac.add_picture(picture)
+        flac.save()
+        return
+    raise ValueError(f"unsupported audio file for cover injection: {path}")
+
+
+class TagOverrides(BaseModel):
+    """Optional tag overrides applied in-place by `apply_tag_overrides`.
+
+    Each field is `None` to mean "leave the existing tag alone". Pass an empty
+    string to *clear* a tag explicitly (rare; typically you just leave it).
+    """
+
+    title: str | None = None
+    artist: str | None = None
+    album_artist: str | None = None
+    album: str | None = None
+    year: str | None = None
+    genre: str | None = None
+    track_total: int | None = None
+    disc_total: int | None = None
+
+    def is_empty(self) -> bool:
+        return all(v is None for v in self.model_dump().values())
+
+
+def apply_tag_overrides(path: Path, overrides: TagOverrides) -> None:
+    """Apply `overrides` to `path` in-place; leave unspecified tags untouched.
+
+    Supports `.m4a/.mp4/.m4b`, `.mp3`, `.flac`. Track totals get merged into
+    the existing `(track, total)` tuple so we don't lose the per-track number.
+    """
+    if overrides.is_empty():
+        return
+    suffix = path.suffix.lower()
+    if suffix in (".m4a", ".mp4", ".m4b"):
+        _apply_overrides_mp4(path, overrides)
+        return
+    if suffix == ".mp3":
+        _apply_overrides_id3(path, overrides)
+        return
+    if suffix == ".flac":
+        _apply_overrides_flac(path, overrides)
+        return
+    raise ValueError(f"unsupported audio file for tag override: {path}")
+
+
+def _apply_overrides_mp4(path: Path, ov: TagOverrides) -> None:
+    mp4 = MP4(path)
+    if mp4.tags is None:
+        mp4.add_tags()
+    tags = mp4.tags
+    assert tags is not None
+    if ov.title is not None:
+        _set(tags, "\xa9nam", ov.title)
+    if ov.artist is not None:
+        _set(tags, "\xa9ART", ov.artist)
+    if ov.album is not None:
+        _set(tags, "\xa9alb", ov.album)
+    if ov.album_artist is not None:
+        _set(tags, "aART", ov.album_artist)
+    if ov.year is not None:
+        _set(tags, "\xa9day", _year_only(ov.year) or ov.year)
+    if ov.genre is not None:
+        _set(tags, "\xa9gen", ov.genre)
+    if ov.track_total is not None:
+        existing_trkn = tags.get("trkn") or [(0, 0)]
+        first_trkn = existing_trkn[0]
+        current_no = first_trkn[0] if isinstance(first_trkn, tuple) else 0
+        tags["trkn"] = [(current_no, ov.track_total)]
+    if ov.disc_total is not None:
+        existing_disk = tags.get("disk") or [(0, 0)]
+        first_disk = existing_disk[0]
+        current_disc = first_disk[0] if isinstance(first_disk, tuple) else 0
+        tags["disk"] = [(current_disc, ov.disc_total)]
+    mp4.save()
+
+
+def _apply_overrides_id3(path: Path, ov: TagOverrides) -> None:
+    try:
+        id3 = ID3(path)
+    except ID3NoHeaderError:
+        id3 = ID3()
+    if ov.title is not None:
+        id3.delall("TIT2")
+        if ov.title:
+            id3.add(TIT2(encoding=3, text=ov.title))
+    if ov.artist is not None:
+        id3.delall("TPE1")
+        if ov.artist:
+            id3.add(TPE1(encoding=3, text=ov.artist))
+    if ov.album is not None:
+        id3.delall("TALB")
+        if ov.album:
+            id3.add(TALB(encoding=3, text=ov.album))
+    if ov.album_artist is not None:
+        id3.delall("TPE2")
+        if ov.album_artist:
+            id3.add(TPE2(encoding=3, text=ov.album_artist))
+    if ov.year is not None:
+        id3.delall("TDRC")
+        year_value = _year_only(ov.year) or ov.year
+        if year_value:
+            id3.add(TDRC(encoding=3, text=year_value))
+    if ov.genre is not None:
+        id3.delall("TCON")
+        if ov.genre:
+            id3.add(TCON(encoding=3, text=ov.genre))
+    if ov.track_total is not None:
+        existing = id3.get("TRCK")
+        current_no = ""
+        if existing and existing.text:
+            current_no = str(existing.text[0]).split("/", 1)[0]
+        id3.delall("TRCK")
+        id3.add(TRCK(encoding=3, text=f"{current_no or '0'}/{ov.track_total}"))
+    if ov.disc_total is not None:
+        existing_disc = id3.get("TPOS")
+        current_disc = ""
+        if existing_disc and existing_disc.text:
+            current_disc = str(existing_disc.text[0]).split("/", 1)[0]
+        id3.delall("TPOS")
+        id3.add(TPOS(encoding=3, text=f"{current_disc or '0'}/{ov.disc_total}"))
+    id3.save(path, v2_version=4)
+
+
+def _apply_overrides_flac(path: Path, ov: TagOverrides) -> None:
+    flac = FLAC(path)
+    if flac.tags is None:
+        flac.add_tags()
+    year_value = (_year_only(ov.year) or ov.year) if ov.year is not None else None
+    pairs: list[tuple[str, str | None]] = [
+        ("TITLE", ov.title),
+        ("ARTIST", ov.artist),
+        ("ALBUM", ov.album),
+        ("ALBUMARTIST", ov.album_artist),
+        ("DATE", year_value),
+        ("GENRE", ov.genre),
+    ]
+    for key, value in pairs:
+        if value is None:
+            continue
+        if value == "":
+            if key in flac:
+                del flac[key]
+        else:
+            flac[key] = [value]
+    if ov.track_total is not None:
+        flac["TRACKTOTAL"] = [str(ov.track_total)]
+    if ov.disc_total is not None:
+        flac["DISCTOTAL"] = [str(ov.disc_total)]
+    flac.save()
 
 
 # ---------------------------------------------------------------------------
@@ -608,11 +846,24 @@ def _to_int(value: str | int | None) -> int | None:
     return int(match.group(0))
 
 
-def _majority(values: Any) -> str | None:
-    counts: Counter[str] = Counter(v for v in values if v)
+def _majority(values: Any, *, quorum: bool = False) -> str | None:
+    """Most common non-empty value across `values`.
+
+    With `quorum=True`, the winner must occur on at least half of *all* values
+    (including empties). This guards against a stray tag from a misfiled
+    track impersonating the album-wide value when most tracks are blank — a
+    real album is unanimous on its own album name.
+    """
+    materialized = list(values)
+    counts: Counter[str] = Counter(v for v in materialized if v)
     if not counts:
         return None
-    return counts.most_common(1)[0][0]
+    winner, count = counts.most_common(1)[0]
+    if quorum:
+        threshold = max(1, (len(materialized) + 1) // 2)
+        if count < threshold:
+            return None
+    return winner
 
 
 def _year_only(date: str | None) -> str | None:

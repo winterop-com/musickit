@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,9 +38,14 @@ from musickit.metadata import (
 
 
 def default_workers() -> int:
-    """Worker thread default: half the available cores, minimum 1."""
-    cores = os.cpu_count() or 2
-    return max(1, cores // 2)
+    """Worker thread default: 2.
+
+    Each worker spawns ffmpeg, which is itself multi-threaded — so even 2
+    workers keeps a modern Mac usable for browsing/dev while a big convert
+    runs in the background. Bump explicitly with `--workers N` if you don't
+    care about foreground responsiveness.
+    """
+    return 2
 
 
 class AlbumReport(BaseModel):
@@ -224,24 +228,42 @@ def _process_album(
     for path in album_dir.tracks:
         try:
             track = read_source(path)
+            # Scrub scene-domain "artists" (`LanzamientosMp3.es` etc.) — vandalism
+            # by rip groups. Treat as missing so downstream signals pick the real
+            # artist from filename slugs / per-track artist majority.
+            if naming.is_scene_domain_artist(track.album_artist):
+                track.album_artist = None
+            if naming.is_scene_domain_artist(track.artist):
+                track.artist = None
+            # Scrub scene-domain album tags too (`www.0dayvinyls.org`) so the
+            # dirname-fallback fires instead of leaking the URL into the album
+            # name. clean_album_title would otherwise dot-flatten it to
+            # `www 0dayvinyls org`, which is worse.
+            if naming.is_scene_domain_artist(track.album):
+                track.album = None
             # When discover merged disc subfolders, the folder name is the
             # authoritative disc number — overrides whatever the per-track tag says.
             disc_from_folder = album_dir.disc_of(path)
             if disc_from_folder is not None:
                 track.disc_no = disc_from_folder
                 track.disc_total = album_dir.disc_total
-            # Pre-fill artist/title from a `NN. Artist - Title.mp3`-style filename
-            # when the source has no tags. Without this, `summarize_album` sees
-            # `track.artist == None` for every track, fails to detect the album
-            # as a compilation, and the output folder becomes `Unknown Artist/…`
-            # instead of `Various Artists/…` (the 7Os8Os9Os layout: 100 tagless
-            # MP3s named `NN. Artist - Title.mp3` and nothing else).
+            # Pre-fill artist/title/track_no from a `NN. Artist - Title.mp3`-style
+            # filename when the source tags lack them. Without this, downstream
+            # passes (compilation detection, scene-encoded DTT track-number
+            # detection, summarize_album disc-1 bias) all see Nones and bail
+            # — leaving the album bucketed under `Unknown Artist/` with flat
+            # track numbers. Two real-world cases this rescues:
+            # - 7Os8Os9Os: 100 tagless MP3s named `NN. Artist - Title.mp3`.
+            # - Absolute Music: `116-depeche_mode_-_freelove-atm.mp3` with
+            #   tags carrying title/artist/album but NO `track` tag.
             if not track.artist or not track.title:
                 parsed_artist, parsed_title = _parse_filename_for_va(path)
                 if parsed_artist and not track.artist:
                     track.artist = parsed_artist
                 if parsed_title and not track.title:
                     track.title = parsed_title
+            if track.track_no is None:
+                track.track_no = _track_no_from_filename(path)
             tracks.append(track)
         except Exception as exc:
             warnings.append(f"failed to read {path.name}: {exc}")
@@ -267,8 +289,14 @@ def _process_album(
         )
 
     _maybe_apply_filename_disc_track(album_dir, tracks)
+    _maybe_apply_scene_encoded_disc_track(album_dir, tracks)
 
     summary = summarize_album(tracks)
+    # Folder-level VA detection: `VA-Absolute_Music_60`, `Various - Hits 2024`.
+    # Only kicks in when we don't already have a clear single-artist signal —
+    # an artist majority of 90%+ should win regardless of folder vandalism.
+    if not summary.is_compilation and naming.folder_name_implies_va(album_dir.path.name):
+        summary.is_compilation = True
     if not summary.album:
         warnings.append("missing album tag — using input folder name")
         cleaned, folder_year = naming.clean_folder_album_name(album_dir.path.name)
@@ -667,6 +695,7 @@ def _planned_filename(
         artist=filename_artist,
         disc_no=track.disc_no,
         disc_total=track.disc_total or summary.disc_total,
+        track_total=track.track_total or summary.track_total,
         extension=output_ext,
     )
 
@@ -746,10 +775,83 @@ def _maybe_apply_filename_disc_track(album_dir: AlbumDir, tracks: list[SourceTra
             track.title = title
 
 
+_FILENAME_LEADING_3DIGIT_RE = re.compile(r"^\s*(\d{3})(?!\d)")
+
+
+def _maybe_apply_scene_encoded_disc_track(album_dir: AlbumDir, tracks: list[SourceTrack]) -> None:
+    """Decode scene-style `DTT` track numbers (`101 = disc 1 track 1`).
+
+    Conventions like Now! / Absolute Music / Billboard compilations encode
+    multi-disc structure into a 3-digit track number prefix on the FILENAME
+    (`101_artist_-_title.mp3`). The MP3 `track` tag often carries the in-disc
+    number (e.g. `1`) while the filename carries the encoded form (`101`).
+    We read the FILENAME prefix because the tag is unreliable.
+
+    Trigger conditions (all required, conservative):
+    - `discover` did NOT already merge this album from disc subfolders.
+    - Every track's filename starts with a 3-digit number (100-999).
+    - The set of `tn // 100` has ≥2 unique values.
+    - Each disc cluster has ≥3 tracks (a 100-track regular album with one
+      track numbered 100 won't accidentally trigger this).
+
+    On match, rewrite each track: `disc_no = filename_tn // 100`,
+    `track_no = filename_tn % 100`, `disc_total = max(disc_no)`.
+    """
+    if album_dir.disc_total is not None:
+        return
+    filename_dtt: list[tuple[SourceTrack, int]] = []
+    for track in tracks:
+        match = _FILENAME_LEADING_3DIGIT_RE.match(track.path.stem)
+        if not match:
+            return  # at least one track lacks the prefix → bail
+        tn = int(match.group(1))
+        if not (100 <= tn < 1000):
+            return
+        filename_dtt.append((track, tn))
+    discs: dict[int, int] = {}
+    for _, tn in filename_dtt:
+        discs[tn // 100] = discs.get(tn // 100, 0) + 1
+    if len(discs) < 2 or any(count < 3 for count in discs.values()):
+        return
+    disc_total = max(discs)
+    for track, tn in filename_dtt:
+        track.disc_no = tn // 100
+        track.track_no = tn % 100
+        track.disc_total = disc_total
+
+
+_SCENE_TAG_SUFFIX_RE = re.compile(r"[\s\-_]+(?:atm|lzy|dqm|tfm|rjk|atb|wre|cmc|mfa)$", re.IGNORECASE)
+
+
+def _humanise_slug(s: str) -> str:
+    """Clean a snake_case filename slug into Title Case.
+
+    Real-world rips frequently store track titles only in the filename, in
+    `lowercase_underscore-separated_form-scene` style (e.g. Absolute Music's
+    `miio_feat_daddy_boastin_-_nar_vi_tva_blir_en-atm`). This function:
+    - drops a trailing scene-tag suffix (`-atm`, `-lzy`, `-dqm`, …)
+    - converts underscores to spaces
+    - title-cases each word (preserving apostrophes that `str.title()` mangles)
+    Idempotent on already-humanised strings.
+    """
+    if not s:
+        return s
+    cleaned = _SCENE_TAG_SUFFIX_RE.sub("", s)
+    if "_" not in cleaned:
+        # Already looks human (no slug separators) — leave it.
+        return cleaned.strip()
+    cleaned = cleaned.replace("_", " ")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    # `.capitalize()` is gentler on apostrophes than `.title()` (it leaves
+    # "don't" alone instead of producing "Don'T").
+    return " ".join(w.capitalize() if w else w for w in cleaned.split(" "))
+
+
 def _title_from_filename(path: Path) -> str:
     stem = path.stem
     match = re.match(r"^\s*\d{1,3}\s*[.\-_]+\s*(.+)$", stem)
-    return (match.group(1) if match else stem).strip()
+    body = match.group(1) if match else stem
+    return _humanise_slug(body.strip())
 
 
 def _parse_filename_for_va(path: Path) -> tuple[str | None, str | None]:
@@ -758,10 +860,14 @@ def _parse_filename_for_va(path: Path) -> tuple[str | None, str | None]:
     Returns `(artist, title)` if the filename has at least 3 ` - ` segments
     after the track number, otherwise `(None, None)` and the caller falls
     back to `_title_from_filename`. Strips a leading `VA -` segment if present.
+    Underscored slugs are humanised (`per_gessle_-_tycker_om` →
+    `Per Gessle - Tycker Om`) before splitting, so the dash detector works
+    on the human form.
     """
     stem = path.stem
     body_match = re.match(r"^\s*\d{1,3}\s*[.\-_]+\s*(.+)$", stem)
     body = body_match.group(1) if body_match else stem
+    body = _humanise_slug(body)
     parts = [p.strip() for p in re.split(r"\s+-\s+", body) if p.strip()]
     if parts and parts[0].lower() in ("va", "various", "various artists"):
         parts = parts[1:]

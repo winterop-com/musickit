@@ -32,6 +32,85 @@ def test_va_aliases_collapse_to_various_artists():
         assert is_various_artists(alias) is True
 
 
+def test_va_aliases_include_localised_forms():
+    """Real rips ship with the localised form of 'Various Artists'."""
+    for alias in [
+        "Blandade Artister",  # Swedish
+        "blandade artister",
+        "Verschiedene Interpreten",  # German
+        "Varios Artistas",  # Spanish
+        "Vari Artisti",  # Italian
+        "Artistes Divers",  # French
+    ]:
+        assert is_various_artists(alias) is True, alias
+
+
+def test_folder_name_implies_va_for_scene_naming():
+    """Scene-rip dir names like `VA-Absolute_Music_60` should signal compilation."""
+    from musickit.naming import folder_name_implies_va
+
+    assert folder_name_implies_va("VA-Absolute_Music_60") is True
+    assert folder_name_implies_va("VA_Absolute_Music_47") is True
+    assert folder_name_implies_va("VA - Greatest Hits 2024") is True
+    assert folder_name_implies_va("V.A. - Best Of") is True
+    assert folder_name_implies_va("Various - Top 40") is True
+    assert folder_name_implies_va("Various Artists - Hits") is True
+    # Real artists named starting with VA-something shouldn't be misclassified.
+    assert folder_name_implies_va("Vampire Weekend - Modern Vampires") is False
+    assert folder_name_implies_va("Vance Joy") is False
+    assert folder_name_implies_va("Variety Pack") is False
+    assert folder_name_implies_va("") is False
+
+
+def test_smart_title_case_only_acts_on_all_lowercase():
+    """Title-case fires only when source has zero uppercase — protects real casing."""
+    from musickit.naming import smart_title_case
+
+    # All-lowercase → titled.
+    assert smart_title_case("hang with me") == "Hang With Me"
+    assert smart_title_case("robyn") == "Robyn"
+    assert smart_title_case("håkan hellström") == "Håkan Hellström"
+    # Apostrophe contractions stay correct (not `Don'T`).
+    assert smart_title_case("don't stop me now") == "Don't Stop Me Now"
+    assert smart_title_case("rock'n'roll") == "Rock'n'Roll"
+    # Real casing → preserved.
+    assert smart_title_case("AC/DC") == "AC/DC"
+    assert smart_title_case("ABBA") == "ABBA"
+    assert smart_title_case("iPhone") == "iPhone"
+    assert smart_title_case("R.E.M.") == "R.E.M."
+    assert smart_title_case("Imagine Dragons") == "Imagine Dragons"
+    # Edges.
+    assert smart_title_case(None) is None
+    assert smart_title_case("") == ""
+
+
+def test_scene_domain_detection_handles_multilabel_hosts():
+    """`www.0dayvinyls.org` survived the single-dot regex; multi-dot now caught."""
+    from musickit.naming import is_scene_domain_artist
+
+    assert is_scene_domain_artist("www.0dayvinyls.org") is True
+    assert is_scene_domain_artist("releases.scene.cc") is True
+    # `R.E.M.` would still be safe — last segment is 1-letter, not a TLD.
+    assert is_scene_domain_artist("R.E.M.") is False
+
+
+def test_scene_domain_artist_detection():
+    """Domain-shaped 'artists' (vandalism by rip groups) detected as fake."""
+    from musickit.naming import is_scene_domain_artist
+
+    assert is_scene_domain_artist("LanzamientosMp3.es") is True
+    assert is_scene_domain_artist("boxset.me") is True
+    assert is_scene_domain_artist("mp3hosting.cc") is True
+    assert is_scene_domain_artist("rutracker.org") is True
+    # Not a domain — real artist names with periods stay intact.
+    assert is_scene_domain_artist("R.E.M.") is False
+    assert is_scene_domain_artist("St. Vincent") is False
+    assert is_scene_domain_artist("Mr. Big") is False
+    assert is_scene_domain_artist("Imagine Dragons") is False
+    assert is_scene_domain_artist(None) is False
+    assert is_scene_domain_artist("") is False
+
+
 def test_non_va_artists_pass_through():
     assert is_various_artists("Imagine Dragons") is False
     assert is_various_artists(None) is False
@@ -93,6 +172,19 @@ def test_track_filename_handles_missing_inputs():
 def test_track_filename_honours_extension():
     assert track_filename(1, "Hi", extension=".mp3") == "01 - Hi.mp3"
     assert track_filename(1, "Hi", extension="mp3") == "01 - Hi.mp3"
+
+
+def test_track_filename_widens_padding_for_albums_with_100_plus_tracks():
+    """100-track albums need 3-digit padding so alphabetical sort matches track order."""
+    # Single-digit and 2-digit albums keep the original 2-wide format.
+    assert track_filename(1, "Track", track_total=12) == "01 - Track.m4a"
+    assert track_filename(99, "Track", track_total=99) == "99 - Track.m4a"
+    # 100+: width grows to 3, so 1 → 001 ... 99 → 099 ... 100 → 100, sorts correctly.
+    assert track_filename(1, "Track", track_total=100) == "001 - Track.m4a"
+    assert track_filename(99, "Track", track_total=100) == "099 - Track.m4a"
+    assert track_filename(100, "Track", track_total=100) == "100 - Track.m4a"
+    # Multi-disc + 100-track album: disc stays 2-wide, track widens to 3.
+    assert track_filename(50, "Track", disc_no=2, disc_total=2, track_total=100) == "02-050 - Track.m4a"
 
 
 def test_track_filename_includes_artist_for_compilations():

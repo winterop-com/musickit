@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 from collections.abc import Iterable
 from enum import Enum
 from pathlib import Path
@@ -14,6 +15,13 @@ from musickit.metadata import SourceTrack
 
 _COVER_STEMS: tuple[str, ...] = ("cover", "folder", "front", "albumart")
 _COVER_EXTS: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp")
+# Token-level cover keyword match: catches scene-style filenames like
+# `000_va_-_absolute_music_47_(swedish_edition)-2cd-2004-(front)-dqm.jpg` and
+# `absolute music 45 front.jpg`. Negative lookarounds prevent false positives
+# like `frontiers` or `coverage`. `_BACK_KEYWORD_RE` filters out matching
+# `back` covers so we don't pick a back cover over a front cover.
+_COVER_KEYWORD_RE = re.compile(r"(?<![a-z])(?:cover|folder|front|albumart)(?![a-z])", re.IGNORECASE)
+_BACK_KEYWORD_RE = re.compile(r"(?<![a-z])back(?![a-z])", re.IGNORECASE)
 DEFAULT_MAX_EDGE = 1000  # 1000×1000 JPEG is plenty for Music.app cover-flow + Finder previews.
 _JPEG_QUALITY = 90
 
@@ -217,11 +225,20 @@ def normalize(candidate: CoverCandidate, *, max_edge: int = DEFAULT_MAX_EDGE) ->
 
 
 def _find_folder_images(album_dir: Path) -> list[Path]:
+    """Find candidate cover-art files in `album_dir`.
+
+    Two-tier match: exact stems (`cover.jpg`, `front.png`) are preferred. As a
+    fallback, any image whose stem contains `cover` / `folder` / `front` /
+    `albumart` as a token is included — this catches scene-rip naming like
+    `*-(front)-*.jpg` and `absolute music 45 front.jpg`. `back` covers are
+    filtered so a back-only file doesn't get picked when no front exists.
+    """
     if not album_dir.is_dir():
         return []
     matches: list[Path] = []
     seen: set[Path] = set()
     by_stem: dict[str, list[Path]] = {stem: [] for stem in _COVER_STEMS}
+    keyword_matches: list[Path] = []
     for entry in album_dir.iterdir():
         if not entry.is_file():
             continue
@@ -231,11 +248,19 @@ def _find_folder_images(album_dir: Path) -> list[Path]:
         stem = entry.stem.lower()
         if stem in by_stem:
             by_stem[stem].append(entry)
+            continue
+        # Token-level fallback for noisy filenames.
+        if _COVER_KEYWORD_RE.search(stem) and not _BACK_KEYWORD_RE.search(stem):
+            keyword_matches.append(entry)
     for stem in _COVER_STEMS:
         for path in sorted(by_stem.get(stem, []), key=lambda p: p.name):
             if path not in seen:
                 matches.append(path)
                 seen.add(path)
+    for path in sorted(keyword_matches, key=lambda p: p.name):
+        if path not in seen:
+            matches.append(path)
+            seen.add(path)
     return matches
 
 

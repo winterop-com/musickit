@@ -188,6 +188,110 @@ def test_remove_source_refuses_to_delete_input_root(silent_flac_template: Path, 
     assert any("refusing to remove" in w for w in reports[0].warnings)
 
 
+def test_humanise_slug_cleans_snake_case_titles() -> None:
+    """Filename slugs (snake_case lowercase) → human-readable Title Case."""
+    from musickit.pipeline import _humanise_slug
+
+    # Plain slug with scene tag suffix.
+    assert (
+        _humanise_slug("miio_feat_daddy_boastin_-_nar_vi_tva_blir_en-atm")
+        == "Miio Feat Daddy Boastin - Nar Vi Tva Blir En"
+    )
+    # Per Gessle case (no scene tag).
+    assert _humanise_slug("per_gessle_-_tycker_om_nar_du_tar_pa_mig") == "Per Gessle - Tycker Om Nar Du Tar Pa Mig"
+    # Apostrophe survival: `str.title()` would mangle "don't" → "Don'T".
+    assert _humanise_slug("eamon_-_fuck_it_(i_don't_want_you_back)") == "Eamon - Fuck It (i Don't Want You Back)"
+    # Already humanised → idempotent.
+    assert _humanise_slug("Already Clean Title") == "Already Clean Title"
+    # Empty / None-like.
+    assert _humanise_slug("") == ""
+
+
+def test_scene_encoded_dtt_track_number_splits_into_multidisc(silent_flac_template: Path, tmp_path: Path) -> None:
+    """`101 = CD1 track 1`-style scene compilations get rewritten to proper multi-disc.
+
+    The Absolute Music / Now!-series convention: track numbers `101..120` then
+    `201..220` mean "disc 1 tracks 1-20" + "disc 2 tracks 1-20", with no
+    `disc`/`disctotal` tag in sight. Pipeline detects the cluster, rewrites
+    `disc_no` / `track_no`, and the planner produces multi-disc filenames.
+    """
+    from mutagen.flac import FLAC
+
+    album_dir = tmp_path / "input" / "VA-Comp"
+    album_dir.mkdir(parents=True)
+    # 4 tracks per disc (≥3 required by the heuristic) across 2 discs.
+    for disc in (1, 2):
+        for n in range(1, 5):
+            tn = disc * 100 + n  # 101, 102, 103, 104, 201, 202, 203, 204
+            dst = album_dir / f"{tn:03d}_track.flac"
+            shutil.copy2(silent_flac_template, dst)
+            flac = FLAC(dst)
+            flac["TITLE"] = f"Track {n}"
+            flac["ARTIST"] = f"Artist {disc}-{n}"
+            flac["ALBUM"] = "Compilation Vol 1"
+            flac["DATE"] = "2003"
+            flac["TRACKNUMBER"] = str(tn)
+            flac.save()
+
+    out_root = tmp_path / "output"
+    reports = pipeline.run(
+        tmp_path / "input",
+        out_root,
+        fmt=OutputFormat.ALAC,
+        verbose=True,
+        console=Console(record=True, width=120),
+    )
+    assert reports[0].ok is True
+    out_album = out_root / "Various Artists" / "2003 - Compilation Vol 1"
+    files = sorted(p.name for p in out_album.glob("*.m4a"))
+    # Multi-disc prefix kicked in: `01-01 ... 01-04, 02-01 ... 02-04`.
+    assert all(name.startswith(("01-0", "02-0")) for name in files), files
+    assert any(name.startswith("01-01 -") for name in files)
+    assert any(name.startswith("02-04 -") for name in files)
+
+
+def test_scene_encoded_heuristic_does_not_fire_on_legit_99plus_album(
+    silent_flac_template: Path, tmp_path: Path
+) -> None:
+    """A legit 100-track album (1..100, including a single 100) shouldn't be split.
+
+    Only one track has `track_no >= 100` so the cluster `{1: 1}` doesn't have
+    ≥2 disc prefixes — heuristic correctly bails.
+    """
+    from mutagen.flac import FLAC
+
+    album_dir = tmp_path / "input" / "BigAlbum"
+    album_dir.mkdir(parents=True)
+    # Make 5 tracks: 1, 2, 3, 4, 100. Track 100 alone shouldn't trigger split.
+    for tn in (1, 2, 3, 4, 100):
+        dst = album_dir / f"{tn:03d}_track.flac"
+        shutil.copy2(silent_flac_template, dst)
+        flac = FLAC(dst)
+        flac["TITLE"] = f"Track {tn}"
+        flac["ARTIST"] = "Solo"
+        flac["ALBUMARTIST"] = "Solo"
+        flac["ALBUM"] = "Big Album"
+        flac["DATE"] = "2024"
+        flac["TRACKNUMBER"] = str(tn)
+        flac.save()
+
+    out_root = tmp_path / "output"
+    reports = pipeline.run(
+        tmp_path / "input",
+        out_root,
+        fmt=OutputFormat.ALAC,
+        verbose=True,
+        console=Console(record=True, width=120),
+    )
+    assert reports[0].ok is True
+    out_album = out_root / "Solo" / "2024 - Big Album"
+    files = sorted(p.name for p in out_album.glob("*.m4a"))
+    # Single-disc — heuristic didn't split. No `01-` / `02-` disc-prefixed names.
+    assert not any(name.startswith(("01-", "02-")) for name in files), files
+    # Track 100 lands at "100 - …" (the {:02d} format is min-width and accommodates).
+    assert any(name.startswith("100 -") for name in files)
+
+
 def test_collision_disambiguation_keeps_every_track(silent_flac_template: Path, tmp_path: Path) -> None:
     """Two tracks sharing track-no + title must both end up on disk, not silently dropped."""
     from mutagen.flac import FLAC
@@ -389,3 +493,41 @@ def test_cover_collects_every_distinct_embedded_picture(silent_flac_template: Pa
     assert best is not None
     # The 1200×1200 picture wins on pixel area.
     assert best.width == 1200 and best.height == 1200
+
+
+def test_cover_discovery_matches_token_keywords(tmp_path: Path) -> None:
+    """Scene-rip covers like `*-(front)-*.jpg` should be picked up.
+
+    Real-world filenames don't stick to `cover.jpg`/`folder.jpg` — Absolute
+    Music rips ship `absolute music 45 front.jpg`,
+    `000_va_-_absolute_music_47_(swedish_edition)-2cd-2004-(front)-dqm.jpg`.
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    from musickit import cover as cover_mod
+
+    album_dir = tmp_path / "scene-rip"
+    album_dir.mkdir()
+    img = Image.new("RGB", (600, 600), color="red")
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    payload = buf.getvalue()
+    front = album_dir / "000_va_-_absolute_music_47_(swedish_edition)-2cd-2004-(front)-dqm.jpg"
+    front.write_bytes(payload)
+    back = album_dir / "000_va_-_absolute_music_47_(swedish_edition)-2cd-2004-(back)-dqm.jpg"
+    back.write_bytes(payload)
+    other = album_dir / "absolute music 45 front.jpg"
+    other.write_bytes(payload)
+    unrelated = album_dir / "frontiers_was_a_journey_album.jpg"  # `front` lookalike
+    unrelated.write_bytes(payload)
+
+    matches = cover_mod._find_folder_images(album_dir)
+    names = {p.name for p in matches}
+    assert front.name in names
+    assert other.name in names
+    # `back` cover is filtered out (we don't want a back cover when no front exists).
+    assert back.name not in names
+    # `frontiers` should not match the `front` token (negative-lookahead works).
+    assert unrelated.name not in names

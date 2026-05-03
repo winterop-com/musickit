@@ -34,3 +34,6 @@ output/*
 
 # Claude Code project state
 .claude/
+
+# Ad-hoc debug logs
+*.log

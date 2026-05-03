@@ -20,9 +20,9 @@ from musickit.metadata import SUPPORTED_AUDIO_EXTS
 # - leading bare:    `CD1`, `CD-1`, `CD 2`, `Disc 2`, `Disk3`
 # - leading + trail: `CD2 (Bonus Live CD)`, `CD2 - Live In Madrid`
 # - trailing suffix: `Album Name (CD1)`, `Album Name [Disc 2]`
-_DISC_LEAD_RE = re.compile(r"^(?:cd|disc|disk)[\s\-_]*(\d+)\b\s*(.*)$", re.IGNORECASE)
+_DISC_LEAD_RE = re.compile(r"^(?:cd|disc|disk)[\s\-_.]*(\d+)\b\s*(.*)$", re.IGNORECASE)
 _DISC_SUFFIX_RE = re.compile(
-    r"\s*[\(\[\-]\s*(?:cd|disc|disk)[\s\-_]*(\d+)\s*[\)\]]?\s*$",
+    r"\s*[\(\[\-]\s*(?:cd|disc|disk)[\s\-_.]*(\d+)\s*[\)\]]?\s*$",
     re.IGNORECASE,
 )
 

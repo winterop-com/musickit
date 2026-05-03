@@ -6,6 +6,9 @@ import re
 import unicodedata
 
 # Aliases that should all map to the canonical "Various Artists" folder name.
+# Includes localised forms that show up on real rips (Swedish "Blandade
+# Artister", German "Verschiedene Interpreten", Spanish "Varios Artistas",
+# Italian "Vari Artisti", French "Artistes Divers"). Comparison is case-folded.
 _VA_ALIASES: frozenset[str] = frozenset(
     {
         "va",
@@ -14,7 +17,45 @@ _VA_ALIASES: frozenset[str] = frozenset(
         "various",
         "various artist",
         "various artists",
+        # Swedish
+        "blandade artister",
+        "blandade artist",
+        # German
+        "verschiedene interpreten",
+        "verschiedene",
+        # Spanish
+        "varios artistas",
+        "varios",
+        # Italian
+        "vari artisti",
+        # French
+        "artistes divers",
+        "divers",
     }
+)
+
+# Pattern matching scene-website "artists" like `LanzamientosMp3.es` /
+# `boxset.me` / `mp3hosting.cc` / `www.0dayvinyls.org` — domain-shaped strings
+# that some rip groups vandalise the artist (and sometimes album) tag with.
+# Allows multi-label hosts (`www.foo.org`) but the final segment must be a
+# 2–5 char TLD so single-letter acronyms (`R.E.M.`) and honorifics (`St. V`)
+# don't accidentally match.
+_SCENE_DOMAIN_RE = re.compile(r"^(?:[\w-]+\.)+[a-z]{2,5}\.?$", re.IGNORECASE)
+
+# Patterns indicating a string still contains scene-rip residue that *should*
+# have been cleaned by the convert pipeline. Used by `musickit library`
+# auditing to flag rows the user might want to fix with `retag`.
+_SCENE_RESIDUE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    # Underscore between two ≥2-letter chunks (e.g. `Absolute_Music_45`).
+    re.compile(r"(?<=[A-Za-z]{2})_(?=[A-Za-z]{2})"),
+    # Dot between two ≥2-letter chunks (e.g. `Absolute.Music.60`); allows
+    # `R.E.M.` and `St. Vincent` because of the 2-char minimum on each side.
+    re.compile(r"(?<=[A-Za-z]{2})\.(?=[A-Za-z]{2})"),
+    # Codec / quality / bitrate brackets that should have been stripped.
+    re.compile(r"\[\s*(?:flac|mp3|aac|alac|wav|24\s*bit|16\s*bit|hi-?res|lossless|web)\s*\]", re.IGNORECASE),
+    re.compile(r"\[\s*\d+\s*(?:k|kbps|kHz)\s*\]", re.IGNORECASE),
+    # Leading `VA-` / `VA_` / `V.A.-` prefix.
+    re.compile(r"^\s*(?:VA|V\.A\.)[\s_.\-]+", re.IGNORECASE),
 )
 
 VARIOUS_ARTISTS = "Various Artists"
@@ -84,6 +125,69 @@ def is_various_artists(album_artist: str | None) -> bool:
     return album_artist.strip().casefold() in _VA_ALIASES
 
 
+_FOLDER_VA_PREFIX_RE = re.compile(
+    # Matches `VA`, `V.A.`, `V_A`, `Various`, `Various Artists` at the start of a
+    # folder name, followed by a separator (space/dash/dot/underscore).
+    r"^\s*(?:V[\._]?A|various(?:[\s_]+artists?)?)[\s\.\-_]",
+    re.IGNORECASE,
+)
+
+
+def folder_name_implies_va(name: str) -> bool:
+    """True if a folder name like `VA-Absolute_Music_60` indicates a compilation.
+
+    Used as a fallback signal when neither the album_artist tag nor a per-track
+    artist majority can identify a compilation — common with scene-rip MP3
+    directories whose tags were vandalised by domain-shaped junk.
+    """
+    if not name:
+        return False
+    return bool(_FOLDER_VA_PREFIX_RE.match(name))
+
+
+def is_scene_residue(value: str | None) -> bool:
+    """True if `value` still carries scene-rip residue that should have been cleaned.
+
+    Used by audit tooling to flag album/artist names like `Absolute_Music_45`,
+    `VA.-.Hits.2024`, or `Album [FLAC]` that the convert pipeline normally
+    cleans up but might survive on already-converted libraries.
+    """
+    if not value:
+        return False
+    return any(pattern.search(value) for pattern in _SCENE_RESIDUE_PATTERNS)
+
+
+def is_scene_domain_artist(value: str | None) -> bool:
+    """True if the artist/album-artist tag is a scene-site domain (`xxx.es`).
+
+    These are vandalism by rip groups, not real artist names. Callers should
+    treat the value as missing so a downstream signal (per-track artist
+    majority, compilation flag) wins instead.
+    """
+    if not value:
+        return False
+    return bool(_SCENE_DOMAIN_RE.match(value.strip()))
+
+
+_TITLE_CASE_WORD_RE = re.compile(r"[A-Za-zÀ-ɏ]+(?:'[A-Za-zÀ-ɏ]+)?")
+
+
+def smart_title_case(value: str | None) -> str | None:
+    """Title-case `value` only when it appears to have been case-stripped.
+
+    Heuristic: if the input contains any uppercase letter, return it unchanged
+    (the source had real casing — `AC/DC`, `ABBA`, `iPhone`, `R.E.M.` should
+    survive). Only when the source is entirely lowercase letters do we
+    capitalize the first letter of each word, keeping apostrophe-suffix
+    contractions intact (`don't` → `Don't`, not `Don'T`).
+    """
+    if value is None:
+        return None
+    if not value or any(c.isupper() for c in value):
+        return value
+    return _TITLE_CASE_WORD_RE.sub(lambda m: m.group(0)[0].upper() + m.group(0)[1:].lower(), value)
+
+
 def sanitize_component(value: str) -> str:
     """Make `value` safe to use as a single path component on any OS.
 
@@ -141,6 +245,7 @@ def track_filename(
     artist: str | None = None,
     disc_no: int | None = None,
     disc_total: int | None = None,
+    track_total: int | None = None,
     extension: str = ".m4a",
 ) -> str:
     """Output filename for a single track.
@@ -149,8 +254,14 @@ def track_filename(
     (`disc_total > 1`), the disc number is prefixed: `01-01 - Title<ext>`.
     When `artist` is provided (typically only for compilations / VA albums)
     it is inserted between track number and title: `01-05 - Artist - Title<ext>`.
+
+    Track-number width grows with `track_total` so albums with ≥100 tracks
+    sort alphabetically correctly: a 100-track album yields `001`, `002`,
+    `010`, `099`, `100` instead of breaking at the 2/3-digit boundary.
+    Disc-number width is fixed at 2 (no realistic disc count needs more).
     """
-    track_str = f"{track_no:02d}" if track_no else "00"
+    width = 3 if (track_total or 0) >= 100 else 2
+    track_str = f"{track_no:0{width}d}" if track_no else "0" * width
     title_str = (title or "").strip() or "Untitled"
     title_str = sanitize_component(title_str)
     if disc_total and disc_total > 1 and disc_no:

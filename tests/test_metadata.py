@@ -97,6 +97,18 @@ def test_clean_album_title_strips_disc_suffixes() -> None:
     assert clean_album_title("Roses (CD2) Live In Madrid 12-03-2010") == "Roses Live In Madrid 12-03-2010"
     # Bare trailing `(N)` is treated as a disc index when the album would otherwise be intact.
     assert clean_album_title("Echoes - The Best Of Pink Floyd (1)") == "Echoes - The Best Of Pink Floyd"
+    # Period as separator: `[CD.1]` / `(CD.2)` (Absolute Music Swedish-edition style).
+    assert clean_album_title("Absolute Music 51 [CD.1]") == "Absolute Music 51"
+    assert clean_album_title("Absolute Music 52 (CD.2)") == "Absolute Music 52"
+    # Dots-as-separator + VA prefix (scene-rip vandalism: `VA.-.Absolute.Music.60`).
+    assert clean_album_title("VA.-.Absolute.Music.60") == "Absolute Music 60"
+    # Underscores-as-separator (folder-name fallback: `VA-Absolute_Music_45`).
+    assert clean_album_title("Absolute_Music_45") == "Absolute Music 45"
+    # Single-letter acronyms with periods are preserved.
+    assert clean_album_title("R.E.M.") == "R.E.M."
+    # Honorifics with trailing period + space are preserved.
+    assert clean_album_title("St. Vincent") == "St. Vincent"
+    assert clean_album_title("Mr. Big") == "Mr. Big"
     # Don't mangle albums with no suffix.
     assert clean_album_title("Night Visions") == "Night Visions"
     assert clean_album_title(None) is None
@@ -120,11 +132,72 @@ def test_summarize_album_infers_compilation_when_album_artist_missing_and_artist
     assert summary.is_compilation is True
 
 
+def test_summarize_album_album_quorum_rejects_stray_tagged_track() -> None:
+    """A single misfiled track should not impersonate the album's whole-album tag.
+
+    AM45 case: 40 tracks have no album tag, 1 stray says `Guilty`. Without the
+    quorum rule, `Guilty` won the vote and became the album name even though
+    the rest of the album was nothing of the sort.
+    """
+    tracks: list[SourceTrack] = []
+    for i in range(40):
+        tracks.append(SourceTrack(path=Path(f"/{i}.mp3"), album=None, artist="Various"))
+    tracks.append(SourceTrack(path=Path("/stray1.mp3"), album="Guilty", artist="Blue"))
+    tracks.append(SourceTrack(path=Path("/stray2.mp3"), album="Seal IV", artist="Seal"))
+    summary = summarize_album(tracks)
+    # Neither stray tag has the >50% quorum, so summary.album falls back to None.
+    # Pipeline-level dirname fallback then takes over.
+    assert summary.album is None
+
+
+def test_summarize_album_album_quorum_accepts_unanimous_tags() -> None:
+    tracks = [SourceTrack(path=Path(f"/{i}.flac"), album="Night Visions") for i in range(11)]
+    summary = summarize_album(tracks)
+    assert summary.album == "Night Visions"
+
+
 def test_summarize_album_detects_compilation_when_per_track_artist_is_va_marker() -> None:
     # Rip stamps every track with ARTIST=VA and leaves album_artist blank.
     tracks = [SourceTrack(path=Path(f"/{i}.flac"), artist="VA", album="Mix") for i in range(3)]
     summary = summarize_album(tracks)
     assert summary.is_compilation is True
+
+
+def test_apply_tag_overrides_only_changes_specified_fields(silent_flac: Path) -> None:
+    """`retag` must update only the fields you pass; everything else stays."""
+    from musickit.metadata import TagOverrides, apply_tag_overrides
+
+    _tag_flac(
+        silent_flac,
+        {
+            "TITLE": "Original Title",
+            "ARTIST": "Original Artist",
+            "ALBUM": "Original Album",
+            "ALBUMARTIST": "Original Album Artist",
+            "DATE": "2010",
+            "GENRE": "Rock",
+        },
+    )
+
+    apply_tag_overrides(silent_flac, TagOverrides(album="New Album", year="2024"))
+
+    flac = FLAC(silent_flac)
+    assert flac["ALBUM"][0] == "New Album"
+    assert flac["DATE"][0] == "2024"
+    # Untouched fields preserved.
+    assert flac["TITLE"][0] == "Original Title"
+    assert flac["ARTIST"][0] == "Original Artist"
+    assert flac["ALBUMARTIST"][0] == "Original Album Artist"
+    assert flac["GENRE"][0] == "Rock"
+
+
+def test_apply_tag_overrides_year_normalises_to_4_digits(silent_flac: Path) -> None:
+    from musickit.metadata import TagOverrides, apply_tag_overrides
+
+    _tag_flac(silent_flac, {"DATE": "2010"})
+    apply_tag_overrides(silent_flac, TagOverrides(year="2024-01-15"))
+    flac = FLAC(silent_flac)
+    assert flac["DATE"][0] == "2024"
 
 
 def test_round_trip_flac_to_alac_preserves_tags(silent_flac: Path, tmp_path: Path) -> None:
