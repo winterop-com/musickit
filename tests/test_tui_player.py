@@ -152,7 +152,7 @@ def test_player_handles_unopenable_file_softly(tmp_path: Path, fake_stream: type
 
     bogus = tmp_path / "not-audio.m4a"
     bogus.write_bytes(b"\x00" * 100)
-    failures: list[tuple[Path, str]] = []
+    failures: list[tuple[Path | str, str]] = []
 
     player = AudioPlayer()
     player.on_track_failed = lambda p, msg: failures.append((p, msg))

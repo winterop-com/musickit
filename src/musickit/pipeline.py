@@ -115,7 +115,11 @@ def run(
     Pass `verbose=True` to swap the bar for one log line per track.
     """
     console = console or Console()
-    convert.ensure_ffmpeg()
+    if not dry_run:
+        # `--dry-run` plans only — no encoding, so we don't need ffmpeg on
+        # PATH. Useful for previewing what convert will do on a machine that
+        # hasn't installed ffmpeg yet.
+        convert.ensure_ffmpeg()
     worker_count = max(1, workers if workers is not None else default_workers())
 
     # Tri-state enrich: None = "auto, probe connectivity"; True = "force on,

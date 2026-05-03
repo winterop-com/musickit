@@ -51,7 +51,8 @@ class AudioPlayer:
     """
 
     on_track_end: Callable[[], None] | None = None
-    on_track_failed: Callable[[Path, str], None] | None = None
+    on_track_failed: Callable[[Path | str, str], None] | None = None
+    on_metadata_change: Callable[[], None] | None = None
 
     def __init__(self, sample_rate: int = _SAMPLE_RATE) -> None:
         self._sample_rate = sample_rate
@@ -61,7 +62,14 @@ class AudioPlayer:
         self._stopped: bool = True
         self._frames_played: int = 0
         self._duration: float = 0.0
-        self._current_path: Path | None = None
+        self._current_source: Path | str | None = None
+        # Live-stream metadata. `is_live` flips True when we're playing a
+        # URL whose `stream.duration` is None (Icecast/Shoutcast/HLS).
+        # `stream_title` is the most recent ICY `StreamTitle` (current song)
+        # — updated by the decoder thread polling `container.metadata`.
+        self._is_live: bool = False
+        self._stream_title: str | None = None
+        self._stream_station_name: str | None = None
         # 8-band amplitude levels (0.0–1.0), driven by the UI tick (NOT the
         # audio callback). The callback only stores the last-played chunk;
         # `update_band_levels()` reads it and runs FFT off the audio thread.
@@ -84,33 +92,51 @@ class AudioPlayer:
     # Public API
     # ------------------------------------------------------------------
 
-    def play(self, path: Path) -> None:
-        """Stop any current playback and start `path` from the beginning."""
+    def play(self, source: Path | str) -> None:
+        """Stop any current playback and start `source` from the beginning.
+
+        `source` can be a local `Path` or a URL string — PyAV's `av.open`
+        handles HTTP / Icecast / Shoutcast streams natively. Live streams
+        (where the demuxer can't tell the duration) flip `is_live=True` and
+        kick off ICY `StreamTitle` polling.
+        """
         self.stop()
         self._frames_played = 0
         self._end_fired = False
         self._paused = False
         self._stopped = False
-        self._current_path = path
+        self._current_source = source
+        self._stream_title = None
+        self._stream_station_name = None
         self._queue = queue.Queue(maxsize=_QUEUE_MAX_CHUNKS)
         self._current_chunk = None
         self._chunk_offset = 0
 
         try:
-            container, stream = _open_container(path)
+            container, stream = _open_container(source)
         except Exception as exc:
-            log.warning("failed to open %s: %s", path, exc)
+            log.warning("failed to open %s: %s", source, exc)
             self._stopped = True
             if self.on_track_failed is not None:
-                self.on_track_failed(path, str(exc))
+                self.on_track_failed(source, str(exc))
             return
 
         self._duration = float(stream.duration * stream.time_base) if stream.duration else 0.0
+        self._is_live = self._duration <= 0
+        # Pull initial ICY metadata if it's a stream (icy-name etc.).
+        self._stream_station_name = _get_metadata_value(container, "icy-name")
+        self._stream_title = _get_metadata_value(container, "StreamTitle")
+        if self.on_metadata_change is not None and (self._stream_station_name or self._stream_title):
+            try:
+                self.on_metadata_change()
+            except Exception:  # pragma: no cover
+                pass
 
+        thread_name = f"musickit-decoder-{Path(str(source)).name}"
         self._decoder_thread = threading.Thread(
             target=self._decoder_loop,
             args=(container, stream),
-            name=f"musickit-decoder-{path.name}",
+            name=thread_name,
             daemon=True,
         )
         self._decoder_thread.start()
@@ -128,7 +154,7 @@ class AudioPlayer:
             log.warning("failed to open audio device: %s", exc)
             self._stopped = True
             if self.on_track_failed is not None:
-                self.on_track_failed(path, f"audio device unavailable: {exc}")
+                self.on_track_failed(source, f"audio device unavailable: {exc}")
 
     def stop(self) -> None:
         """Stop playback and join the decoder thread."""
@@ -197,7 +223,26 @@ class AudioPlayer:
 
     @property
     def current_path(self) -> Path | None:
-        return self._current_path
+        return self._current_source if isinstance(self._current_source, Path) else None
+
+    @property
+    def current_source(self) -> Path | str | None:
+        return self._current_source
+
+    @property
+    def is_live(self) -> bool:
+        """True when playing an unbounded stream (live radio / Icecast)."""
+        return self._is_live
+
+    @property
+    def stream_title(self) -> str | None:
+        """ICY `StreamTitle` (current track) — only meaningful while `is_live`."""
+        return self._stream_title
+
+    @property
+    def stream_station_name(self) -> str | None:
+        """ICY `icy-name` (station name) — set on stream open."""
+        return self._stream_station_name
 
     @property
     def band_levels(self) -> list[float]:
@@ -218,9 +263,9 @@ class AudioPlayer:
             resampler = av.AudioResampler(format="flt", layout="stereo", rate=self._sample_rate)
             self._decode_into_queue(container, stream, resampler)
         except Exception as exc:  # pragma: no cover — surface decode errors softly
-            log.warning("decoder failed for %s: %s", self._current_path, exc)
-            if self.on_track_failed is not None and self._current_path is not None:
-                self.on_track_failed(self._current_path, str(exc))
+            log.warning("decoder failed for %s: %s", self._current_source, exc)
+            if self.on_track_failed is not None and self._current_source is not None:
+                self.on_track_failed(self._current_source, str(exc))
         finally:
             try:
                 container.close()
@@ -242,6 +287,11 @@ class AudioPlayer:
             if target is not None:
                 self._apply_seek(container, stream, target)
                 continue
+            # ICY metadata refresh: when streaming, `container.metadata` is
+            # updated in-place by libavformat as `StreamTitle` lines arrive
+            # in the stream. Polling per-packet is cheap.
+            if self._is_live:
+                self._poll_stream_metadata(container)
             for frame in packet.decode():
                 if self._stopped:
                     return
@@ -249,6 +299,16 @@ class AudioPlayer:
                     self._push_frame(resampled)
                     if self._stopped:
                         return
+
+    def _poll_stream_metadata(self, container: InputContainer) -> None:
+        new_title = _get_metadata_value(container, "StreamTitle")
+        if new_title and new_title != self._stream_title:
+            self._stream_title = new_title
+            if self.on_metadata_change is not None:
+                try:
+                    self.on_metadata_change()
+                except Exception:  # pragma: no cover
+                    pass
 
     def _consume_seek_target(self) -> float | None:
         with self._lock:
@@ -394,11 +454,37 @@ class AudioPlayer:
 # ---------------------------------------------------------------------------
 
 
-def _open_container(path: Path) -> tuple[InputContainer, Any]:
-    """Open `path` and return `(container, audio_stream)`. Caller owns the container."""
-    container = av.open(str(path))
+def _open_container(source: Path | str) -> tuple[InputContainer, Any]:
+    """Open `source` (local path or URL) and return `(container, audio_stream)`.
+
+    Caller owns the container. For URLs, `icy=1` opt-in is enabled so
+    Icecast/Shoutcast metadata (station name + StreamTitle) shows up in
+    `container.metadata`.
+    """
+    target = str(source)
+    is_url = target.startswith(("http://", "https://"))
+    options: dict[str, str] = {"icy": "1"} if is_url else {}
+    container = av.open(target, options=options) if options else av.open(target)
     audio_streams = [s for s in container.streams if s.type == "audio"]
     if not audio_streams:
         container.close()
-        raise ValueError(f"no audio stream in {path}")
+        raise ValueError(f"no audio stream in {source}")
     return container, audio_streams[0]
+
+
+def _get_metadata_value(container: InputContainer, key: str) -> str | None:
+    """Fetch a single ICY/general metadata value from a container.
+
+    Checks both the container-level `metadata` (most ICY headers) and the
+    first audio stream's metadata (PyAV exposes some fields on the stream
+    side). Returns None if missing/blank.
+    """
+    for source in (container.metadata, *(s.metadata for s in container.streams)):
+        if not source:
+            continue
+        value = source.get(key)
+        if value:
+            text = str(value).strip()
+            if text:
+                return text
+    return None

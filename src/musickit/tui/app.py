@@ -16,10 +16,12 @@ from textual.reactive import reactive
 from textual.widgets import ListItem, ListView, Static
 
 from musickit import library as library_mod
+from musickit import radio as radio_mod
 from musickit.tui.player import AudioPlayer
 
 if TYPE_CHECKING:
     from musickit.library import LibraryAlbum, LibraryIndex, LibraryTrack
+    from musickit.radio import RadioStation
 
 log = logging.getLogger(__name__)
 
@@ -471,10 +473,20 @@ class MusickitApp(App[None]):
         self._player = AudioPlayer()
         self._player.on_track_end = self._on_track_end
         self._player.on_track_failed = self._on_track_failed
+        self._player.on_metadata_change = self._on_stream_metadata_change
         self._current_album: LibraryAlbum | None = None
         self._current_track_idx: int | None = None
         self._marker_idx: int | None = None
         self._shuffle = False
+        # Radio: curated streaming stations loaded from `~/.config/musickit/radio.toml`.
+        # When the user selects "Radio" in the browser, the right-side track
+        # list is populated with these (each station is a streaming "track")
+        # and the "current album" is the synthetic `_RADIO_VIEW`.
+        self._radio_stations: list[RadioStation] = []
+        self._in_radio_view: bool = False
+        # Set by AudioPlayer.on_metadata_change (worker thread). Drained in
+        # the UI tick so the `Now Playing` block updates with new ICY title.
+        self._stream_metadata_dirty: bool = False
         self._repeat = RepeatMode.OFF
         self._end_pending = False
         # Browser navigation state: None = at top level (artists);
@@ -509,6 +521,14 @@ class MusickitApp(App[None]):
         self.set_interval(1 / 30, self._refresh_visualizer)
         self.set_interval(0.25, self._refresh_status)
         self.set_interval(0.05, self._drain_end_pending)
+        self.set_interval(0.5, self._drain_stream_metadata)
+        # Seed the user's `radio.toml` with starter stations on first run, then
+        # load. Cheap (no network).
+        try:
+            radio_mod.seed_default_config()
+        except OSError:  # pragma: no cover — read-only home, etc.
+            pass
+        self._radio_stations = radio_mod.load_stations()
         # Kick off the initial scan in a worker thread so the TUI is
         # responsive immediately. The overlay covers the body until the
         # first index lands.
@@ -583,7 +603,10 @@ class MusickitApp(App[None]):
             return
         kind = getattr(item, "entry_kind", None)
         data = getattr(item, "entry_data", None)
-        if kind == "album" and isinstance(data, library_mod.LibraryAlbum):
+        if kind == "radio":
+            n = len(self._radio_stations)
+            info.body = f"[{C_LABEL}]Radio[/]\n[dim]{n} curated station(s)[/]"
+        elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
             if data.warnings:
                 lines = [f"[{C_PEAK}]⚠ {len(data.warnings)} warning(s)[/]"]
                 for w in data.warnings:
@@ -621,6 +644,12 @@ class MusickitApp(App[None]):
 
     def _populate_browser_artists(self, browser: BrowserList) -> None:
         assert self._index is not None
+        # Radio sits at the very top — single click drops you into the
+        # station list (right pane), bypassing the artist→album drill.
+        radio_item = ListItem(Static(f" [{C_ACCENT}]📻[/] [bold]Radio[/]  [dim]({len(self._radio_stations)})[/]"))
+        radio_item.entry_kind = "radio"  # type: ignore[attr-defined]
+        radio_item.entry_data = None  # type: ignore[attr-defined]
+        browser.append(radio_item)
         by_artist: dict[str, list[LibraryAlbum]] = {}
         for album in self._index.albums:
             by_artist.setdefault(album.artist_dir, []).append(album)
@@ -662,6 +691,10 @@ class MusickitApp(App[None]):
         if event.list_view is browser:
             self._handle_browser_selection(event.item)
         elif event.list_view is tracklist:
+            station = getattr(event.item, "station", None)
+            if isinstance(station, radio_mod.RadioStation):
+                self._play_station(station)
+                return
             idx = getattr(event.item, "track_index", None)
             if isinstance(idx, int):
                 self._current_track_idx = idx
@@ -679,7 +712,10 @@ class MusickitApp(App[None]):
             return
         kind = getattr(item, "entry_kind", None)
         data = getattr(item, "entry_data", None)
-        if kind == "album" and isinstance(data, library_mod.LibraryAlbum):
+        if kind == "radio":
+            n = len(self._radio_stations)
+            info.body = f"[{C_LABEL}]Radio[/]\n[dim]{n} curated station(s)[/]"
+        elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
             if data.warnings:
                 lines = [f"[{C_PEAK}]⚠ {len(data.warnings)} warning(s)[/]"]
                 for w in data.warnings:
@@ -698,7 +734,28 @@ class MusickitApp(App[None]):
         else:
             info.body = ""
 
-    def _handle_browser_selection(self, item: ListItem) -> None:
+    def _handle_browser_selection(self, item: ListItem) -> None:  # noqa: D102 — see body
+        kind_first = getattr(item, "entry_kind", None)
+        if kind_first == "radio":
+            self._open_radio_view()
+            self.query_one(TrackList).focus()
+            return
+        return self._handle_browser_selection_default(item)
+
+    def _open_radio_view(self) -> None:
+        """Populate the right-pane track list with the curated radio stations.
+
+        Treated as a virtual album: `_in_radio_view=True` flips the playlist
+        repopulation to render `RadioStation` rows instead of `LibraryTrack`s.
+        Entering this view doesn't drill the browser — it stays where it is.
+        """
+        self._in_radio_view = True
+        self._current_album = None
+        self._current_track_idx = None
+        self._marker_idx = None
+        self._repopulate_radio_playlist()
+
+    def _handle_browser_selection_default(self, item: ListItem) -> None:
         kind = getattr(item, "entry_kind", None)
         data = getattr(item, "entry_data", None)
         if kind == "up":
@@ -708,6 +765,7 @@ class MusickitApp(App[None]):
             self._browse_artist = data
             self._populate_browser()
         elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
+            self._in_radio_view = False
             self._set_current_album(data, track_idx=None)
             self._repopulate_playlist()
             self.query_one(TrackList).focus()
@@ -753,6 +811,76 @@ class MusickitApp(App[None]):
         if 0 <= target < len(tracklist.children):
             tracklist.index = target
 
+    def _repopulate_radio_playlist(self) -> None:
+        """Render the curated radio stations as the right-side track list.
+
+        Each row carries a `RadioStation` instance via `item.station` so the
+        track-list selection handler can dispatch to `_play_station` instead
+        of the regular library-track path.
+        """
+        tracklist = self.query_one(TrackList)
+        tracklist.index = None
+        tracklist.clear()
+        if not self._radio_stations:
+            empty = ListItem(Static("[dim]No stations configured. Edit `~/.config/musickit/radio.toml`.[/]"))
+            tracklist.append(empty)
+            return
+        for i, station in enumerate(self._radio_stations):
+            label = self._format_station_row(i, station, marker=False)
+            item = ListItem(Static(label, id=f"track-row-{i}"))
+            item.track_index = i  # type: ignore[attr-defined]
+            item.station = station  # type: ignore[attr-defined]
+            tracklist.append(item)
+        self.call_after_refresh(self._set_tracklist_cursor, 0)
+
+    def _format_station_row(self, idx: int, station: RadioStation, *, marker: bool) -> str:
+        glyph = f"[bold {C_PLAYING}]▶[/]" if marker else " "
+        name = station.name[:44]
+        desc = (station.description or "Live")[:26]
+        if marker:
+            num = f"[{C_PLAYING}]{idx + 1:>3}[/]"
+            name_cell = f"[bold]{name}[/]"
+            desc_cell = f"[{C_PLAYING}]{desc}[/]"
+        else:
+            num = f"[dim]{idx + 1:>3}[/]"
+            name_cell = name
+            desc_cell = f"[dim]{desc}[/]"
+        return f"{num} {glyph} {name_cell:<44}{desc_cell:<26} [dim]{'LIVE':>6}[/]"
+
+    def _play_station(self, station: RadioStation) -> None:
+        """Start an internet-radio stream and mark the row as playing."""
+        idx = self._radio_stations.index(station) if station in self._radio_stations else None
+        # `_marker_idx` follows the playing row's index; refresh both old + new.
+        prev = self._marker_idx
+        self._current_track_idx = idx
+        self._marker_idx = idx
+        self._player.play(station.url)
+        # Repaint just the affected rows.
+        if prev is not None and prev != idx:
+            try:
+                self.query_one(f"#track-row-{prev}", Static).update(
+                    self._format_station_row(prev, self._radio_stations[prev], marker=False)
+                )
+            except Exception:  # pragma: no cover
+                pass
+        if idx is not None:
+            try:
+                self.query_one(f"#track-row-{idx}", Static).update(self._format_station_row(idx, station, marker=True))
+            except Exception:  # pragma: no cover
+                pass
+
+    def _on_stream_metadata_change(self) -> None:
+        """Player callback (off-thread) — flag the UI tick to redraw the title."""
+        self._stream_metadata_dirty = True
+
+    def _drain_stream_metadata(self) -> None:
+        """UI tick: pull fresh ICY title into the now-playing meta if the player set it."""
+        if not self._stream_metadata_dirty:
+            return
+        self._stream_metadata_dirty = False
+        # The status refresh path below already reads stream_title; just nudge it.
+        self._refresh_status()
+
     def _refresh_play_marker(self) -> None:
         if self._current_album is None:
             return
@@ -780,7 +908,7 @@ class MusickitApp(App[None]):
         glyph = f"[bold {C_PLAYING}]▶[/]" if marker else " "
         artist = (track.artist or album.artist_dir)[:26]
         title = (track.title or track.path.stem)[:44]
-        time_str = _fmt_mmss(0)  # we don't store per-track duration in light scan; placeholder
+        time_str = _fmt_mmss(track.duration_s) if track.duration_s > 0 else "  —  "
         if marker:
             num = f"[{C_PLAYING}]{idx + 1:>3}[/]"
             artist_cell = f"[{C_PLAYING}]{artist}[/]"
@@ -804,44 +932,76 @@ class MusickitApp(App[None]):
         meta = self.query_one(NowPlayingMeta)
         progress = self.query_one(ProgressLine)
         status = self.query_one(StatusBar)
-        track = self._currently_playing_track()
-        if track is None:
-            meta.title_text = "—"
-            meta.artist = "—"
-            meta.album = "—"
-            meta.year = "—"
-            meta.genre = "—"
-            meta.fmt = "—"
+        if self._player.is_live:
+            self._populate_meta_from_stream(meta)
             progress.position = 0.0
             progress.duration = 0.0
-            progress.state = "stopped"
+            progress.state = "playing" if self._player.is_playing else "paused" if self._player.is_paused else "stopped"
         else:
-            meta.title_text = track.title or track.path.stem
-            meta.artist = track.artist or self._current_album.artist_dir if self._current_album else "—"
-            meta.album = self._current_album.album_dir if self._current_album else "—"
-            meta.year = track.year or "—"
-            meta.genre = "—"  # not tracked in light scan
-            meta.fmt = track.path.suffix.lstrip(".").upper()
-            progress.position = self._player.position
-            progress.duration = self._player.duration
-            if self._player.is_paused:
-                progress.state = "paused"
-            elif self._player.is_playing:
-                progress.state = "playing"
-            else:
+            track = self._currently_playing_track()
+            if track is None:
+                meta.title_text = "—"
+                meta.artist = "—"
+                meta.album = "—"
+                meta.year = "—"
+                meta.genre = "—"
+                meta.fmt = "—"
+                progress.position = 0.0
+                progress.duration = 0.0
                 progress.state = "stopped"
+            else:
+                meta.title_text = track.title or track.path.stem
+                meta.artist = track.artist or self._current_album.artist_dir if self._current_album else "—"
+                meta.album = self._current_album.album_dir if self._current_album else "—"
+                meta.year = track.year or "—"
+                meta.genre = "—"  # not tracked in light scan
+                meta.fmt = track.path.suffix.lstrip(".").upper()
+                progress.position = self._player.position
+                progress.duration = self._player.duration
+                if self._player.is_paused:
+                    progress.state = "paused"
+                elif self._player.is_playing:
+                    progress.state = "playing"
+                else:
+                    progress.state = "stopped"
         status.volume = self._player.volume
         status.repeat = self._repeat.value
         status.shuffle = "On" if self._shuffle else "Off"
         status.position = self._player.position
         status.duration = self._player.duration
-        if self._current_album is not None:
+        if self._in_radio_view:
+            status.album_label = "Radio"
+            cur = (self._current_track_idx or 0) + 1 if self._current_track_idx is not None else 0
+            status.cursor_label = f"{cur}/{len(self._radio_stations)}"
+        elif self._current_album is not None:
             status.album_label = self._current_album.album_dir
             cur = (self._current_track_idx or 0) + 1 if self._current_track_idx is not None else 0
             status.cursor_label = f"{cur}/{len(self._current_album.tracks)}"
         else:
             status.album_label = "—"
             status.cursor_label = "0/0"
+
+    def _populate_meta_from_stream(self, meta: NowPlayingMeta) -> None:
+        """Now-playing meta when a live stream is active.
+
+        Title comes from ICY `StreamTitle` (current song), Album from
+        `icy-name` (station). When `StreamTitle` looks like `Artist - Title`,
+        we split it for the Artist/Title fields.
+        """
+        station = self._player.stream_station_name or "Live Stream"
+        raw = self._player.stream_title or ""
+        artist = "—"
+        title = raw or station
+        if " - " in raw:
+            split_artist, split_title = raw.split(" - ", 1)
+            artist = split_artist.strip() or "—"
+            title = split_title.strip() or station
+        meta.artist = artist
+        meta.title_text = title
+        meta.album = station
+        meta.year = "—"
+        meta.genre = "—"
+        meta.fmt = "STREAM"
 
     def _drain_end_pending(self) -> None:
         if self._end_pending:
@@ -1094,7 +1254,7 @@ class MusickitApp(App[None]):
     def _on_track_end(self) -> None:
         self._end_pending = True
 
-    def _on_track_failed(self, path: Path, message: str) -> None:
+    def _on_track_failed(self, path: Path | str, message: str) -> None:
         log.warning("track failed: %s — %s", path, message)
         self._end_pending = True
 

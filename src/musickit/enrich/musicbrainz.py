@@ -46,7 +46,11 @@ class MusicBrainzProvider:
         client = self._client or get_client()
         try:
             mbid = self._search_release(client, title, artist_query, len(tracks))
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            # Catch a wider net than just transport errors: malformed JSON,
+            # unexpected response shapes (HTML error pages, missing keys),
+            # and surprise types in `score`/`id` would otherwise crash the
+            # entire enrichment pass instead of yielding a per-album warning.
             log.debug("musicbrainz lookup failed: %s", exc)
             return EnrichmentResult(notes=[f"musicbrainz: lookup failed ({exc!s})"])
         finally:
@@ -111,14 +115,20 @@ def lookup_release_year(
         )
         response.raise_for_status()
         releases = response.json().get("releases") or []
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        # Same defensive net as `MusicBrainzProvider.enrich`: any malformed
+        # MB response should yield None (skip the fix), not crash the run.
         log.debug("musicbrainz year lookup failed: %s", exc)
         return None
     finally:
         if own_client:
             client.close()
     for release in releases:
-        if int(release.get("score", 0)) < 90:
+        try:
+            score = int(release.get("score", 0))
+        except (TypeError, ValueError):
+            continue
+        if score < 90:
             continue
         date = str(release.get("date") or "").strip()
         if len(date) >= 4 and date[:4].isdigit():

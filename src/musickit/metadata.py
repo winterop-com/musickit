@@ -200,18 +200,6 @@ def read_source(
     track.artist = smart_title_case(track.artist)
     track.album = smart_title_case(track.album)
     track.album_artist = smart_title_case(track.album_artist)
-    if not light and track.duration_s is None:
-        # Pull `info.length` via the format-agnostic mutagen entry point.
-        # Used by dedup to tell same-tag-same-content (rip-group dups) apart
-        # from same-tag-different-content (remixes that share a track_no).
-        try:
-            mfile = _mutagen.File(path)  # pyright: ignore[reportPrivateImportUsage]
-            if mfile is not None and mfile.info is not None:
-                length = getattr(mfile.info, "length", None)
-                if length is not None:
-                    track.duration_s = float(length)
-        except Exception:  # pragma: no cover — duration is best-effort
-            pass
     return track
 
 
@@ -639,6 +627,8 @@ def _read_flac(path: Path, *, light: bool = False, measure_pictures: bool = Fals
     flac = FLAC(path)
     tags: Any = flac.tags or {}
     track = SourceTrack(path=path)
+    if flac.info is not None:
+        track.duration_s = float(getattr(flac.info, "length", 0.0) or 0.0)
     track.title = _vorbis_first(tags, "title")
     track.artist = _vorbis_first(tags, "artist")
     track.album_artist = _vorbis_first(tags, "albumartist") or _vorbis_first(tags, "album artist")
@@ -695,6 +685,14 @@ def _read_mp3(path: Path, *, light: bool = False, measure_pictures: bool = False
         id3 = ID3(path)
     except ID3NoHeaderError:
         return track
+    # Pull duration directly from the same MP3() open we'll use below for
+    # validation — avoids the second mutagen open we used to do in
+    # `read_source` for `info.length`.
+    try:
+        mp3 = MP3(path)
+        track.duration_s = float(getattr(mp3.info, "length", 0.0) or 0.0)
+    except Exception:  # pragma: no cover — duration is best-effort
+        pass
 
     track.title = _id3_text(id3, "TIT2")
     track.artist = _id3_text(id3, "TPE1")
@@ -736,6 +734,7 @@ def _read_mp4(path: Path, *, light: bool = False, measure_pictures: bool = False
     track = SourceTrack(path=path)
     mp4 = MP4(path)
     tags: Any = mp4.tags or {}
+    track.duration_s = float(getattr(mp4.info, "length", 0.0) or 0.0)
 
     track.title = _mp4_first(tags, "\xa9nam")
     track.artist = _mp4_first(tags, "\xa9ART")
@@ -825,7 +824,11 @@ def _read_generic(path: Path, *, light: bool = False, measure_pictures: bool = F
     del light, measure_pictures  # generic reader pulls only basic tags, no pictures to skip
     track = SourceTrack(path=path)
     audio = _mutagen.File(path, easy=True)  # pyright: ignore[reportPrivateImportUsage]
-    if audio is None or audio.tags is None:
+    if audio is None:
+        return track
+    if audio.info is not None:
+        track.duration_s = float(getattr(audio.info, "length", 0.0) or 0.0)
+    if audio.tags is None:
         return track
     tags = audio.tags
     track.title = _easy_first(tags, "title")

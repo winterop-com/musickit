@@ -43,6 +43,7 @@ class LibraryTrack(BaseModel):
     year: str | None = None
     track_no: int | None = None
     disc_no: int | None = None
+    duration_s: float = 0.0
     has_cover: bool = False
     cover_pixels: int = 0
 
@@ -153,6 +154,7 @@ def _scan_album(album_dir: Path, *, measure_pictures: bool = False) -> LibraryAl
             year=_year_only(source.date),
             track_no=source.track_no,
             disc_no=source.disc_no,
+            duration_s=source.duration_s or 0.0,
             # `light` mode uses a presence-only sentinel (b"") for embedded
             # pictures — skipping the byte copy and Pillow decode but still
             # reporting cover presence accurately.

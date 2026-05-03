@@ -53,9 +53,12 @@ async def test_app_populates_browser_with_artists(silent_flac_template: Path, tm
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
-        assert kinds == ["artist", "artist"]
-        names = sorted(str(getattr(c, "entry_data", "")) for c in browser.children)
-        assert names == ["Imagine Dragons", "Linkin Park"]
+        # Radio is pinned at the top — artists follow.
+        assert kinds == ["radio", "artist", "artist"]
+        artist_names = sorted(
+            str(getattr(c, "entry_data", "")) for c in browser.children if getattr(c, "entry_kind", None) == "artist"
+        )
+        assert artist_names == ["Imagine Dragons", "Linkin Park"]
 
 
 @pytest.mark.asyncio
@@ -113,8 +116,9 @@ async def test_browser_drills_into_artist_and_back(silent_flac_template: Path, t
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
-        # Drill into the only artist.
-        pilot.app._handle_browser_selection(browser.children[0])  # type: ignore[attr-defined]
+        # Find the artist row — Radio is now pinned at the top, so it's [1].
+        artist_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        pilot.app._handle_browser_selection(artist_row)  # type: ignore[attr-defined]
         await pilot.pause()
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
         assert kinds[0] == "up"
@@ -123,4 +127,5 @@ async def test_browser_drills_into_artist_and_back(silent_flac_template: Path, t
         pilot.app._handle_browser_selection(browser.children[0])  # type: ignore[attr-defined]
         await pilot.pause()
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
-        assert kinds == ["artist"]
+        # Back at root: radio + the one artist.
+        assert kinds == ["radio", "artist"]
