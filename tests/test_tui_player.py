@@ -157,6 +157,10 @@ def test_player_handles_unopenable_file_softly(tmp_path: Path, fake_stream: type
     player = AudioPlayer()
     player.on_track_failed = lambda p, msg: failures.append((p, msg))
     player.play(bogus)
+    # `play()` is now threaded — wait for the opener thread to finish.
+    deadline = time.time() + 5.0
+    while time.time() < deadline and not failures:
+        time.sleep(0.05)
     assert len(failures) == 1
     assert failures[0][0] == bogus
 

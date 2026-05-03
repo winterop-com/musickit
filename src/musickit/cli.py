@@ -572,9 +572,13 @@ def _render_audit_table(
 @app.command()
 def tui(
     target_dir: Annotated[
-        Path,
-        typer.Argument(exists=True, file_okay=False, help="Library root to browse + play."),
-    ] = Path("./output"),
+        Path | None,
+        typer.Argument(
+            exists=True,
+            file_okay=False,
+            help="Library root to browse + play. Omit to launch in radio-only mode.",
+        ),
+    ] = None,
 ) -> None:
     """Browse and play the converted library in a Textual TUI.
 
@@ -582,10 +586,13 @@ def tui(
     library tree (artist → album), right playlist with a marker on the
     playing row, bottom keybinding hints. Decoding via PyAV (in-process,
     no external player). Audio output via sounddevice/PortAudio (bundled).
+
+    When `TARGET_DIR` is omitted the TUI starts in radio-only mode — no
+    library scan, the sidebar shows just the curated Radio entry.
     """
     from musickit.tui.app import MusickitApp
 
-    MusickitApp(target_dir.resolve()).run()
+    MusickitApp(target_dir.resolve() if target_dir is not None else None).run()
 
 
 if __name__ == "__main__":  # pragma: no cover

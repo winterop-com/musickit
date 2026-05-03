@@ -87,46 +87,83 @@ class AudioPlayer:
         self._stream: sd.OutputStream | None = None
         self._end_fired: bool = False
         self._seek_target: float | None = None  # set by seek(), consumed by decoder
+        # Monotonic counter — every `play()` bumps it. The opener thread
+        # checks against the latest value to drop stale opens when the user
+        # mashes through stations faster than HTTP connects complete.
+        self._opener_gen: int = 0
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def play(self, source: Path | str) -> None:
-        """Stop any current playback and start `source` from the beginning.
+        """Schedule playback of `source`. Returns immediately.
 
-        `source` can be a local `Path` or a URL string — PyAV's `av.open`
-        handles HTTP / Icecast / Shoutcast streams natively. Live streams
-        (where the demuxer can't tell the duration) flip `is_live=True` and
-        kick off ICY `StreamTitle` polling.
+        The slow part of starting playback for live streams is the HTTP
+        connect inside `av.open` — easily 1+ seconds. We do that on a
+        background thread so:
+          1. The UI doesn't freeze during the connect.
+          2. The PREVIOUS source keeps playing right up until the new one
+             is ready (no audible silence-then-pop on station switches).
+
+        `source` can be a local `Path` or a URL string. Multiple rapid
+        `play()` calls are handled via a generation counter — only the
+        latest one's opener is allowed to swap.
         """
+        self._opener_gen += 1
+        gen = self._opener_gen
+        threading.Thread(
+            target=self._open_and_swap,
+            args=(source, gen),
+            name=f"musickit-opener-{Path(str(source)).name}",
+            daemon=True,
+        ).start()
+
+    def _open_and_swap(self, source: Path | str, gen: int) -> None:
+        """Worker thread: connect to `source`, then atomically take over playback."""
+        try:
+            container, stream = _open_container(source)
+        except Exception as exc:
+            log.warning("failed to open %s: %s", source, exc)
+            if gen == self._opener_gen and self.on_track_failed is not None:
+                self.on_track_failed(source, str(exc))
+            return
+        if gen != self._opener_gen:
+            # A newer play() call superseded us while we were connecting —
+            # discard this open without touching playback.
+            try:
+                container.close()
+            except Exception:  # pragma: no cover
+                pass
+            return
+        # Tear the OLD playback down only now that the NEW container is
+        # ready. Keeps the previous track audible during the HTTP connect
+        # for stream-to-stream switches.
         self.stop()
+        if gen != self._opener_gen:
+            try:
+                container.close()
+            except Exception:  # pragma: no cover
+                pass
+            return
+        self._setup_playback(source, container, stream)
+
+    def _setup_playback(self, source: Path | str, container: InputContainer, stream: Any) -> None:
+        """Wire up state + threads for an already-opened container."""
         self._frames_played = 0
         self._end_fired = False
         self._paused = False
         self._stopped = False
         self._current_source = source
-        self._stream_title = None
-        self._stream_station_name = None
         self._queue = queue.Queue(maxsize=_QUEUE_MAX_CHUNKS)
         self._current_chunk = None
         self._chunk_offset = 0
 
-        try:
-            container, stream = _open_container(source)
-        except Exception as exc:
-            log.warning("failed to open %s: %s", source, exc)
-            self._stopped = True
-            if self.on_track_failed is not None:
-                self.on_track_failed(source, str(exc))
-            return
-
         self._duration = float(stream.duration * stream.time_base) if stream.duration else 0.0
         self._is_live = self._duration <= 0
-        # Pull initial ICY metadata if it's a stream (icy-name etc.).
         self._stream_station_name = _get_metadata_value(container, "icy-name")
         self._stream_title = _get_metadata_value(container, "StreamTitle")
-        if self.on_metadata_change is not None and (self._stream_station_name or self._stream_title):
+        if self.on_metadata_change is not None:
             try:
                 self.on_metadata_change()
             except Exception:  # pragma: no cover

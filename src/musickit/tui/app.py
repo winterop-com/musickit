@@ -321,15 +321,16 @@ class ScanOverlay(Static):
 
     DEFAULT_CSS = """
     ScanOverlay {
+        /* Card-style modal: not full width. `layer: overlay` keeps it above
+           the body without a relayout when shown/hidden. */
         layer: overlay;
-        dock: top;
-        offset: 0 8;
-        width: 1fr;
+        offset: 50% 30%;
+        margin: 0 -30;  /* shift back by half-width so 50% lands on center */
+        width: 60;
         height: auto;
-        padding: 2 4;
-        background: $boost;
-        border: tall $primary 50%;
-        content-align: center middle;
+        padding: 1 2;
+        background: $surface;
+        border: round $primary;
         text-align: center;
         display: none;
     }
@@ -464,11 +465,12 @@ class MusickitApp(App[None]):
         Binding("ctrl+right", "tree_wider", "Tree+", show=False),
         Binding("backspace", "browser_up", "Up", show=False),
         Binding("ctrl+r,f5", "rescan_library", "Rescan", show=False),
+        Binding("question_mark", "toggle_keybar", "Help", show=False),
     ]
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path | None) -> None:
         super().__init__()
-        self._root = root
+        self._root: Path | None = root
         self._index: LibraryIndex | None = None
         self._player = AudioPlayer()
         self._player.on_track_end = self._on_track_end
@@ -507,7 +509,7 @@ class MusickitApp(App[None]):
                 yield Visualizer(id="visualizer")
                 yield ProgressLine(id="progress")
                 yield TrackTableHeader(id="track-header")
-                with VerticalScroll(id="track-scroll"):
+                with VerticalScroll(id="track-scroll", can_focus=False):
                     yield TrackList(id="tracklist")
         yield StatusBar(id="status")
         yield KeyBar(id="keybar")
@@ -529,6 +531,14 @@ class MusickitApp(App[None]):
         except OSError:  # pragma: no cover — read-only home, etc.
             pass
         self._radio_stations = radio_mod.load_stations()
+        if self._root is None:
+            # Radio-only launch: skip the library scan, render the browser
+            # immediately with just the Radio entry, and drop straight into
+            # the station list on the right.
+            self._populate_sidebar_stats()
+            self._populate_browser()
+            self._open_radio_view()
+            return
         # Kick off the initial scan in a worker thread so the TUI is
         # responsive immediately. The overlay covers the body until the
         # first index lands.
@@ -559,9 +569,18 @@ class MusickitApp(App[None]):
         browser.index = None
         browser.clear()
         if self._index is None or not self._index.albums:
+            # Radio-only mode (or empty library): browser shows just the
+            # Radio entry. Selecting it fills the right pane with stations.
             header.path = "Browse"
-            browser.append(ListItem(Static("[dim](no albums)[/]")))
+            radio_item = ListItem(Static(f" [{C_ACCENT}]📻[/] [bold]Radio[/]  [dim]({len(self._radio_stations)})[/]"))
+            radio_item.entry_kind = "radio"  # type: ignore[attr-defined]
+            radio_item.entry_data = None  # type: ignore[attr-defined]
+            browser.append(radio_item)
+            if self._root is not None:
+                # Library was specified but had nothing. Surface that.
+                browser.append(ListItem(Static("[dim](no albums)[/]")))
             self._fit_sidebar_width()
+            self.call_after_refresh(self._set_browser_cursor, 0)
             return
         if self._browse_artist is None:
             header.path = "Browse"
@@ -1140,8 +1159,15 @@ class MusickitApp(App[None]):
 
         There's no on-disk DB — the index is built fresh on `on_mount` and
         kept in memory. Use this binding (Ctrl+R / F5) when you've moved
-        files around outside the TUI and want the changes reflected.
+        files around outside the TUI and want the changes reflected. In
+        radio-only mode (no library), reload the radio config instead.
         """
+        if self._root is None:
+            self._radio_stations = radio_mod.load_stations()
+            self._populate_browser()
+            if self._in_radio_view:
+                self._repopulate_radio_playlist()
+            return
         self._show_scan_overlay("[bold cyan]Rescanning library…[/]")
         self._scan_library_async(initial=False)
 
@@ -1161,12 +1187,15 @@ class MusickitApp(App[None]):
     @work(thread=True, exclusive=True, group="scan")
     def _scan_library_async(self, *, initial: bool) -> None:
         """Run `library.scan` in a worker thread; route progress + result back."""
+        if self._root is None:
+            return
         prior_artist = self._browse_artist
+        root = self._root
 
         def on_album(album_dir: Path, idx: int, total: int) -> None:
             self.call_from_thread(self._on_scan_progress, album_dir, idx, total)
 
-        new_index = library_mod.scan(self._root, on_album=on_album)
+        new_index = library_mod.scan(root, on_album=on_album)
         library_mod.audit(new_index)
         self.call_from_thread(self._on_scan_complete, new_index, prior_artist, initial)
 
@@ -1207,6 +1236,11 @@ class MusickitApp(App[None]):
         else:
             self.screen.add_class("fullscreen")
             self.query_one(Visualizer).styles.height = "1fr"
+
+    def action_toggle_keybar(self) -> None:
+        """`?` shows / hides the bottom keybindings hint bar."""
+        keybar = self.query_one(KeyBar)
+        keybar.styles.display = "none" if keybar.styles.display != "none" else "block"
 
     # ------------------------------------------------------------------
     # Playback orchestration

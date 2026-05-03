@@ -76,7 +76,7 @@ async def test_app_quits_on_q(silent_flac_template: Path, tmp_path: Path) -> Non
 
 @pytest.mark.asyncio
 async def test_app_renders_empty_library(tmp_path: Path) -> None:
-    """No albums under the root → browser shows the empty placeholder, no crash."""
+    """Empty library → browser shows the Radio entry plus the no-albums note."""
     from musickit.tui.app import BrowserList, MusickitApp
 
     root = tmp_path / "lib"
@@ -85,8 +85,23 @@ async def test_app_renders_empty_library(tmp_path: Path) -> None:
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
-        # Single placeholder ListItem.
-        assert len(browser.children) == 1
+        kinds = [getattr(c, "entry_kind", None) for c in browser.children]
+        # Radio is always present; the second row is the "(no albums)" note.
+        assert kinds[0] == "radio"
+        assert len(browser.children) == 2
+
+
+@pytest.mark.asyncio
+async def test_app_radio_only_when_no_root_provided(tmp_path: Path) -> None:
+    """`musickit tui` (no arg) launches in radio-only mode — no scan, just stations."""
+    from musickit.tui.app import BrowserList, MusickitApp
+
+    async with MusickitApp(None).run_test() as pilot:
+        await pilot.pause()
+        browser = pilot.app.query_one(BrowserList)
+        kinds = [getattr(c, "entry_kind", None) for c in browser.children]
+        # Just the Radio entry — no library, no "no albums" note.
+        assert kinds == ["radio"]
 
 
 @pytest.mark.asyncio
