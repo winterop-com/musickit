@@ -32,7 +32,11 @@ class RepeatMode(str, Enum):
 
 
 class HeaderBlock(Static):
-    """Top status block: app name, current track, time, state, volume."""
+    """Top status block: app name, current track, time, state, volume.
+
+    In fullscreen mode (`Screen.fullscreen`), this widget grows and renders
+    the now-playing info in a larger / centered layout.
+    """
 
     DEFAULT_CSS = """
     HeaderBlock {
@@ -40,14 +44,22 @@ class HeaderBlock(Static):
         padding: 0 1;
         background: $boost;
     }
+    Screen.fullscreen HeaderBlock {
+        height: 8;
+        padding: 1 2;
+    }
     """
 
     title_line = reactive("")
     time_line = reactive("00:00 / 00:00")
     state_badge = reactive("⏹ Stopped")
     volume_line = reactive("VOL " + "░" * 20 + "  100%")
+    progress_line = reactive("")
+    fullscreen_now_playing = reactive("")
 
     def render(self) -> str:
+        if self.has_class("fullscreen"):
+            return self.fullscreen_now_playing
         return (
             f"[bold cyan]musickit[/bold cyan]   {self.title_line}\n"
             f"{self.time_line:<40}{self.state_badge:>40}\n"
@@ -56,7 +68,11 @@ class HeaderBlock(Static):
 
 
 class Visualizer(Static):
-    """8-band spectrum bars driven by the audio callback's FFT output."""
+    """8-band spectrum bars driven by the audio callback's FFT output.
+
+    Adapts to its allocated height — in fullscreen mode it grows to fill
+    the available vertical space.
+    """
 
     DEFAULT_CSS = """
     Visualizer {
@@ -64,13 +80,16 @@ class Visualizer(Static):
         padding: 1 1;
         background: $boost;
     }
+    Screen.fullscreen Visualizer {
+        height: 1fr;
+    }
     """
 
     levels = reactive([0.0] * 8)
 
     def render(self) -> str:
-        rows = 5
-        bar_width = 5  # cells per bar (block + spacing)
+        # Fill whatever vertical space we've been given (down to 5 rows minimum).
+        rows = max(5, max(0, self.size.height - 2))
         lines: list[str] = []
         for row_idx in range(rows):
             # Row 0 = top (peak), row rows-1 = bottom.
@@ -84,7 +103,6 @@ class Visualizer(Static):
                     line_parts.append("    ")
                 line_parts.append(" ")  # gap
             lines.append("".join(line_parts))
-        del bar_width  # consumed implicitly via the four-block + space format
         return "\n".join(lines)
 
 
@@ -147,20 +165,24 @@ class MusickitApp(App[None]):
         width: 1fr;
         padding: 0 1;
     }
+    Screen.fullscreen #body {
+        display: none;
+    }
     """
 
     BINDINGS = [
         Binding("q,ctrl+c", "quit", "Quit", show=True),
         Binding("space", "toggle_pause", "Play/Pause", show=True),
         Binding("enter", "play_selected", "Play", show=True),
-        Binding("greater_than_sign,n", "next_track", "Next", show=False),
-        Binding("less_than_sign,p", "prev_track", "Prev", show=False),
+        Binding("n", "next_track", "Next", show=True),
+        Binding("p", "prev_track", "Prev", show=True),
         Binding("plus,equals_sign", "vol_up", "Vol+", show=False),
         Binding("minus", "vol_down", "Vol-", show=False),
         Binding("left", "seek_back", "Seek -", show=True),
         Binding("right", "seek_fwd", "Seek +", show=True),
         Binding("s", "toggle_shuffle", "Shuffle", show=True),
         Binding("r", "cycle_repeat", "Repeat", show=True),
+        Binding("f", "toggle_fullscreen", "Fullscreen", show=True),
         Binding("tab", "focus_next", "Focus", show=True),
         Binding("ctrl+left", "tree_narrower", "Tree-", show=True),
         Binding("ctrl+right", "tree_wider", "Tree+", show=True),
@@ -341,18 +363,29 @@ class MusickitApp(App[None]):
             header.title_line = "[dim]nothing queued[/dim]"
             header.time_line = "00:00 / 00:00"
             header.state_badge = "⏹ Stopped"
+            header.fullscreen_now_playing = "[dim]nothing queued — press f to exit[/dim]"
         else:
             artist = track.artist or "?"
             title = track.title or track.path.stem
             album = self._current_album.album_dir if self._current_album else ""
+            time_str = f"{_fmt_mmss(self._player.position)} / {_fmt_mmss(self._player.duration)}"
             header.title_line = f"♪ {artist} - {title} · [dim]{album}[/dim]"
-            header.time_line = f"{_fmt_mmss(self._player.position)} / {_fmt_mmss(self._player.duration)}"
+            header.time_line = time_str
             if self._player.is_paused:
-                header.state_badge = "[yellow]⏸ Paused[/yellow]"
+                state = "[yellow]⏸ Paused[/yellow]"
             elif self._player.is_playing:
-                header.state_badge = "[green]▶ Playing[/green]"
+                state = "[green]▶ Playing[/green]"
             else:
-                header.state_badge = "[dim]⏹ Stopped[/dim]"
+                state = "[dim]⏹ Stopped[/dim]"
+            header.state_badge = state
+            progress = _progress_bar(self._player.position, self._player.duration, width=60)
+            header.fullscreen_now_playing = (
+                f"[bold cyan]♪[/bold cyan]  [bold]{title}[/bold]\n"
+                f"   [dim]{artist}[/dim]\n"
+                f"   [dim]{album}[/dim]\n\n"
+                f"   {progress}\n"
+                f"   {time_str:<60}{state:>20}"
+            )
         header.volume_line = _volume_bar(self._player.volume)
         visualizer.levels = self._player.band_levels
 
@@ -434,6 +467,17 @@ class MusickitApp(App[None]):
     def action_tree_narrower(self) -> None:
         self._resize_tree(-_TREE_RESIZE_STEP)
 
+    def action_toggle_fullscreen(self) -> None:
+        """Hide the library / playlist and let the visualizer fill the screen."""
+        if self.screen.has_class("fullscreen"):
+            self.screen.remove_class("fullscreen")
+            self.query_one(HeaderBlock).remove_class("fullscreen")
+            self.query_one(Visualizer).remove_class("fullscreen")
+        else:
+            self.screen.add_class("fullscreen")
+            self.query_one(HeaderBlock).add_class("fullscreen")
+            self.query_one(Visualizer).add_class("fullscreen")
+
     def _resize_tree(self, delta: int) -> None:
         tree = self.query_one(LibraryTree)
         # Tree.styles.width is a Scalar; pull the integer cell value, clamp, set.
@@ -512,3 +556,12 @@ def _fmt_mmss(seconds: float) -> str:
 def _volume_bar(volume: int, width: int = 20) -> str:
     filled = int(round(volume / 100.0 * width))
     return f"VOL {'█' * filled}{'░' * (width - filled)}  {volume:3d}%"
+
+
+def _progress_bar(position: float, duration: float, width: int = 60) -> str:
+    """Solid/empty bar showing playback progress."""
+    if duration <= 0:
+        return "░" * width
+    ratio = max(0.0, min(1.0, position / duration))
+    filled = int(round(ratio * width))
+    return f"[green]{'█' * filled}[/green]{'░' * (width - filled)}"
