@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import random
 from enum import Enum
@@ -465,7 +466,7 @@ class MusickitApp(App[None]):
         Binding("ctrl+right", "tree_wider", "Tree+", show=False),
         Binding("backspace", "browser_up", "Up", show=False),
         Binding("ctrl+r,f5", "rescan_library", "Rescan", show=False),
-        Binding("question_mark", "toggle_keybar", "Help", show=False),
+        Binding("question_mark", "toggle_help", "Help", show=False),
     ]
 
     def __init__(self, root: Path | None) -> None:
@@ -495,6 +496,14 @@ class MusickitApp(App[None]):
         # a string = drilled into that artist's albums.
         self._browse_artist: str | None = None
 
+    def watch_theme(self, theme: str) -> None:
+        """Persist theme changes (e.g. via the command palette) to disk."""
+        state = _load_state()
+        if state.get("theme") == theme:
+            return
+        state["theme"] = theme
+        _save_state(state)
+
     def compose(self) -> ComposeResult:
         yield TopBar(id="topbar")
         with Horizontal(id="body"):
@@ -517,6 +526,14 @@ class MusickitApp(App[None]):
 
     def on_mount(self) -> None:
         self.title = "musickit"
+        # Restore the user's theme choice (set via the command palette) before
+        # the first paint, so we don't flash the default theme on startup.
+        saved_theme = _load_state().get("theme")
+        if isinstance(saved_theme, str):
+            try:
+                self.theme = saved_theme
+            except Exception:  # pragma: no cover — bad/old theme name
+                pass
         # Visualizer animates at ~30 FPS so bars feel responsive to the audio.
         # Other status (time, progress, meta) only needs ~4 FPS — saves redraw
         # work since the surrounding text doesn't change frame-to-frame.
@@ -1237,10 +1254,22 @@ class MusickitApp(App[None]):
             self.screen.add_class("fullscreen")
             self.query_one(Visualizer).styles.height = "1fr"
 
-    def action_toggle_keybar(self) -> None:
-        """`?` shows / hides the bottom keybindings hint bar."""
-        keybar = self.query_one(KeyBar)
-        keybar.styles.display = "none" if keybar.styles.display != "none" else "block"
+    def action_toggle_help(self) -> None:
+        """`?` shows / hides Textual's full keybindings help panel.
+
+        The bottom keybar stays visible always — it's the at-a-glance
+        cheatsheet. The help panel has every binding (including the ones
+        not shown in the keybar) and full descriptions; press `?` to
+        dismiss when done.
+        """
+        from textual.widgets import HelpPanel
+
+        try:
+            panel = self.query_one(HelpPanel)
+        except Exception:
+            self.action_show_help_panel()
+        else:
+            panel.remove()
 
     # ------------------------------------------------------------------
     # Playback orchestration
@@ -1296,6 +1325,33 @@ class MusickitApp(App[None]):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _state_path() -> Path:
+    """Persistent UI state (theme selection, etc.) lives in `state.json`."""
+    return Path.home() / ".config" / "musickit" / "state.json"
+
+
+def _load_state() -> dict[str, object]:
+    p = _state_path()
+    if not p.exists():
+        return {}
+    try:
+        with p.open() as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _save_state(state: dict[str, object]) -> None:
+    p = _state_path()
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w") as f:
+            json.dump(state, f, indent=2)
+    except OSError:  # pragma: no cover — read-only home etc.
+        pass
 
 
 def _fmt_mmss(seconds: float) -> str:
