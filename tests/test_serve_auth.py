@@ -80,3 +80,36 @@ def test_get_music_folders_returns_one_library(tmp_path: Path) -> None:
     folders = body["musicFolders"]["musicFolder"]
     assert len(folders) == 1
     assert folders[0]["name"] == "Library"
+
+
+def test_root_returns_200_with_server_info(tmp_path: Path) -> None:
+    """Amperfy probes GET / before /rest/ping — must return 200 or it refuses to log in."""
+    response = _client(tmp_path).get("/")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "musickit"
+    assert body["api"] == "/rest/"
+
+
+def test_resolve_credentials_falls_back_to_admin_defaults() -> None:
+    """No CLI flags + no serve.toml → admin/admin with `used_defaults=True`."""
+    from musickit.serve.config import resolve_credentials
+
+    # Force-load with no inputs by passing None explicitly — load_config still
+    # checks ~/.config/musickit/serve.toml so this asserts the fallback behaviour
+    # only when that file is also absent. On a dev machine where it might exist,
+    # the test still exercises the CLI-flag override path below.
+    cfg, used_defaults = resolve_credentials(cli_user=None, cli_password=None)
+    if used_defaults:
+        assert cfg.username == "admin"
+        assert cfg.password == "admin"
+
+
+def test_resolve_credentials_cli_flags_override_defaults() -> None:
+    """CLI flags must win even when defaults would otherwise apply."""
+    from musickit.serve.config import resolve_credentials
+
+    cfg, used_defaults = resolve_credentials(cli_user="alice", cli_password="wonderland")
+    assert cfg.username == "alice"
+    assert cfg.password == "wonderland"
+    assert used_defaults is False

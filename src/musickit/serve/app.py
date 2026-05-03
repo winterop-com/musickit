@@ -96,6 +96,20 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
     app.include_router(scan_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(media_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(search_router, prefix="/rest", dependencies=auth_dep)
+
+    # Root probe: Amperfy and some other clients hit `GET /` before `/rest/ping`
+    # to confirm the host is reachable. Without this they get a 404 and refuse
+    # to log in. The response body is informational + harmless to expose pre-auth.
+    @app.get("/")
+    async def server_info() -> dict[str, Any]:
+        return {
+            "name": SERVER_NAME,
+            "version": SERVER_VERSION,
+            "type": "subsonic-compatible",
+            "api": "/rest/",
+            "spec": "https://opensubsonic.netlify.app/docs/api-reference/",
+        }
+
     return app
 
 

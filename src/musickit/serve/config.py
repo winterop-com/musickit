@@ -43,14 +43,18 @@ def load_config() -> dict[str, str]:
     return out
 
 
-def resolve_credentials(*, cli_user: str | None, cli_password: str | None) -> ServeConfig:
-    """CLI flags win over the TOML; either-or, but at least one must yield both fields."""
+DEFAULT_USERNAME = "admin"
+DEFAULT_PASSWORD = "admin"  # noqa: S105 — default for first-run convenience; warning emitted when used
+
+
+def resolve_credentials(*, cli_user: str | None, cli_password: str | None) -> tuple[ServeConfig, bool]:
+    """CLI flags win over the TOML. Falls back to admin/admin when nothing is set.
+
+    Returns `(cfg, used_defaults)` so the caller can warn the user when the
+    insecure defaults are in play.
+    """
     file_creds = load_config()
-    username = cli_user or file_creds.get("username")
-    password = cli_password or file_creds.get("password")
-    if not username or not password:
-        raise ValueError(
-            "missing username/password — provide --user/--password or write "
-            f"`username = ...` and `password = ...` to {config_path()}"
-        )
-    return ServeConfig(username=username, password=password)
+    username = cli_user or file_creds.get("username") or DEFAULT_USERNAME
+    password = cli_password or file_creds.get("password") or DEFAULT_PASSWORD
+    used_defaults = username == DEFAULT_USERNAME and password == DEFAULT_PASSWORD
+    return ServeConfig(username=username, password=password), used_defaults

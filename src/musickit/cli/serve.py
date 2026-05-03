@@ -52,11 +52,14 @@ def serve(
     """
     from musickit.serve import create_app, resolve_credentials
 
-    try:
-        cfg = resolve_credentials(cli_user=user, cli_password=password)
-    except ValueError as exc:
-        typer.echo(f"error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+    cfg, used_defaults = resolve_credentials(cli_user=user, cli_password=password)
+    if used_defaults:
+        typer.secho(
+            "WARNING: using default credentials admin/admin — pass --user/--password "
+            "or write `~/.config/musickit/serve.toml` for anything beyond a private LAN.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
 
     fastapi_app = create_app(root=target_dir.resolve(), cfg=cfg)
     _print_startup_banner(host=host, port=port, root=target_dir.resolve())
