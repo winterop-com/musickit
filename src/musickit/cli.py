@@ -395,16 +395,37 @@ def library(
         bool,
         typer.Option("--json", help="Emit the index as JSON instead of rendering."),
     ] = False,
+    fix: Annotated[
+        bool,
+        typer.Option(
+            "--fix",
+            help=(
+                "Apply deterministic fixes to flagged albums: MB year backfill for missing years, "
+                "rename dirs to match tags. Use `--dry-run` to preview without writing."
+            ),
+        ),
+    ] = False,
+    fix_dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="With `--fix`: print planned actions but don't write or rename."),
+    ] = False,
 ) -> None:
     """Walk a converted-output directory and print an Artist→Album→Track index.
 
     Default render is a `rich.Tree`. `--audit` / `--issues-only` switch to a
     table that flags concrete cleanup actions (no cover, missing year, scene
-    residue in names, track gaps, tag/path mismatches, and so on).
+    residue in names, track gaps, tag/path mismatches, and so on). `--fix`
+    closes the loop on the deterministic warnings.
     """
     console = Console()
     index = library_mod.scan(target_dir.resolve())
     library_mod.audit(index)
+
+    if fix:
+        actions = library_mod.fix_index(index, dry_run=fix_dry_run, console=console)
+        prefix = "[yellow]would apply[/yellow]" if fix_dry_run else "[cyan]applied[/cyan]"
+        console.print(f"{prefix} {len(actions)} fix(es)")
+        return
 
     if json_out:
         console.print_json(index.model_dump_json())

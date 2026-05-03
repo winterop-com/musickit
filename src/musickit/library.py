@@ -3,6 +3,10 @@
 Reads tags via `metadata.read_source` (cover bytes are dropped immediately
 after reading; we only keep `cover_pixels` and `has_cover`). Audit rules
 flag albums the user might want to fix with `retag` / `cover` / re-convert.
+
+`fix_*` helpers close the loop: for warnings that have a deterministic
+action (MB-derivable year, dir/tag rename), they call `apply_tag_overrides`
+and rename the album dir directly.
 """
 
 from __future__ import annotations
@@ -12,11 +16,15 @@ import unicodedata
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
 
 from musickit import naming
-from musickit.metadata import SUPPORTED_AUDIO_EXTS, read_source
+from musickit.metadata import SUPPORTED_AUDIO_EXTS, TagOverrides, apply_tag_overrides, read_source
+
+if TYPE_CHECKING:
+    from rich.console import Console
 
 _ALBUM_DIR_YEAR_RE = re.compile(r"^(\d{4})\s*-\s*(.+)$")
 _LOW_RES_THRESHOLD_PIXELS = 500 * 500
@@ -266,3 +274,112 @@ def _audit_track_count(album: LibraryAlbum) -> None:
 def _normalise_for_compare(value: str) -> str:
     """Lowercase + NFC + strip whitespace so dir/tag album comparisons aren't case-/accent-sensitive."""
     return unicodedata.normalize("NFC", value).strip().casefold()
+
+
+# ---------------------------------------------------------------------------
+# Auto-fix
+# ---------------------------------------------------------------------------
+
+
+def fix_index(
+    index: LibraryIndex,
+    *,
+    dry_run: bool = False,
+    console: Console | None = None,
+    year_lookup: object | None = None,
+) -> list[str]:
+    """Apply deterministic fixes to every flagged album in `index`.
+
+    Returns a list of human-readable action lines. `year_lookup` is the
+    MusicBrainz year-lookup callable (defaults to
+    `enrich.musicbrainz.lookup_release_year` — injectable for tests).
+    """
+    if year_lookup is None:
+        from musickit.enrich.musicbrainz import lookup_release_year
+
+        year_lookup = lookup_release_year
+
+    actions: list[str] = []
+    for album in index.albums:
+        if not album.warnings:
+            continue
+        actions.extend(fix_album(album, dry_run=dry_run, console=console, year_lookup=year_lookup))
+    return actions
+
+
+def fix_album(
+    album: LibraryAlbum,
+    *,
+    dry_run: bool = False,
+    console: Console | None = None,
+    year_lookup: object,
+) -> list[str]:
+    """Apply fixes to one album. Returns the action lines performed (or planned)."""
+    actions: list[str] = []
+    label = f"{album.artist_dir} / {album.album_dir}"
+
+    # Missing-year fixes go first so the rename below sees the new year.
+    if any("missing year" in w for w in album.warnings):
+        new_year = _fix_missing_year(album, dry_run=dry_run, year_lookup=year_lookup)
+        if new_year:
+            actions.append(f"{label}: year ← {new_year} (musicbrainz)")
+            if console is not None:
+                console.print(f"[green]✓[/green] {label}: year ← {new_year} (musicbrainz)")
+
+    # Tag/path mismatch — rename the directory to match the (now-current) tag.
+    needs_rename = any(w.startswith("tag/path mismatch") for w in album.warnings) or bool(actions)
+    if needs_rename:
+        renamed = _fix_rename_to_match_tag(album, dry_run=dry_run)
+        if renamed:
+            actions.append(f"{label}: renamed dir → {renamed}")
+            if console is not None:
+                console.print(f"[green]✓[/green] {label}: renamed dir → {renamed}")
+
+    return actions
+
+
+def _fix_missing_year(
+    album: LibraryAlbum,
+    *,
+    dry_run: bool,
+    year_lookup: object,
+) -> str | None:
+    if not album.tag_album:
+        return None
+    artist_query = album.tag_album_artist or album.artist_dir
+    if naming.is_various_artists(artist_query):
+        artist_query = "Various Artists"
+    year = year_lookup(album.tag_album, artist_query)  # type: ignore[operator]
+    if not isinstance(year, str) or not year:
+        return None
+    if dry_run:
+        return year
+    overrides = TagOverrides(year=year)
+    for track in album.tracks:
+        try:
+            apply_tag_overrides(track.path, overrides)
+        except Exception:  # pragma: no cover — surface elsewhere
+            return None
+    # Reflect the change in the in-memory model so downstream rename uses it.
+    for track in album.tracks:
+        track.year = year
+    album.tag_year = year
+    return year
+
+
+def _fix_rename_to_match_tag(album: LibraryAlbum, *, dry_run: bool) -> str | None:
+    """Rename `album.path` to `YYYY - Album` based on current tag values."""
+    if not album.tag_album:
+        return None
+    new_name = naming.album_folder(album.tag_album, album.tag_year)
+    if new_name == album.album_dir:
+        return None
+    new_path = album.path.parent / new_name
+    if new_path.exists() and new_path.resolve() != album.path.resolve():
+        return None  # don't clobber an existing dir
+    if dry_run:
+        return new_name
+    album.path.rename(new_path)
+    album.path = new_path
+    album.album_dir = new_name
+    return new_name

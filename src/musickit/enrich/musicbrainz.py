@@ -84,6 +84,48 @@ class MusicBrainzProvider:
         return str(best["id"])
 
 
+def lookup_release_year(
+    album: str,
+    artist: str,
+    *,
+    client: httpx.Client | None = None,
+) -> str | None:
+    """Return the 4-digit release year for `(album, artist)` per MusicBrainz, or None.
+
+    Used by `library --fix` to backfill a missing year tag without a full
+    enrichment pass. Honours the same 1 req/sec throttle as `enrich`.
+    """
+    if not album.strip():
+        return None
+    own_client = client is None
+    client = client or get_client()
+    try:
+        query_parts = [f'release:"{_escape(album)}"']
+        if artist:
+            query_parts.append(f'artist:"{_escape(artist)}"')
+        response = throttled_get(
+            client,
+            f"{MB_BASE}/release/",
+            host_key=MB_HOST_KEY,
+            params={"query": " AND ".join(query_parts), "fmt": "json", "limit": 5},
+        )
+        response.raise_for_status()
+        releases = response.json().get("releases") or []
+    except httpx.HTTPError as exc:
+        log.debug("musicbrainz year lookup failed: %s", exc)
+        return None
+    finally:
+        if own_client:
+            client.close()
+    for release in releases:
+        if int(release.get("score", 0)) < 90:
+            continue
+        date = str(release.get("date") or "").strip()
+        if len(date) >= 4 and date[:4].isdigit():
+            return date[:4]
+    return None
+
+
 def _escape(value: str) -> str:
     """Escape Lucene metacharacters that MB's search index honours."""
     out: list[str] = []

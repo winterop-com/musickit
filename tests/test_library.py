@@ -276,5 +276,144 @@ def test_library_command_json_output(silent_flac_template: Path, tmp_path: Path)
     assert payload["albums"][0]["artist_dir"] == "Artist"
 
 
+# ---------------------------------------------------------------------------
+# Auto-fix
+# ---------------------------------------------------------------------------
+
+
+def test_fix_backfills_missing_year_via_musicbrainz(silent_flac_template: Path, tmp_path: Path) -> None:
+    """A 'missing year' warning triggers MB lookup; tag is written and dir renamed."""
+    root = tmp_path / "lib"
+    album_dir = root / "Various Artists" / "Absolute Music 70"
+    _make_track(
+        album_dir,
+        silent_flac_template,
+        filename="01 - T.m4a",
+        album="Absolute Music 70",
+        album_artist="Various Artists",
+        year=None,
+    )
+
+    def fake_lookup(album: str, artist: str) -> str | None:
+        assert album == "Absolute Music 70"
+        assert artist == "Various Artists"
+        return "2012"
+
+    index = library.scan(root)
+    library.audit(index)
+    actions = library.fix_index(index, year_lookup=fake_lookup)
+
+    assert any("year ← 2012" in a for a in actions)
+    # Folder renamed.
+    new_dir = root / "Various Artists" / "2012 - Absolute Music 70"
+    assert new_dir.is_dir()
+    # Tag persisted.
+    tags_path = new_dir / "01 - T.m4a"
+    mp4 = MP4(tags_path)
+    assert mp4.tags is not None
+    assert mp4.tags["\xa9day"] == ["2012"]
+
+
+def test_fix_dry_run_does_not_write_or_rename(silent_flac_template: Path, tmp_path: Path) -> None:
+    root = tmp_path / "lib"
+    album_dir = root / "Various Artists" / "Absolute Music 70"
+    _make_track(
+        album_dir,
+        silent_flac_template,
+        filename="01 - T.m4a",
+        album="Absolute Music 70",
+        album_artist="Various Artists",
+        year=None,
+    )
+
+    def fake_lookup(album: str, artist: str) -> str | None:
+        return "2012"
+
+    index = library.scan(root)
+    library.audit(index)
+    actions = library.fix_index(index, dry_run=True, year_lookup=fake_lookup)
+
+    assert any("year ← 2012" in a for a in actions)
+    # Filesystem untouched.
+    assert album_dir.is_dir()
+    assert not (root / "Various Artists" / "2012 - Absolute Music 70").exists()
+    mp4 = MP4(album_dir / "01 - T.m4a")
+    assert mp4.tags is not None
+    assert "\xa9day" not in mp4.tags
+
+
+def test_fix_renames_on_tag_path_mismatch(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Tag-says-X but dir-says-Y → rename dir to match the tag."""
+    root = tmp_path / "lib"
+    album_dir = root / "Artist" / "2020 - Wrong Title"
+    _make_track(
+        album_dir,
+        silent_flac_template,
+        filename="01 - T.m4a",
+        album="Right Title",
+        year="2020",
+    )
+
+    def fake_lookup(album: str, artist: str) -> str | None:
+        return None
+
+    index = library.scan(root)
+    library.audit(index)
+    actions = library.fix_index(index, year_lookup=fake_lookup)
+
+    assert any("renamed dir" in a for a in actions)
+    assert (root / "Artist" / "2020 - Right Title").is_dir()
+
+
+def test_fix_skips_albums_without_warnings(silent_flac_template: Path, tmp_path: Path) -> None:
+    root = tmp_path / "lib"
+    album_dir = root / "Imagine Dragons" / "2012 - Night Visions"
+    _make_track(
+        album_dir,
+        silent_flac_template,
+        filename="01 - Radioactive.m4a",
+        title="Radioactive",
+        artist="Imagine Dragons",
+        album_artist="Imagine Dragons",
+        album="Night Visions",
+        year="2012",
+        cover_size=(1000, 1000),
+    )
+
+    def fake_lookup(album: str, artist: str) -> str | None:
+        raise AssertionError("year_lookup should not be called when there are no warnings")
+
+    index = library.scan(root)
+    library.audit(index)
+    actions = library.fix_index(index, year_lookup=fake_lookup)
+    assert actions == []
+
+
+def test_fix_does_not_clobber_existing_target_dir(silent_flac_template: Path, tmp_path: Path) -> None:
+    """If renaming would overwrite another dir, skip silently."""
+    root = tmp_path / "lib"
+    album_dir = root / "Artist" / "2020 - Wrong Title"
+    _make_track(
+        album_dir,
+        silent_flac_template,
+        filename="01 - T.m4a",
+        album="Right Title",
+        year="2020",
+    )
+    # Pre-existing collision.
+    (root / "Artist" / "2020 - Right Title").mkdir(parents=True)
+
+    def fake_lookup(album: str, artist: str) -> str | None:
+        return None
+
+    index = library.scan(root)
+    library.audit(index)
+    library.fix_index(index, year_lookup=fake_lookup)
+
+    # Both dirs still around — no clobber.
+    assert album_dir.is_dir()
+    assert (root / "Artist" / "2020 - Right Title").is_dir()
+
+
 # Silence pytest "unused import" via PIL/MP4 in lint-only contexts.
 _ = pytest
