@@ -46,6 +46,27 @@ def test_post_ping_works_too(tmp_path: Path) -> None:
     assert response.json()["subsonic-response"]["status"] == "ok"
 
 
+def test_post_credentials_in_form_body_authenticate(tmp_path: Path) -> None:
+    """play:Sub puts u/p in application/x-www-form-urlencoded body, not query string."""
+    response = _client(tmp_path).post(
+        "/rest/ping.view",
+        data={"u": "mort", "p": "secret", "f": "json"},
+    )
+    assert response.status_code == 200
+    assert response.json()["subsonic-response"]["status"] == "ok"
+
+
+def test_post_credentials_split_between_body_and_query(tmp_path: Path) -> None:
+    """f=json in query, u/p in body — should still authenticate."""
+    response = _client(tmp_path).post(
+        "/rest/ping.view",
+        params={"f": "json"},
+        data={"u": "mort", "p": "secret"},
+    )
+    assert response.status_code == 200
+    assert response.json()["subsonic-response"]["status"] == "ok"
+
+
 def test_ping_plain_password_round_trips(tmp_path: Path) -> None:
     response = _client(tmp_path).get("/rest/ping", params={"u": "mort", "p": "secret", "f": "json"})
     body = response.json()

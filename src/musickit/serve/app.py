@@ -70,6 +70,10 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
     # serialization). Binary responses (stream / cover) skip conversion via
     # the content-type check below.
     app.add_middleware(SubsonicFormatMiddleware)
+    # Outermost: merge POST form-body params into query string so the
+    # auth dependency + endpoint Query() defaults pick them up uniformly.
+    # play:Sub (iOS) sends credentials this way.
+    app.add_middleware(PostFormToQueryMiddleware)
 
     async def require_auth(
         request: Request,
@@ -124,6 +128,63 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
 
 class _SubsonicAuthError(Exception):
     """Internal — translated to a Subsonic error 40 response by the handler."""
+
+
+class PostFormToQueryMiddleware:
+    """Merge POST form-body params into the query string for `/rest/*` requests.
+
+    play:Sub (and some other older clients) send Subsonic credentials in
+    an `application/x-www-form-urlencoded` POST body, not the query string.
+    Our endpoints + auth dependency read everything from `request.query_params`,
+    so we synthesise a merged query_string on the ASGI scope and replay the
+    body for downstream consumers. After this middleware, the rest of the
+    stack treats POST + form body identically to GET + query string.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if (
+            scope.get("type") != "http"
+            or scope.get("method") != "POST"
+            or not scope.get("path", "").startswith("/rest/")
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        content_type = b""
+        for header_name, header_value in scope.get("headers", []):
+            if header_name.lower() == b"content-type":
+                content_type = header_value
+                break
+        if not content_type.startswith(b"application/x-www-form-urlencoded"):
+            await self.app(scope, receive, send)
+            return
+
+        body_chunks: list[bytes] = []
+        more_body = True
+        while more_body:
+            message = await receive()
+            body_chunks.append(message.get("body", b"") or b"")
+            more_body = message.get("more_body", False)
+        body = b"".join(body_chunks)
+
+        if body:
+            existing_qs = scope.get("query_string", b"")
+            merged_qs = existing_qs + b"&" + body if existing_qs else body
+            scope = {**scope, "query_string": merged_qs}
+
+        replayed = False
+
+        async def replay_receive() -> Any:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay_receive, send)
 
 
 class SubsonicFormatMiddleware(BaseHTTPMiddleware):
