@@ -30,8 +30,8 @@ def _safe_path_under_root(cache: IndexCache, path_id: str) -> JSONResponse | Non
     return None
 
 
-@router.api_route("/stream", methods=["GET", "POST"])
-@router.api_route("/stream.view", methods=["GET", "POST"])
+@router.api_route("/stream", methods=["GET", "POST", "HEAD"])
+@router.api_route("/stream.view", methods=["GET", "POST", "HEAD"])
 async def stream(request: Request, id: str = Query(...)) -> Response:
     """Audio bytes for a track. Starlette's FileResponse handles HTTP Range natively."""
     cache = _get_cache(request)
@@ -47,15 +47,15 @@ async def stream(request: Request, id: str = Query(...)) -> Response:
     )
 
 
-@router.api_route("/download", methods=["GET", "POST"])
-@router.api_route("/download.view", methods=["GET", "POST"])
+@router.api_route("/download", methods=["GET", "POST", "HEAD"])
+@router.api_route("/download.view", methods=["GET", "POST", "HEAD"])
 async def download(request: Request, id: str = Query(...)) -> Response:
     """Same as `stream` for now — we never transcode, so there's no distinction."""
     return await stream(request, id=id)
 
 
-@router.api_route("/getCoverArt", methods=["GET", "POST"])
-@router.api_route("/getCoverArt.view", methods=["GET", "POST"])
+@router.api_route("/getCoverArt", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getCoverArt.view", methods=["GET", "POST", "HEAD"])
 async def get_cover_art(
     request: Request,
     id: str = Query(...),

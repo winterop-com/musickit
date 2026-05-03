@@ -98,6 +98,7 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
     # Mount endpoint groups. Imports happen lazily to keep the module graph
     # shallow and to avoid pulling FastAPI into pure-data modules.
     from musickit.serve.endpoints.browsing import router as browsing_router
+    from musickit.serve.endpoints.extras import router as extras_router
     from musickit.serve.endpoints.media import router as media_router
     from musickit.serve.endpoints.scan import router as scan_router
     from musickit.serve.endpoints.search import router as search_router
@@ -109,6 +110,7 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
     app.include_router(scan_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(media_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(search_router, prefix="/rest", dependencies=auth_dep)
+    app.include_router(extras_router, prefix="/rest", dependencies=auth_dep)
 
     # Root probe: Amperfy and some other clients hit `GET /` before `/rest/ping`
     # to confirm the host is reachable. Without this they get a 404 and refuse

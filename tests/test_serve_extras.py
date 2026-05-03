@@ -1,0 +1,121 @@
+"""Stub endpoints — scrobble / artistInfo / musicDirectory / random / starred / playlists / HEAD."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from musickit.library.models import LibraryAlbum, LibraryIndex, LibraryTrack
+from musickit.serve import ServeConfig, create_app
+from musickit.serve.ids import album_id, artist_id
+
+
+def _params(**extra: str | int) -> dict[str, str | int]:
+    return {"u": "mort", "p": "secret", "f": "json", **extra}
+
+
+def _track(album_path: Path, name: str, *, n: int) -> LibraryTrack:
+    return LibraryTrack(
+        path=album_path / f"{n:02d} - {name}.m4a",
+        title=name,
+        artist=album_path.parent.name,
+        album=album_path.name,
+        track_no=n,
+        duration_s=180.0,
+    )
+
+
+def _album(root: Path, artist: str, album: str, *, year: str, tracks: list[str]) -> LibraryAlbum:
+    album_path = root / artist / album
+    return LibraryAlbum(
+        path=album_path,
+        artist_dir=artist,
+        album_dir=album,
+        tag_album=album,
+        tag_year=year,
+        tag_album_artist=artist,
+        track_count=len(tracks),
+        tracks=[_track(album_path, name, n=i + 1) for i, name in enumerate(tracks)],
+    )
+
+
+def _client(tmp_path: Path) -> TestClient:
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    albums = [
+        _album(tmp_path, "ABBA", "Arrival", year="1976", tracks=["Dancing Queen", "Money Money Money"]),
+        _album(tmp_path, "Beck", "Sea Change", year="2002", tracks=["The Golden Age"]),
+    ]
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=albums))  # noqa: SLF001
+    return TestClient(app)
+
+
+def test_scrobble_returns_ok(tmp_path: Path) -> None:
+    body = _client(tmp_path).get("/rest/scrobble", params=_params(id="tr_x", submission="true")).json()
+    assert body["subsonic-response"]["status"] == "ok"
+
+
+def test_get_artist_info2_returns_empty_shell(tmp_path: Path) -> None:
+    body = _client(tmp_path).get("/rest/getArtistInfo2", params=_params(id="ar_anything")).json()
+    info = body["subsonic-response"]["artistInfo2"]
+    assert info["biography"] == ""
+    assert info["similarArtist"] == []
+
+
+def test_get_music_directory_for_artist_lists_albums(tmp_path: Path) -> None:
+    abba_id = artist_id("ABBA")
+    body = _client(tmp_path).get("/rest/getMusicDirectory", params=_params(id=abba_id)).json()
+    inner = body["subsonic-response"]["directory"]
+    assert inner["name"] == "ABBA"
+    assert all(child["isDir"] is True for child in inner["child"])
+    names = [c["name"] for c in inner["child"]]
+    assert "Arrival" in names
+
+
+def test_get_music_directory_for_album_lists_songs(tmp_path: Path) -> None:
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    fixture_album = _album(tmp_path, "ABBA", "Arrival", year="1976", tracks=["Dancing Queen", "Money Money Money"])
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=[fixture_album]))  # noqa: SLF001
+
+    body = TestClient(app).get("/rest/getMusicDirectory", params=_params(id=album_id(fixture_album))).json()
+    inner = body["subsonic-response"]["directory"]
+    assert inner["name"] == "Arrival"
+    assert [c["title"] for c in inner["child"]] == ["Dancing Queen", "Money Money Money"]
+
+
+def test_get_music_directory_unknown_id_returns_70(tmp_path: Path) -> None:
+    body = _client(tmp_path).get("/rest/getMusicDirectory", params=_params(id="bogus_xxx")).json()
+    assert body["subsonic-response"]["status"] == "failed"
+    assert body["subsonic-response"]["error"]["code"] == 70
+
+
+def test_get_random_songs_returns_at_most_size(tmp_path: Path) -> None:
+    body = _client(tmp_path).get("/rest/getRandomSongs", params=_params(size=2)).json()
+    songs = body["subsonic-response"]["randomSongs"]["song"]
+    assert 0 < len(songs) <= 2
+
+
+def test_get_starred_and_starred2_return_empty(tmp_path: Path) -> None:
+    cl = _client(tmp_path)
+    s1 = cl.get("/rest/getStarred", params=_params()).json()["subsonic-response"]["starred"]
+    s2 = cl.get("/rest/getStarred2", params=_params()).json()["subsonic-response"]["starred2"]
+    assert s1 == s2 == {"artist": [], "album": [], "song": []}
+
+
+def test_star_unstar_no_ops(tmp_path: Path) -> None:
+    cl = _client(tmp_path)
+    assert cl.get("/rest/star", params=_params(id="tr_x")).json()["subsonic-response"]["status"] == "ok"
+    assert cl.get("/rest/unstar", params=_params(id="tr_x")).json()["subsonic-response"]["status"] == "ok"
+
+
+def test_get_playlists_empty(tmp_path: Path) -> None:
+    body = _client(tmp_path).get("/rest/getPlaylists", params=_params()).json()
+    assert body["subsonic-response"]["playlists"]["playlist"] == []
+
+
+def test_head_on_ping_returns_200(tmp_path: Path) -> None:
+    """play:Sub does HEAD /rest/stream.view to estimate Content-Length; HEAD must be allowed."""
+    response = _client(tmp_path).head("/rest/ping", params=_params())
+    assert response.status_code == 200

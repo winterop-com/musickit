@@ -34,8 +34,8 @@ def _index_letter(name: str) -> str:
     return first if first.isalpha() else "#"
 
 
-@router.api_route("/getArtists", methods=["GET", "POST"])
-@router.api_route("/getArtists.view", methods=["GET", "POST"])
+@router.api_route("/getArtists", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getArtists.view", methods=["GET", "POST", "HEAD"])
 async def get_artists(request: Request) -> dict:
     """Alphabetically grouped artist list — the modern (ID3) browse root."""
     cache = _get_cache(request)
@@ -50,8 +50,8 @@ async def get_artists(request: Request) -> dict:
     return envelope("artists", {"ignoredArticles": _IGNORED_ARTICLES, "index": index})
 
 
-@router.api_route("/getIndexes", methods=["GET", "POST"])
-@router.api_route("/getIndexes.view", methods=["GET", "POST"])
+@router.api_route("/getIndexes", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getIndexes.view", methods=["GET", "POST", "HEAD"])
 async def get_indexes(request: Request) -> dict:
     """Legacy folder-based browse — same shape as getArtists, different envelope key."""
     cache = _get_cache(request)
@@ -69,8 +69,8 @@ async def get_indexes(request: Request) -> dict:
     )
 
 
-@router.api_route("/getArtist", methods=["GET", "POST"])
-@router.api_route("/getArtist.view", methods=["GET", "POST"])
+@router.api_route("/getArtist", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getArtist.view", methods=["GET", "POST", "HEAD"])
 async def get_artist(request: Request, id: str = Query(...)) -> dict:
     """Albums for one artist."""
     cache = _get_cache(request)
@@ -90,8 +90,8 @@ async def get_artist(request: Request, id: str = Query(...)) -> dict:
     )
 
 
-@router.api_route("/getAlbum", methods=["GET", "POST"])
-@router.api_route("/getAlbum.view", methods=["GET", "POST"])
+@router.api_route("/getAlbum", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getAlbum.view", methods=["GET", "POST", "HEAD"])
 async def get_album(request: Request, id: str = Query(...)) -> dict:
     """One album with its tracks."""
     cache = _get_cache(request)
@@ -101,8 +101,8 @@ async def get_album(request: Request, id: str = Query(...)) -> dict:
     return envelope("album", album_payload(album, with_songs=True))
 
 
-@router.api_route("/getSong", methods=["GET", "POST"])
-@router.api_route("/getSong.view", methods=["GET", "POST"])
+@router.api_route("/getSong", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getSong.view", methods=["GET", "POST", "HEAD"])
 async def get_song(request: Request, id: str = Query(...)) -> dict:
     """One track."""
     cache = _get_cache(request)
@@ -113,8 +113,8 @@ async def get_song(request: Request, id: str = Query(...)) -> dict:
     return envelope("song", song_payload(album, track))
 
 
-@router.api_route("/getAlbumList2", methods=["GET", "POST"])
-@router.api_route("/getAlbumList2.view", methods=["GET", "POST"])
+@router.api_route("/getAlbumList2", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getAlbumList2.view", methods=["GET", "POST", "HEAD"])
 async def get_album_list2(  # noqa: PLR0912 — Subsonic's `type` enum has many cases
     request: Request,
     type: str = Query(default="alphabeticalByName"),

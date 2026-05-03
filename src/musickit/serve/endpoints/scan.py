@@ -23,8 +23,8 @@ def _scan_status_payload(cache: IndexCache) -> dict[str, object]:
     return {"scanning": cache.scan_in_progress, "count": cache.track_count}
 
 
-@router.api_route("/startScan", methods=["GET", "POST"])
-@router.api_route("/startScan.view", methods=["GET", "POST"])
+@router.api_route("/startScan", methods=["GET", "POST", "HEAD"])
+@router.api_route("/startScan.view", methods=["GET", "POST", "HEAD"])
 async def start_scan(request: Request) -> dict:
     """Kick a background rescan. Returns immediately with the new status."""
     cache = _get_cache(request)
@@ -32,8 +32,8 @@ async def start_scan(request: Request) -> dict:
     return envelope("scanStatus", _scan_status_payload(cache))
 
 
-@router.api_route("/getScanStatus", methods=["GET", "POST"])
-@router.api_route("/getScanStatus.view", methods=["GET", "POST"])
+@router.api_route("/getScanStatus", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getScanStatus.view", methods=["GET", "POST", "HEAD"])
 async def get_scan_status(request: Request) -> dict:
     """Poll the rescan state. `scanning=false` once `rebuild()` returns."""
     cache = _get_cache(request)
