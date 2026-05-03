@@ -155,6 +155,13 @@ class Visualizer(Static):
         rows = max(4, max(0, self.size.height - 1))
         red_cutoff = max(1, rows // 5)
         yellow_cutoff = red_cutoff + max(1, rows // 3)
+        # Spread bars across the full available width. Each bar gets
+        # `bar_width` block chars + 1 cell gap. Floor at 3 so it still looks
+        # like a meter on narrow terminals.
+        n_bars = len(self.levels) or 1
+        avail = max(0, self.size.width - 4)  # account for the widget's padding
+        bar_width = max(3, (avail - n_bars) // n_bars)
+        empty_cell = " " * bar_width
         lines: list[str] = []
         for row_idx in range(rows):
             if row_idx < red_cutoff:
@@ -168,15 +175,15 @@ class Visualizer(Static):
             line_parts: list[str] = []
             for level in self.levels:
                 if level >= row_top:
-                    line_parts.append(f"[{color}]███[/]")
+                    line_parts.append(f"[{color}]{'█' * bar_width}[/]")
                 elif level > row_bottom:
                     fraction = (level - row_bottom) / max(1e-6, row_top - row_bottom)
                     block = self._PARTIAL_BLOCKS[
                         min(len(self._PARTIAL_BLOCKS) - 1, int(fraction * len(self._PARTIAL_BLOCKS)))
                     ]
-                    line_parts.append(f"[{color}]{block * 3}[/]")
+                    line_parts.append(f"[{color}]{block * bar_width}[/]")
                 else:
-                    line_parts.append("   ")
+                    line_parts.append(empty_cell)
                 line_parts.append(" ")
             lines.append("".join(line_parts))
         return "\n".join(lines)
