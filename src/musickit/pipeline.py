@@ -598,22 +598,25 @@ def _process_album(
     # single-dir, wrapped multi-disc, and the special anchored-at-first-disc
     # case) so removing one album doesn't take down siblings.
     if remove_source:
-        footprint = _input_footprint(album_dir)
         try:
             input_root_resolved = input_root.resolve()
-            footprint_resolved = footprint.resolve()
         except OSError:
             input_root_resolved = input_root
-            footprint_resolved = footprint
-        # Hard refuse to remove the input root itself (or anything outside it).
-        try:
-            footprint_resolved.relative_to(input_root_resolved)
-            inside_input = footprint_resolved != input_root_resolved
-        except ValueError:
-            inside_input = False
-        if not inside_input:
-            warnings.append(f"--remove-source: refusing to remove {footprint} (would touch input root or escape it)")
-        else:
+        for footprint in _input_footprint(album_dir):
+            try:
+                footprint_resolved = footprint.resolve()
+            except OSError:
+                footprint_resolved = footprint
+            try:
+                footprint_resolved.relative_to(input_root_resolved)
+                inside_input = footprint_resolved != input_root_resolved
+            except ValueError:
+                inside_input = False
+            if not inside_input:
+                warnings.append(
+                    f"--remove-source: refusing to remove {footprint} (would touch input root or escape it)"
+                )
+                continue
             try:
                 shutil.rmtree(footprint)
                 if ctx.verbose:
@@ -992,26 +995,38 @@ def _enrich_with_acoustid(
         warnings.append(f"acoustid: matched {matched}/{len(candidates)} tagless track(s)")
 
 
-def _input_footprint(album_dir: AlbumDir) -> Path:
-    """Return the on-disk dir to remove for `album_dir` under `--remove-source`.
+def _input_footprint(album_dir: AlbumDir) -> list[Path]:
+    """Return the on-disk dirs to remove for `album_dir` under `--remove-source`.
 
-    Three cases:
-    - Single-disc album → the album's leaf dir (`album_dir.path`).
-    - Bare-leading multi-disc (`Album/CD1` + `Album/CD2`) → the wrapper
-      `Album/`, which is the anchor.
+    Cases:
+    - Single-disc album → `[album_dir.path]`.
+    - Multi-disc anchored at one shared parent (e.g. bare-leading
+      `Album/CD1` + `Album/CD2` where the anchor is `Album/`) →
+      `[album_dir.path]`.
     - Shared-prefix multi-disc (`wrapper/Album (CD1)` + `wrapper/Album (CD2)`)
-      → the `wrapper/` (common parent of all disc subfolders), so removing
-      one album doesn't strand its sibling disc on disk.
+      → escalate to the wrapper IFF the wrapper contains exactly this album's
+      disc folders (no other subdirs). With siblings present (e.g. another
+      album also under the same wrapper), return the disc folders themselves
+      so removal doesn't take siblings down with it.
     """
     if album_dir.disc_total is None:
-        return album_dir.path
-    track_parents = {t.parent for t in album_dir.tracks}
+        return [album_dir.path]
+    track_parents = sorted({t.parent for t in album_dir.tracks})
     if len(track_parents) <= 1:
-        return album_dir.path
+        return [album_dir.path]
     parents_of_parents = {p.parent for p in track_parents}
-    if len(parents_of_parents) == 1:
-        return parents_of_parents.pop()
-    return album_dir.path
+    if len(parents_of_parents) != 1:
+        return list(track_parents)
+    wrapper = parents_of_parents.pop()
+    try:
+        wrapper_subdirs = {p for p in wrapper.iterdir() if p.is_dir()}
+    except OSError:
+        return list(track_parents)
+    if wrapper_subdirs == set(track_parents):
+        return [wrapper]
+    # Wrapper has unrelated subdirectories — sibling albums likely. Removing
+    # the wrapper would delete them; remove only this album's disc folders.
+    return list(track_parents)
 
 
 def _format_bytes(n: int) -> str:

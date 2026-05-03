@@ -430,7 +430,15 @@ def library(
     """
     console = Console()
     verbose = bool(ctx.obj and ctx.obj.get("verbose"))
-    index = _scan_with_progress(console, target_dir.resolve(), verbose=verbose)
+    # Audit modes need cover-pixel measurement so the low-res-cover rule can
+    # fire. Otherwise stay in fast scan mode (no Pillow decode per cover).
+    measure_pictures = audit_mode or issues_only or fix
+    index = _scan_with_progress(
+        console,
+        target_dir.resolve(),
+        verbose=verbose,
+        measure_pictures=measure_pictures,
+    )
     library_mod.audit(index)
 
     if fix:
@@ -455,7 +463,13 @@ def library(
     _render_tree(console, index)
 
 
-def _scan_with_progress(console: Console, root: Path, *, verbose: bool) -> library_mod.LibraryIndex:
+def _scan_with_progress(
+    console: Console,
+    root: Path,
+    *,
+    verbose: bool,
+    measure_pictures: bool = False,
+) -> library_mod.LibraryIndex:
     """Wrap `library.scan` with a progress bar (or per-album lines if -v).
 
     Large libraries on slow drives (network, USB) can take seconds to minutes;
@@ -476,7 +490,7 @@ def _scan_with_progress(console: Console, root: Path, *, verbose: bool) -> libra
                 rel = album_dir
             console.print(f"[dim]({idx}/{total})[/] scanning {rel}")
 
-        return library_mod.scan(root, on_album=on_album_verbose)
+        return library_mod.scan(root, on_album=on_album_verbose, measure_pictures=measure_pictures)
 
     with Progress(
         SpinnerColumn(),
@@ -498,7 +512,7 @@ def _scan_with_progress(console: Console, root: Path, *, verbose: bool) -> libra
                 name = name[:39] + "…"
             progress.update(task, advance=1, description=f"[cyan]Scanning[/] {name}")
 
-        return library_mod.scan(root, on_album=on_album)
+        return library_mod.scan(root, on_album=on_album, measure_pictures=measure_pictures)
 
 
 def _render_tree(console: Console, index: library_mod.LibraryIndex) -> None:

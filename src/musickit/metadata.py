@@ -164,7 +164,12 @@ class MusicBrainzIds(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def read_source(path: Path, *, light: bool = False) -> SourceTrack:
+def read_source(
+    path: Path,
+    *,
+    light: bool = False,
+    measure_pictures: bool = False,
+) -> SourceTrack:
     """Read tags + embedded cover from a single audio file.
 
     Source values that arrive entirely lowercase are smart-title-cased here
@@ -177,16 +182,20 @@ def read_source(path: Path, *, light: bool = False) -> SourceTrack:
       - A second mutagen open to read `info.length` (for `duration_s`)
     `has_cover` still works in light mode (presence is checked without
     touching the bytes); only the pixel measurement is skipped.
+
+    `measure_pictures=True` re-enables the Pillow decode even under
+    `light=True`, so audit modes that need low-res-cover detection can
+    pay just that cost without also paying the duration probe.
     """
     suffix = path.suffix.lower()
     if suffix == ".flac":
-        track = _read_flac(path, light=light)
+        track = _read_flac(path, light=light, measure_pictures=measure_pictures)
     elif suffix == ".mp3":
-        track = _read_mp3(path, light=light)
+        track = _read_mp3(path, light=light, measure_pictures=measure_pictures)
     elif suffix in (".m4a", ".mp4", ".m4b"):
-        track = _read_mp4(path, light=light)
+        track = _read_mp4(path, light=light, measure_pictures=measure_pictures)
     else:
-        track = _read_generic(path, light=light)
+        track = _read_generic(path, light=light, measure_pictures=measure_pictures)
     track.title = smart_title_case(track.title)
     track.artist = smart_title_case(track.artist)
     track.album = smart_title_case(track.album)
@@ -518,18 +527,21 @@ def _apply_overrides_mp4(path: Path, ov: TagOverrides) -> None:
         mp4.add_tags()
     tags = mp4.tags
     assert tags is not None
+    # `_set_or_clear` honours the TagOverrides empty-string-means-clear
+    # contract for MP4 atoms. Plain `_set` silently no-ops on empty
+    # strings, which would leave the old value in place.
     if ov.title is not None:
-        _set(tags, "\xa9nam", ov.title)
+        _set_or_clear(tags, "\xa9nam", ov.title)
     if ov.artist is not None:
-        _set(tags, "\xa9ART", ov.artist)
+        _set_or_clear(tags, "\xa9ART", ov.artist)
     if ov.album is not None:
-        _set(tags, "\xa9alb", ov.album)
+        _set_or_clear(tags, "\xa9alb", ov.album)
     if ov.album_artist is not None:
-        _set(tags, "aART", ov.album_artist)
+        _set_or_clear(tags, "aART", ov.album_artist)
     if ov.year is not None:
-        _set(tags, "\xa9day", _year_only(ov.year) or ov.year)
+        _set_or_clear(tags, "\xa9day", _year_only(ov.year) or ov.year if ov.year else "")
     if ov.genre is not None:
-        _set(tags, "\xa9gen", ov.genre)
+        _set_or_clear(tags, "\xa9gen", ov.genre)
     if ov.track_total is not None:
         existing_trkn = tags.get("trkn") or [(0, 0)]
         first_trkn = existing_trkn[0]
@@ -623,7 +635,7 @@ def _apply_overrides_flac(path: Path, ov: TagOverrides) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _read_flac(path: Path, *, light: bool = False) -> SourceTrack:
+def _read_flac(path: Path, *, light: bool = False, measure_pictures: bool = False) -> SourceTrack:
     flac = FLAC(path)
     tags: Any = flac.tags or {}
     track = SourceTrack(path=path)
@@ -659,10 +671,16 @@ def _read_flac(path: Path, *, light: bool = False) -> SourceTrack:
         # Prefer "front cover" (type 3); fall back to largest by pixel area.
         front = next((p for p in pictures if p.type == 3), None)
         chosen = front or max(pictures, key=lambda p: (p.width or 0) * (p.height or 0))
-        if light:
+        if light and not measure_pictures:
             track.embedded_picture = b""  # presence-only sentinel
             track.embedded_picture_mime = chosen.mime or "image/jpeg"
             track.embedded_picture_pixels = 0
+        elif light and measure_pictures:
+            # FLAC pictures carry intrinsic dimensions in the tag block — no
+            # Pillow decode needed even when we want pixel info.
+            track.embedded_picture = b""
+            track.embedded_picture_mime = chosen.mime or "image/jpeg"
+            track.embedded_picture_pixels = (chosen.width or 0) * (chosen.height or 0)
         else:
             track.embedded_picture = bytes(chosen.data)
             track.embedded_picture_mime = chosen.mime or "image/jpeg"
@@ -671,7 +689,7 @@ def _read_flac(path: Path, *, light: bool = False) -> SourceTrack:
     return track
 
 
-def _read_mp3(path: Path, *, light: bool = False) -> SourceTrack:
+def _read_mp3(path: Path, *, light: bool = False, measure_pictures: bool = False) -> SourceTrack:
     track = SourceTrack(path=path)
     try:
         id3 = ID3(path)
@@ -694,13 +712,18 @@ def _read_mp3(path: Path, *, light: bool = False) -> SourceTrack:
     apics = id3.getall("APIC")
     if apics:
         front = next((p for p in apics if getattr(p, "type", 0) == 3), None) or apics[0]
-        if light:
+        track.embedded_picture_mime = front.mime or "image/jpeg"
+        if light and not measure_pictures:
             track.embedded_picture = b""  # presence-only sentinel
+            track.embedded_picture_pixels = 0
+        elif light and measure_pictures:
+            track.embedded_picture = b""
+            track.embedded_picture_pixels = _measure_pixels(bytes(front.data))
         else:
             track.embedded_picture = bytes(front.data)
-        track.embedded_picture_mime = front.mime or "image/jpeg"
-        # MP3 APICs don't carry pixel size; pretend "small" so a folder.jpg of known dims wins.
-        track.embedded_picture_pixels = 0
+            # MP3 APICs don't carry intrinsic dims; either measure here or
+            # leave 0 (the cover-pick code prefers a folder.jpg of known size).
+            track.embedded_picture_pixels = _measure_pixels(track.embedded_picture)
 
     if not light:
         # Bit rate/duration aren't part of the tag bundle, but reading MP3() also validates the file.
@@ -708,7 +731,7 @@ def _read_mp3(path: Path, *, light: bool = False) -> SourceTrack:
     return track
 
 
-def _read_mp4(path: Path, *, light: bool = False) -> SourceTrack:
+def _read_mp4(path: Path, *, light: bool = False, measure_pictures: bool = False) -> SourceTrack:
     """Read tags + cover from an MP4/M4A (ALAC or AAC inside iTunes-style atoms)."""
     track = SourceTrack(path=path)
     mp4 = MP4(path)
@@ -759,9 +782,15 @@ def _read_mp4(path: Path, *, light: bool = False) -> SourceTrack:
         cover = covers[0]
         fmt = getattr(cover, "imageformat", None)
         track.embedded_picture_mime = "image/png" if fmt == MP4Cover.FORMAT_PNG else "image/jpeg"
-        if light:
-            track.embedded_picture = b""  # presence-only sentinel; skip Pillow decode
+        if light and not measure_pictures:
+            track.embedded_picture = b""  # presence-only; skip Pillow + bytes copy
             track.embedded_picture_pixels = 0
+        elif light and measure_pictures:
+            # Audit's low-res-cover rule needs the dimension. Pay the Pillow
+            # decode but skip the duration probe + bytes-copy retention.
+            cover_bytes = bytes(cover)
+            track.embedded_picture = b""  # don't retain the bytes
+            track.embedded_picture_pixels = _measure_pixels(cover_bytes)
         else:
             track.embedded_picture = bytes(cover)
             track.embedded_picture_pixels = _measure_pixels(track.embedded_picture)
@@ -792,8 +821,8 @@ def _mp4_first(tags: Any, key: str) -> str | None:
     return str(values[0])
 
 
-def _read_generic(path: Path, *, light: bool = False) -> SourceTrack:
-    del light  # generic reader pulls only basic tags, no pictures to skip
+def _read_generic(path: Path, *, light: bool = False, measure_pictures: bool = False) -> SourceTrack:
+    del light, measure_pictures  # generic reader pulls only basic tags, no pictures to skip
     track = SourceTrack(path=path)
     audio = _mutagen.File(path, easy=True)  # pyright: ignore[reportPrivateImportUsage]
     if audio is None or audio.tags is None:
@@ -912,6 +941,20 @@ def _set(tags: Any, key: str, value: str | None) -> None:
         return
     text = str(value).strip()
     if not text:
+        return
+    tags[key] = [text]
+
+
+def _set_or_clear(tags: Any, key: str, value: str) -> None:
+    """Like `_set` but treats an empty string as "delete this tag".
+
+    Used by `apply_tag_overrides` for MP4, where the contract is that
+    empty string clears the tag (matching ID3's and FLAC's behaviour).
+    """
+    text = value.strip()
+    if not text:
+        if key in tags:
+            del tags[key]
         return
     tags[key] = [text]
 

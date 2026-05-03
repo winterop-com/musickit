@@ -155,6 +155,60 @@ def test_remove_source_after_successful_album(album_inputs: Path) -> None:
     assert not src_album.exists()
 
 
+def test_input_footprint_keeps_wrapper_when_dedicated_to_one_album(tmp_path: Path) -> None:
+    """Bare-leading + shared-prefix dedicated wrappers escalate to the wrapper."""
+    from musickit.discover import AlbumDir
+    from musickit.pipeline import _input_footprint
+
+    wrapper = tmp_path / "Album X"
+    cd1 = wrapper / "Album X (CD1)"
+    cd2 = wrapper / "Album X (CD2)"
+    for d in (cd1, cd2):
+        d.mkdir(parents=True)
+    a1 = cd1 / "01.flac"
+    a2 = cd2 / "01.flac"
+    a1.touch()
+    a2.touch()
+    album_dir = AlbumDir(path=cd1, tracks=[a1, a2], disc_total=2)
+
+    paths = _input_footprint(album_dir)
+    assert paths == [wrapper]
+
+
+def test_input_footprint_refuses_wrapper_when_siblings_present(tmp_path: Path) -> None:
+    """If the wrapper holds OTHER albums too, fall back to the disc folders.
+
+    Real-world layout:
+        Box/
+          Album A (CD1)/  <- this album, disc 1
+          Album A (CD2)/  <- this album, disc 2
+          Album B (CD1)/  <- sibling album
+          Album B (CD2)/  <- sibling album
+
+    Removing Box/ would take Album B with it. The footprint must return
+    only Album A's disc folders.
+    """
+    from musickit.discover import AlbumDir
+    from musickit.pipeline import _input_footprint
+
+    box = tmp_path / "Box"
+    a1 = box / "Album A (CD1)"
+    a2 = box / "Album A (CD2)"
+    b1 = box / "Album B (CD1)"
+    b2 = box / "Album B (CD2)"
+    for d in (a1, a2, b1, b2):
+        d.mkdir(parents=True)
+    a1_track = a1 / "01.flac"
+    a2_track = a2 / "01.flac"
+    a1_track.touch()
+    a2_track.touch()
+    album_dir = AlbumDir(path=a1, tracks=[a1_track, a2_track], disc_total=2)
+
+    paths = _input_footprint(album_dir)
+    assert sorted(paths) == [a1, a2]
+    assert box not in paths  # wrapper protected
+
+
 def test_remove_source_refuses_to_delete_input_root(silent_flac_template: Path, tmp_path: Path) -> None:
     """If the album footprint resolves to the input root itself, refuse."""
     from mutagen.flac import FLAC

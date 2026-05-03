@@ -200,6 +200,34 @@ def test_apply_tag_overrides_year_normalises_to_4_digits(silent_flac: Path) -> N
     assert flac["DATE"][0] == "2024"
 
 
+def test_apply_tag_overrides_empty_string_clears_mp4_tag(silent_flac: Path, tmp_path: Path) -> None:
+    """`TagOverrides(genre="")` must clear the genre tag on .m4a files.
+
+    The TagOverrides docstring documents empty-string-means-clear, and ID3
+    + FLAC honour it. Previously the MP4 path silently no-op'd on empty
+    strings via `_set` (which strips and returns early on empty values),
+    leaving the old genre in place.
+    """
+    from musickit.metadata import TagOverrides, apply_tag_overrides
+
+    dst = tmp_path / "track.m4a"
+    convert.to_alac(silent_flac, dst)
+    mp4 = MP4(dst)
+    if mp4.tags is None:
+        mp4.add_tags()
+    assert mp4.tags is not None
+    mp4.tags["\xa9gen"] = ["Rock"]
+    mp4.tags["\xa9nam"] = ["Title"]
+    mp4.save()
+
+    apply_tag_overrides(dst, TagOverrides(genre="", title=""))
+
+    mp4 = MP4(dst)
+    assert mp4.tags is not None
+    assert "\xa9gen" not in mp4.tags
+    assert "\xa9nam" not in mp4.tags
+
+
 def test_round_trip_flac_to_alac_preserves_tags(silent_flac: Path, tmp_path: Path) -> None:
     _tag_flac(
         silent_flac,

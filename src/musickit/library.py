@@ -80,6 +80,7 @@ def scan(
     root: Path,
     *,
     on_album: Callable[[Path, int, int], None] | None = None,
+    measure_pictures: bool = False,
 ) -> LibraryIndex:
     """Walk `root` and build a `LibraryIndex` from every album dir found.
 
@@ -92,6 +93,11 @@ def scan(
     tracks are read, where `idx` is 1-indexed and `total` is the album count
     (known from the cheap pre-walk in `_iter_album_dirs`). The CLI uses this
     to drive a progress bar over slow filesystems / network drives.
+
+    `measure_pictures=True` enables embedded-cover dimension measurement
+    (Pillow decode) so the audit's low-res-cover rule has data to work with.
+    Adds noticeable scan time per cover, so it's opt-in — used by the CLI's
+    `--audit` and `--issues-only` modes.
     """
     album_dirs = _iter_album_dirs(root)
     total = len(album_dirs)
@@ -99,7 +105,7 @@ def scan(
     for idx, album_dir in enumerate(album_dirs, start=1):
         if on_album is not None:
             on_album(album_dir, idx, total)
-        album = _scan_album(album_dir)
+        album = _scan_album(album_dir, measure_pictures=measure_pictures)
         albums.append(album)
     albums.sort(key=lambda a: (a.artist_dir.lower(), a.album_dir.lower()))
     return LibraryIndex(root=root, albums=albums)
@@ -130,12 +136,12 @@ def _iter_album_dirs(root: Path) -> list[Path]:
     return sorted(seen)
 
 
-def _scan_album(album_dir: Path) -> LibraryAlbum:
+def _scan_album(album_dir: Path, *, measure_pictures: bool = False) -> LibraryAlbum:
     audio_files = sorted(p for p in album_dir.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_AUDIO_EXTS)
     tracks: list[LibraryTrack] = []
     for audio_path in audio_files:
         try:
-            source = read_source(audio_path, light=True)
+            source = read_source(audio_path, light=True, measure_pictures=measure_pictures)
         except Exception:
             continue
         track = LibraryTrack(

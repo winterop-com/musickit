@@ -98,6 +98,23 @@ def test_scan_groups_by_artist_and_album(silent_flac_template: Path, tmp_path: P
     assert all(a.track_count == 1 for a in index.albums)
 
 
+def test_scan_measures_cover_pixels_when_requested(silent_flac_template: Path, tmp_path: Path) -> None:
+    """`scan(measure_pictures=True)` populates `cover_pixels` for MP4/M4A.
+
+    The library audit's low-res-cover rule depends on this; without it, the
+    rule was effectively disabled for the converter's default output format
+    because light mode always wrote `cover_pixels=0`.
+    """
+    root = tmp_path / "lib"
+    album = root / "Artist" / "2020 - Album"
+    _make_track(album, silent_flac_template, filename="01 - T.m4a", cover_size=(800, 600))
+
+    index = library.scan(root, measure_pictures=True)
+    track = index.albums[0].tracks[0]
+    assert track.has_cover is True
+    assert track.cover_pixels == 800 * 600
+
+
 def test_scan_detects_cover_presence_in_light_mode(silent_flac_template: Path, tmp_path: Path) -> None:
     """Light scan reports cover presence without decoding pixel dimensions.
 
