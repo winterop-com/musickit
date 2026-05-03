@@ -123,7 +123,7 @@ _TREE_RESIZE_STEP = 4
 
 
 class LibraryTree(Tree[object]):
-    """Left-hand artist/album tree (resize via `[` and `]`)."""
+    """Left-hand artist/album tree (resize via `Ctrl+←` / `Ctrl+→`)."""
 
     DEFAULT_CSS = """
     LibraryTree {
@@ -162,8 +162,8 @@ class MusickitApp(App[None]):
         Binding("s", "toggle_shuffle", "Shuffle", show=True),
         Binding("r", "cycle_repeat", "Repeat", show=True),
         Binding("tab", "focus_next", "Focus", show=True),
-        Binding("left_square_bracket", "tree_narrower", "Tree-", show=True),
-        Binding("right_square_bracket", "tree_wider", "Tree+", show=True),
+        Binding("ctrl+left", "tree_narrower", "Tree-", show=True),
+        Binding("ctrl+right", "tree_wider", "Tree+", show=True),
     ]
 
     def __init__(self, root: Path) -> None:
