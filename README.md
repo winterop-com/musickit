@@ -112,14 +112,19 @@ Audit rules: missing/mixed year, no cover, low-res cover (<500×500), mixed `alb
 
 ## Terminal UI — `musickit tui`
 
-A Textual TUI for browsing + playing the converted library, plus a curated radio section.
+A Textual TUI with three modes: local library, radio-only, and Subsonic client.
 
 ```bash
-uv run musickit tui ./output           # library + radio mode
-uv run musickit tui                    # radio-only (no library scan)
+uv run musickit tui ./output                                  # local library + radio
+uv run musickit tui                                           # radio-only (or last-used Subsonic server)
+uv run musickit tui --server http://host:4533 --user U --password P    # Subsonic client mode
+uv run musickit tui --server http://host:4533                 # creds from state.json after first login
+uv run musickit tui                                           # if state.json has Subsonic creds, resumes them
 ```
 
 Three-pane layout: sidebar (stats + Artist→Album browser tree), main (now-playing meta + 24-band FFT visualizer + progress + track list), bottom keybar. Decoder is in-process via PyAV; output via sounddevice/PortAudio (both ship pip wheels — no `brew install` needed). Radio plays Icecast/Shoutcast streams with live ICY metadata (`StreamTitle` updates the now-playing block).
+
+In **Subsonic client mode** (`--server URL`) the TUI talks to any Subsonic-compatible server — your own `musickit serve` over Tailscale, Navidrome, the original Subsonic, etc. Browsing data comes from `getArtists`/`getAlbum` calls, playback streams via `/rest/stream?id=…`. Same widgets, same keybindings; the `LibraryTrack.stream_url` field carries the auth-loaded URL through to PyAV. Credentials persist to `~/.config/musickit/state.json` after a successful login, so subsequent launches can drop the flags.
 
 Keybindings: `↑`/`↓` navigate, `Enter`/`Space` play/pause, `n`/`p` next/prev, `</>` seek ±5s, `+`/`-` volume, `s` shuffle, `r` repeat, `f` fullscreen visualizer, `Tab` focus switch, `Ctrl+R` rescan, `?` help panel, `Ctrl+P` command palette, `q` quit.
 
@@ -227,9 +232,9 @@ When a source MP3 is processed under `--format auto`, the output is **transcoded
 
 ## Roadmap
 
-Convert + library + retag/cover + TUI + Subsonic server are all shipped. Remaining work, in rough priority order:
+Convert + library + retag/cover + TUI (local + Subsonic client) + Subsonic server are all shipped. Remaining work:
 
-- **`musickit tui` as a Subsonic client**, not just a local-library player — point it at any Subsonic-compatible server (including its own `musickit serve`) and browse/play remotely. Lets the same TUI work over Tailscale from a laptop without mounting the library. Adds a `--server URL --user USER --password PWD` triplet (or stored creds in `~/.config/musickit/state.json`); when present, `library.scan()` is replaced by Subsonic API calls and `AudioPlayer.play()` is given the `/rest/stream?id=...` URL (PyAV already plays HTTP).
+- **Lazy-load tracks in TUI client mode** — currently `build_index` walks every album on launch (slow over Tailscale for 800+ albums). Switch to fetching `getAlbum` only when the user opens an album. ~half a day.
 - **Serve hardening**: `scrobble` / `getStarred2` / `star` no-op stubs (clients pre-fetch them and log errors otherwise), `getRandomSongs`, `getPlaylists` (read-only first), per-client transcoding (`?format=mp3` / `?maxBitRate=N`) only if a real client demands it.
 - **mDNS / Bonjour advertisement** for `musickit serve` so clients on the LAN auto-discover it without typing the URL.
 - **`musickit cover-pick`**: open musichoarders.xyz pre-filled per album for manual cover selection (semi-automated workflow per their integration policy).

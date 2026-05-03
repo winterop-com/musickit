@@ -23,6 +23,10 @@ class LibraryTrack(BaseModel):
     duration_s: float = 0.0
     has_cover: bool = False
     cover_pixels: int = 0
+    # When set, the TUI plays this URL instead of `path` — populated by the
+    # Subsonic client mode so the same widgets/format helpers work for both
+    # local files and remote streams.
+    stream_url: str | None = None
 
 
 class LibraryAlbum(BaseModel):

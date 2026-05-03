@@ -225,12 +225,26 @@ Both documented in README's "Edge-case behaviours worth knowing" section.
 
 ### `tui`
 
-- `TARGET_DIR` (default unset — radio-only mode if omitted)
+- `TARGET_DIR` (default unset — radio-only mode if omitted, OR Subsonic mode if state.json has creds)
+- `--server URL` (Subsonic server URL; falls back to state.json)
+- `--user U` / `--password P` (override state.json)
+
+## TUI Subsonic-client mode
+
+`musickit tui --server URL --user U --password P` connects to any Subsonic-compatible server. Three new mechanisms:
+
+1. **`tui/subsonic_client.py`** — httpx-based read-only client (`ping`, `get_artists`, `get_artist`, `get_album`, `stream_url`, `cover_url`) plus a `build_index(client, on_progress=...)` walker that translates the API into `LibraryIndex` shape — same models the local-scan path produces, so widgets/formatters/advance-track all work unchanged.
+2. **`LibraryTrack.stream_url: str | None = None`** — when set, `MusickitApp._play_current` passes the URL to `AudioPlayer.play()` instead of `track.path`. AudioPlayer already handles URLs (radio uses them), so the playback path is identical.
+3. **state.json persistence** — after a successful `client.ping()` the CLI writes `{"subsonic": {"url": ..., "user": ..., "password": ...}}` to `~/.config/musickit/state.json`. Subsequent `musickit tui --server URL` launches drop the user/password flags; bare `musickit tui` resumes the last server when state has creds and no local DIR is given.
+
+Round-trip cost on launch: 1 (`getArtists`) + N_artists (`getArtist`) + N_albums (`getAlbum`). For an 800-album library that's ~900 calls, slow over Tailscale but tolerable for v1. Lazy per-album loading is the top roadmap item.
+
+Verified end-to-end against the local `musickit serve` test client — six tests cover ping (success + failure), get_artists, build_index walk + progress callback, and stream_url / cover_url construction with auth params.
 
 ## Roadmap (current)
 
-1. **`musickit tui` Subsonic-client mode** — let the TUI act as a Subsonic *client*, not just a local-library player. `--server URL --user USER --password PWD` triplet (or stored in state.json); when present, `library.scan()` is replaced by API calls, `AudioPlayer.play()` is fed `/rest/stream?id=...` URLs (PyAV already plays HTTP). Lets the same TUI work over Tailscale from a laptop without mounting the library. **This is the user's next requested feature as of this session.**
-2. **Serve hardening**: no-op stubs for `scrobble`, `getStarred2`, `star`/`unstar`, `getRandomSongs`, `getPlaylists` (read-only first), so clients that pre-fetch them don't log errors. Per-client transcoding (`?format=mp3` / `?maxBitRate=N`) only if a real client demands it.
+1. **Lazy-load tracks in TUI client mode** — fetch `getAlbum` on album-click instead of pre-walking every album. Cuts startup from ~900 calls to 1+N_artists.
+2. **Serve hardening**: no-op stubs for `scrobble`, `getStarred2`, `star`/`unstar`, `getRandomSongs`, `getPlaylists` (read-only first). Per-client transcoding (`?format=mp3` / `?maxBitRate=N`) only if a real client demands it.
 3. **mDNS / Bonjour advertisement** for `musickit serve` so clients on the LAN auto-discover it.
 4. **`musickit cover-pick`**: open musichoarders.xyz pre-filled per album for manual cover selection.
 5. Fill in artist / release-group / per-track recording MBIDs from the existing MB query.

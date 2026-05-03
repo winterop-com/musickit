@@ -62,6 +62,7 @@ from musickit.tui.widgets import (
 if TYPE_CHECKING:
     from musickit.library import LibraryAlbum, LibraryIndex, LibraryTrack
     from musickit.radio import RadioStation
+    from musickit.tui.subsonic_client import SubsonicClient
 
 log = logging.getLogger(__name__)
 
@@ -132,9 +133,10 @@ class MusickitApp(App[None]):
         Binding("question_mark", "toggle_help", "Help", show=False),
     ]
 
-    def __init__(self, root: Path | None) -> None:
+    def __init__(self, root: Path | None, *, subsonic_client: SubsonicClient | None = None) -> None:
         super().__init__()
         self._root: Path | None = root
+        self._subsonic_client: SubsonicClient | None = subsonic_client
         self._index: LibraryIndex | None = None
         self._player = AudioPlayer()
         self._player.on_track_end = self._on_track_end
@@ -205,6 +207,10 @@ class MusickitApp(App[None]):
         except OSError:  # pragma: no cover — read-only home, etc.
             pass
         self._radio_stations = radio_mod.load_stations()
+        if self._subsonic_client is not None:
+            self._show_scan_overlay("[bold cyan]Loading library from server…[/]")
+            self._scan_library_async(initial=True)
+            return
         if self._root is None:
             # Radio-only launch: skip the scan, drop directly into stations.
             self._populate_sidebar_stats()
@@ -761,9 +767,25 @@ class MusickitApp(App[None]):
 
     @work(thread=True, exclusive=True, group="scan")
     def _scan_library_async(self, *, initial: bool) -> None:
+        prior_artist = self._browse_artist
+
+        if self._subsonic_client is not None:
+            from musickit.tui.subsonic_client import SubsonicError, build_index
+
+            def on_subsonic_album(name: str, idx: int, total: int) -> None:
+                self.call_from_thread(self._on_subsonic_scan_progress, name, idx, total)
+
+            try:
+                new_index = build_index(self._subsonic_client, on_progress=on_subsonic_album)
+            except SubsonicError as exc:
+                log.warning("subsonic walk failed: %s", exc)
+                self.call_from_thread(self._on_scan_failed, str(exc))
+                return
+            self.call_from_thread(self._on_scan_complete, new_index, prior_artist, initial)
+            return
+
         if self._root is None:
             return
-        prior_artist = self._browse_artist
         root = self._root
 
         def on_album(album_dir: Path, idx: int, total: int) -> None:
@@ -784,6 +806,21 @@ class MusickitApp(App[None]):
         bar = f"[{C_PLAYING}]{'█' * filled}[/][{C_DIM}]{'░' * (bar_width - filled)}[/]"
         overlay.body = f"[bold cyan]Scanning library…[/]\n\n{bar}\n[dim]{idx} / {total}[/]\n\n[dim]{name}[/]"
 
+    def _on_subsonic_scan_progress(self, name: str, idx: int, total: int) -> None:
+        overlay = self.query_one(ScanOverlay)
+        if len(name) > 50:
+            name = name[:49] + "…"
+        bar_width = 30
+        ratio = idx / max(1, total)
+        filled = int(round(ratio * bar_width))
+        bar = f"[{C_PLAYING}]{'█' * filled}[/][{C_DIM}]{'░' * (bar_width - filled)}[/]"
+        overlay.body = f"[bold cyan]Loading library from server…[/]\n\n{bar}\n[dim]{idx} / {total}[/]\n\n[dim]{name}[/]"
+
+    def _on_scan_failed(self, message: str) -> None:
+        """Stop the scan overlay and surface the error inline."""
+        overlay = self.query_one(ScanOverlay)
+        overlay.body = f"[bold red]Scan failed[/]\n\n[dim]{message}[/]\n\n[dim]Press q to quit[/]"
+
     def _on_scan_complete(self, new_index: LibraryIndex, prior_artist: str | None, initial: bool) -> None:
         del initial
         self._index = new_index
@@ -801,7 +838,11 @@ class MusickitApp(App[None]):
         track = self._currently_playing_track()
         if track is None:
             return
-        self._player.play(track.path)
+        # In Subsonic-client mode `track.stream_url` is set and `track.path`
+        # is a synthetic placeholder. AudioPlayer accepts URL strings (it's
+        # what radio uses already), so the same call works for both.
+        source: Path | str = track.stream_url if track.stream_url else track.path
+        self._player.play(source)
         self._refresh_play_marker()
 
     def _advance_track(self, *, force: bool = False) -> None:
