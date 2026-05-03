@@ -537,15 +537,58 @@ class MusickitApp(App[None]):
         else:
             header.path = f"Browse · [bold]{self._browse_artist}[/]"
             self._populate_browser_albums(browser, self._browse_artist)
-        # Land the cursor on the first navigable row.
-        # - Top level (artists): row 0.
-        # - Inside an artist: row 0 is `..` Back, so prefer row 1 (first album).
-        if len(browser.children) > 0:
-            if self._browse_artist is not None and len(browser.children) > 1:
-                browser.index = 1
-            else:
-                browser.index = 0
         self._fit_sidebar_width()
+        # Defer cursor placement until after the children have actually
+        # mounted. Setting `index` on a list whose children haven't been
+        # rendered yet doesn't paint the highlight reliably.
+        target_index = 0
+        if self._browse_artist is not None and len(browser.children) > 1:
+            target_index = 1
+        self.call_after_refresh(self._set_browser_cursor, target_index)
+
+    def _set_browser_cursor(self, target_index: int) -> None:
+        """Place the cursor on `target_index` after children mount.
+
+        Also makes sure focus stays on the browser (Textual sometimes drops
+        focus when a widget's children get mass-replaced) and refreshes the
+        info panel manually — `index =` assignments don't always fire
+        `ListView.Highlighted` after a `clear()`+`append()` cycle.
+        """
+        browser = self.query_one(BrowserList)
+        if target_index >= len(browser.children):
+            return
+        browser.index = target_index
+        if not browser.has_focus:
+            browser.focus()
+        # Force an info-panel update for the new highlight.
+        item = browser.children[target_index]
+        self._update_browser_info(item if isinstance(item, ListItem) else None)
+
+    def _update_browser_info(self, item: ListItem | None) -> None:
+        info = self.query_one(BrowserInfo)
+        if item is None:
+            info.body = ""
+            return
+        kind = getattr(item, "entry_kind", None)
+        data = getattr(item, "entry_data", None)
+        if kind == "album" and isinstance(data, library_mod.LibraryAlbum):
+            if data.warnings:
+                lines = [f"[{C_PEAK}]⚠ {len(data.warnings)} warning(s)[/]"]
+                for w in data.warnings:
+                    lines.append(f"[{C_WARM}]·[/] {w}")
+                info.body = "\n".join(lines)
+            else:
+                info.body = f"[{C_PLAYING}]✓ no warnings[/]"
+        elif kind == "artist" and isinstance(data, str):
+            assert self._index is not None
+            albums = [a for a in self._index.albums if a.artist_dir == data]
+            flagged = sum(1 for a in albums if a.warnings)
+            if flagged:
+                info.body = f"[{C_LABEL}]{data}[/]\n[dim]{len(albums)} album(s)[/] [{C_PEAK}]· {flagged} flagged[/]"
+            else:
+                info.body = f"[{C_LABEL}]{data}[/]\n[dim]{len(albums)} album(s)[/]"
+        else:
+            info.body = ""
 
     def _fit_sidebar_width(self) -> None:
         """Size the sidebar to fit the longest visible browser entry, capped at the max."""
@@ -862,10 +905,16 @@ class MusickitApp(App[None]):
         if prior_artist is None:
             return
         browser = self.query_one(BrowserList)
+        prior_idx: int | None = None
         for i, item in enumerate(browser.children):
             if getattr(item, "entry_data", None) == prior_artist:
-                browser.index = i
+                prior_idx = i
                 break
+        if prior_idx is not None:
+            # `_populate_browser` already scheduled `_set_browser_cursor(0)`.
+            # Schedule another one with the prior-artist index so it wins
+            # (`call_after_refresh` runs in order; last wins).
+            self.call_after_refresh(self._set_browser_cursor, prior_idx)
 
     def action_right(self) -> None:
         """Context-aware →: drill into a browser entry, seek as fallback."""
