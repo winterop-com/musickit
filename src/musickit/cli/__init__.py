@@ -44,6 +44,7 @@ from musickit.cli import cover as _cover_cmd  # noqa: E402
 from musickit.cli import inspect as _inspect_cmd  # noqa: E402
 from musickit.cli import library as _library_cmd  # noqa: E402
 from musickit.cli import retag as _retag_cmd  # noqa: E402
+from musickit.cli import serve as _serve_cmd  # noqa: E402
 from musickit.cli import tui as _tui_cmd  # noqa: E402
 
-_ = (_convert_cmd, _cover_cmd, _inspect_cmd, _library_cmd, _retag_cmd, _tui_cmd)
+_ = (_convert_cmd, _cover_cmd, _inspect_cmd, _library_cmd, _retag_cmd, _serve_cmd, _tui_cmd)

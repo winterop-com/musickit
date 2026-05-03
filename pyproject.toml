@@ -15,6 +15,8 @@ dependencies = [
   "av>=13.0.0",
   "sounddevice>=0.5.0",
   "numpy>=2.0.0",
+  "fastapi>=0.136.1",
+  "uvicorn[standard]>=0.46.0",
 ]
 
 [project.scripts]
@@ -29,6 +31,7 @@ dev = [
   "pytest-cov>=7.1.0",
   "pytest-asyncio>=0.24.0",
   "coverage[toml]>=7.13.5",
+  "httpx>=0.28.1",
 ]
 
 [build-system]
