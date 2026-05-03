@@ -16,6 +16,8 @@ A `uv`-managed Python 3.13 CLI that converts arbitrary audio rips (FLAC, MP3, M4
 
 ## Usage
 
+`musickit` exposes six subcommands; this section covers `convert` (the heart of the project). The library / TUI / serve commands have their own sections further down.
+
 ```bash
 uv sync
 uv run musickit convert ./input ./output                          # default: --format auto (per-source dispatch)
@@ -28,9 +30,15 @@ uv run musickit convert ./input ./output --dry-run                # plan only, n
 uv run musickit convert ./input ./output --format aac --allow-lossy-recompress   # opt into lossy → lossy
 
 uv run musickit inspect path/to/file.m4a                          # tag + cover summary
+uv run musickit library ./output --audit                          # Artist→Album→Track tree + warning rules
+uv run musickit library ./output --fix                            # apply deterministic fixes (MB year, dir↔tag rename)
+uv run musickit retag path/to/album --year 1976 --album "Arrival" # in-place tag overrides
+uv run musickit cover  path/to/album cover.jpg                    # retrofit cover art
+uv run musickit tui    ./output                                   # Textual TUI (or omit DIR for radio-only)
+uv run musickit serve  ./output                                   # Subsonic-compatible HTTP server
 ```
 
-`make lint`, `make test`, `make coverage` for the standard dev loop. `ffmpeg` and `ffprobe` must be on `$PATH`.
+`make lint`, `make test`, `make coverage` for the standard dev loop. `ffmpeg` and `ffprobe` must be on `$PATH` for `convert`; `serve` and `tui` only need them indirectly (when re-encoding or playing files that need the codec).
 
 ## Output formats
 
@@ -90,16 +98,111 @@ Both calls go through a polite client: a 1 req/sec throttle per host, a descript
 
 The third provider, `musichoarders.xyz`, is intentionally **not** scraped under `--enrich`. Its integration policy forbids fully automated artwork retrieval; the supported path is a semi-automated browser pre-fill (`?artist=…&album=…`) for manual user pick. A future `musickit cover-pick` subcommand will plug into that flow; the URL builder lives at `musickit.enrich.musichoarders.build_search_url`.
 
+## Browsing + auditing the converted library — `musickit library`
+
+```bash
+uv run musickit library ./output                       # Artist → Album → Track tree (rich.Tree)
+uv run musickit library ./output --audit               # tree + per-album warnings
+uv run musickit library ./output --issues-only         # show only flagged albums
+uv run musickit library ./output --fix                 # apply deterministic fixes
+uv run musickit library ./output --fix --prefer-dirname --dry-run    # invert tag/dir resolution
+```
+
+Audit rules: missing/mixed year, no cover, low-res cover (<500×500), mixed `album_artist`, scene residue in dir or album tag, scene-domain artist dirs, `Unknown Artist`, tag/path mismatch, track gaps. `--fix` resolves the deterministic ones in place: missing-year via MusicBrainz, and tag/path-mismatch by either renaming the dir to match the tag (default) or rewriting tags to match the dir (`--prefer-dirname`).
+
+## Terminal UI — `musickit tui`
+
+A Textual TUI for browsing + playing the converted library, plus a curated radio section.
+
+```bash
+uv run musickit tui ./output           # library + radio mode
+uv run musickit tui                    # radio-only (no library scan)
+```
+
+Three-pane layout: sidebar (stats + Artist→Album browser tree), main (now-playing meta + 24-band FFT visualizer + progress + track list), bottom keybar. Decoder is in-process via PyAV; output via sounddevice/PortAudio (both ship pip wheels — no `brew install` needed). Radio plays Icecast/Shoutcast streams with live ICY metadata (`StreamTitle` updates the now-playing block).
+
+Keybindings: `↑`/`↓` navigate, `Enter`/`Space` play/pause, `n`/`p` next/prev, `</>` seek ±5s, `+`/`-` volume, `s` shuffle, `r` repeat, `f` fullscreen visualizer, `Tab` focus switch, `Ctrl+R` rescan, `?` help panel, `Ctrl+P` command palette, `q` quit.
+
+## Streaming the library to phones / other rooms — `musickit serve`
+
+A Subsonic-compatible HTTP server. Any modern Subsonic client connects: **Symfonium / Tempo / Ultrasonic** (Android), **Amperfy / play:Sub / Substreamer** (iOS), **Feishin / Supersonic** (desktop). The spec implementation tracks [OpenSubsonic v1.16.1](https://opensubsonic.netlify.app/docs/api-reference/).
+
+```bash
+uv run musickit serve ./output --user mort --password secret
+```
+
+On startup the banner prints both LAN and Tailscale URLs:
+
+```
+musickit serve — Subsonic API for /Volumes/T9/Output
+  bind: 0.0.0.0:4533
+  LAN:  http://192.168.1.42:4533
+  Tailscale: http://my-mac.tail-scale.ts.net:4533
+
+scanning library…
+  142 artists, 318 albums, 4521 tracks
+```
+
+Point Symfonium / Amperfy at the URL, sign in, browse + play. Range requests are honoured so seeking works mid-track. Cover art comes from sidecar files (`cover.jpg` / `folder.jpg` / `front.jpg`) first, embedded picture as fallback, with optional Pillow resize via `?size=`.
+
+Defaults:
+
+| Flag | Default | Notes |
+|---|---|---|
+| `--host` | `0.0.0.0` | All interfaces — required for Tailscale (loopback isn't reachable). Auth is always enforced; opt into `127.0.0.1` if you want LAN-blind. |
+| `--port` | `4533` | Navidrome's default; clients pre-fill it. |
+| `--user` / `--password` | from `~/.config/musickit/serve.toml` | CLI flags override the file. |
+
+Endpoints implemented (under `/rest/`):
+
+| Group | Endpoints |
+|---|---|
+| System | `ping`, `getLicense`, `getMusicFolders` |
+| Browsing | `getArtists`, `getArtist`, `getAlbum`, `getAlbumList2` (alphabeticalByName/Artist, random, byYear, byGenre), `getSong`, `getIndexes` |
+| Search | `search3`, `search2` (multi-token AND, case-insensitive substring) |
+| Media | `stream` (with `Accept-Ranges: bytes`), `download`, `getCoverArt` (with optional `?size=` Pillow resize) |
+| Library | `startScan` (background-thread rescan), `getScanStatus` |
+
+Auth: plain `?p=`, `enc:<hex>`, and salted-token `?t=md5(password+salt)&s=salt` — all three forms in the Subsonic spec.
+
+### Tailscale story
+
+Bind to `0.0.0.0`, install Tailscale on the server + your phone, leave the rest to MagicDNS:
+
+1. `tailscale up` on the Mac.
+2. `tailscale ip -4` (or read the banner) for the tailnet IP — or use the MagicDNS hostname (`<machine-name>.<tailnet>.ts.net`).
+3. In Symfonium / Amperfy: server URL = `http://<that-hostname>:4533`, user + password from `serve.toml`.
+
+You're now reachable from any device on your tailnet, anywhere on the internet, no port forwarding, no HTTPS to set up — Tailscale's WireGuard tunnel handles encryption. This was the whole point of binding to `0.0.0.0` rather than `127.0.0.1`.
+
 ## Project layout
 
 ```
 src/musickit/
-  __init__.py     __main__.py      cli.py
-  pipeline.py     discover.py      metadata.py
-  naming.py       convert.py       cover.py
-  enrich/         _http.py         musicbrainz.py
-                  coverart.py      musichoarders.py
-tests/            unit tests covering naming, discovery, metadata round-trips, convert + tag dispatch, atomic album writes, AUTO codec dispatch, and the enrich providers (with mocked HTTP).
+  __init__.py        __main__.py
+  cli/               typer entry — one file per subcommand (convert, cover, inspect, library, retag, serve, tui)
+  convert.py         ffmpeg dispatch (encode / remux / copy_passthrough)
+  cover.py           cover-source candidates + pick_best + normalise
+  discover.py        walk input → list[AlbumDir] (with multi-disc merge)
+  library/           Artist→Album→Track index of the converted output
+    models.py        scan.py        audit.py        fix.py
+  metadata/          tag read/write — FLAC / MP3 / MP4 / generic
+    models.py        album.py       read.py         write.py        overrides.py
+  naming.py          filesystem-safe folder + filename builders
+  pipeline/          orchestrator — discover → cover → convert → tag → swap
+    run.py           album.py       track.py        report.py       progress.py
+    filenames.py     disc.py        dedupe.py       footprint.py    acoustid.py
+  radio.py           curated internet-radio station list (NRK defaults + user TOML)
+  serve/             Subsonic-compatible HTTP server (FastAPI)
+    app.py           auth.py        config.py       ids.py          index.py
+    payloads.py      covers.py
+    endpoints/       system.py  browsing.py  media.py  search.py  scan.py
+  tui/               Textual TUI
+    app.py           widgets.py     player.py       audio_io.py
+    advance.py       commands.py    formatters.py   state.py        types.py
+  enrich/            _http.py       musicbrainz.py  coverart.py
+                     musichoarders.py  acoustid.py  __init__.py
+tests/               167 tests covering naming, discovery, metadata round-trips, convert + tag dispatch, atomic album writes, AUTO codec dispatch, enrich providers (mocked HTTP), library audit, TUI player, and the full serve API surface (auth + envelope + browsing + media + search + scan).
 ```
 
 `pyproject.toml` and `Makefile` follow the same shape as `~/dev/chap-sdk/chapkit`: ruff (E/W/F/I/D, google docstrings, py313, line-length 120), mypy strict-ish, pyright `strict` with the same `report*` softeners, pytest + coverage.
@@ -124,18 +227,12 @@ When a source MP3 is processed under `--format auto`, the output is **transcoded
 
 ## Roadmap
 
-Convert pipeline (this CLI's current scope) is complete. Planned future commands:
+Convert + library + retag/cover + TUI + Subsonic server are all shipped. Remaining work, in rough priority order:
 
-- **`musickit serve`** — local audio server. The most useful target is a **Subsonic-compatible API** so off-the-shelf clients can connect: Symfonium / DSub / Substreamer (mobile), Sonixd / Supersonic (desktop), Jellyfin Finamp, Airsonic web players, etc. FastAPI + a SQLite catalog scanned from the converted output dir; HTTP range requests for seeking; transcoding-on-the-fly via the existing `convert.encode` for unsupported client codecs. mDNS/Bonjour advertisement so it shows up on the LAN automatically.
-- **`musickit ui` / `musickit tui`** — playback + browser pointed at the output dir. Two viable shapes:
-  - **TUI** with [Textual](https://textual.textualize.io/): three-pane (artist / album / track) navigation, mpv subprocess for playback, rich-rendered now-playing footer. Cheap to build, runs over SSH, fits the project's Python-only stack.
-  - **Web UI** served alongside `musickit serve`: same Subsonic backend, a small Vue/htmx frontend. Heavier but reusable from any browser.
-
-  Likely path: TUI first (shares no infrastructure with `serve`, ships independently), then Web UI as a follow-on once `serve` exists.
-
-### Convert-pipeline follow-ups (smaller)
-
-- `musickit cover-pick`: open musichoarders.xyz pre-filled per album for manual cover selection (semi-automated workflow per their integration policy).
-- Better bonus-disc handling for the SOAD-style layout (parent owns audio + `Disc N` subfolders that aren't pure duplicates).
-- Optional `chromaprint` / AcoustID lookup as a stronger MusicBrainz match path for albums with non-standard titles.
+- **`musickit tui` as a Subsonic client**, not just a local-library player — point it at any Subsonic-compatible server (including its own `musickit serve`) and browse/play remotely. Lets the same TUI work over Tailscale from a laptop without mounting the library. Adds a `--server URL --user USER --password PWD` triplet (or stored creds in `~/.config/musickit/state.json`); when present, `library.scan()` is replaced by Subsonic API calls and `AudioPlayer.play()` is given the `/rest/stream?id=...` URL (PyAV already plays HTTP).
+- **Serve hardening**: `scrobble` / `getStarred2` / `star` no-op stubs (clients pre-fetch them and log errors otherwise), `getRandomSongs`, `getPlaylists` (read-only first), per-client transcoding (`?format=mp3` / `?maxBitRate=N`) only if a real client demands it.
+- **mDNS / Bonjour advertisement** for `musickit serve` so clients on the LAN auto-discover it without typing the URL.
+- **`musickit cover-pick`**: open musichoarders.xyz pre-filled per album for manual cover selection (semi-automated workflow per their integration policy).
+- Fill in artist / release-group / per-track recording MBIDs from the existing MusicBrainz query (~3 hours).
 - Folder-name fallback: strip arbitrary venue parens / live-edition annotations when no ALBUM tag is present.
+- Optional `chromaprint` / AcoustID lookup as a stronger MusicBrainz match path for albums with non-standard titles.
