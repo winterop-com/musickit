@@ -12,8 +12,6 @@ Composition:
 from __future__ import annotations
 
 import logging
-import random
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -25,9 +23,20 @@ from textual.widgets import ListItem, ListView, Static
 
 from musickit import library as library_mod
 from musickit import radio as radio_mod
+from musickit.tui.advance import compute_next_track_idx
 from musickit.tui.commands import MusickitCommands
+from musickit.tui.formatters import format_station_row, format_track_row
 from musickit.tui.player import AudioPlayer
 from musickit.tui.state import load_state, save_state
+from musickit.tui.types import (
+    _BROWSER_DECORATION_PAD,
+    _TREE_DEFAULT_WIDTH,
+    _TREE_MAX_WIDTH,
+    _TREE_MIN_WIDTH,
+    _TREE_RESIZE_STEP,
+    RepeatMode,
+    _truncate,
+)
 from musickit.tui.widgets import (
     C_ACCENT,
     C_DIM,
@@ -48,7 +57,6 @@ from musickit.tui.widgets import (
     TrackList,
     TrackTableHeader,
     Visualizer,
-    fmt_mmss,
 )
 
 if TYPE_CHECKING:
@@ -56,29 +64,6 @@ if TYPE_CHECKING:
     from musickit.radio import RadioStation
 
 log = logging.getLogger(__name__)
-
-
-class RepeatMode(str, Enum):
-    """Cycle target for the `r` keybinding."""
-
-    OFF = "Off"
-    ALBUM = "Album"
-    TRACK = "Track"
-
-
-_TREE_DEFAULT_WIDTH = 32
-_TREE_MIN_WIDTH = 20
-_TREE_MAX_WIDTH = 80
-_TREE_RESIZE_STEP = 4
-# Decoration overhead per browser row: ` ▸ ` prefix + ` (NN)` suffix + padding ≈ 8 cells.
-_BROWSER_DECORATION_PAD = 8
-
-
-def _truncate(value: str, max_len: int) -> str:
-    """Cap `value` at `max_len` cells with an ellipsis. Used by browser rows."""
-    if len(value) <= max_len:
-        return value
-    return value[: max_len - 1] + "…"
 
 
 class MusickitApp(App[None]):
@@ -448,7 +433,7 @@ class MusickitApp(App[None]):
             return
         album = self._current_album
         for i, track in enumerate(album.tracks):
-            label = self._format_track_row(i, track, album, marker=(i == self._current_track_idx))
+            label = format_track_row(i, track, album, marker=(i == self._current_track_idx))
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             tracklist.append(item)
@@ -474,26 +459,12 @@ class MusickitApp(App[None]):
             tracklist.append(ListItem(Static("[dim]No stations configured. Edit `~/.config/musickit/radio.toml`.[/]")))
             return
         for i, station in enumerate(self._radio_stations):
-            label = self._format_station_row(i, station, marker=False)
+            label = format_station_row(i, station, marker=False)
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             item.station = station  # type: ignore[attr-defined]
             tracklist.append(item)
         self.call_after_refresh(self._set_tracklist_cursor, 0)
-
-    def _format_station_row(self, idx: int, station: RadioStation, *, marker: bool) -> str:
-        glyph = f"[bold {C_PLAYING}]▶[/]" if marker else " "
-        name = station.name[:44]
-        desc = (station.description or "Live")[:26]
-        if marker:
-            num = f"[{C_PLAYING}]{idx + 1:>3}[/]"
-            name_cell = f"[bold]{name}[/]"
-            desc_cell = f"[{C_PLAYING}]{desc}[/]"
-        else:
-            num = f"[dim]{idx + 1:>3}[/]"
-            name_cell = name
-            desc_cell = f"[dim]{desc}[/]"
-        return f"{num} {glyph} {name_cell:<44}{desc_cell:<26} [dim]{'LIVE':>6}[/]"
 
     def _play_station(self, station: RadioStation) -> None:
         idx = self._radio_stations.index(station) if station in self._radio_stations else None
@@ -504,13 +475,13 @@ class MusickitApp(App[None]):
         if prev is not None and prev != idx:
             try:
                 self.query_one(f"#track-row-{prev}", Static).update(
-                    self._format_station_row(prev, self._radio_stations[prev], marker=False)
+                    format_station_row(prev, self._radio_stations[prev], marker=False)
                 )
             except Exception:  # pragma: no cover
                 pass
         if idx is not None:
             try:
-                self.query_one(f"#track-row-{idx}", Static).update(self._format_station_row(idx, station, marker=True))
+                self.query_one(f"#track-row-{idx}", Static).update(format_station_row(idx, station, marker=True))
             except Exception:  # pragma: no cover
                 pass
 
@@ -535,22 +506,7 @@ class MusickitApp(App[None]):
         except Exception:
             return
         track = self._current_album.tracks[idx]
-        label_widget.update(self._format_track_row(idx, track, self._current_album, marker=marker))
-
-    def _format_track_row(self, idx: int, track: LibraryTrack, album: LibraryAlbum, *, marker: bool) -> str:
-        glyph = f"[bold {C_PLAYING}]▶[/]" if marker else " "
-        artist = (track.artist or album.artist_dir)[:26]
-        title = (track.title or track.path.stem)[:44]
-        time_str = fmt_mmss(track.duration_s) if track.duration_s > 0 else "  —  "
-        if marker:
-            num = f"[{C_PLAYING}]{idx + 1:>3}[/]"
-            artist_cell = f"[{C_PLAYING}]{artist}[/]"
-            title_cell = f"[bold]{title}[/]"
-        else:
-            num = f"[dim]{idx + 1:>3}[/]"
-            artist_cell = artist
-            title_cell = title
-        return f"{num} {glyph} {title_cell:<44}{artist_cell:<26} [dim]{time_str:>6}[/]"
+        label_widget.update(format_track_row(idx, track, self._current_album, marker=marker))
 
     # ------------------------------------------------------------------
     # Status refresh (UI ticks)
@@ -851,30 +807,20 @@ class MusickitApp(App[None]):
     def _advance_track(self, *, force: bool = False) -> None:
         if self._current_album is None or self._current_track_idx is None:
             return
-        if not force and self._repeat is RepeatMode.TRACK:
-            self._play_current()
+        next_idx = compute_next_track_idx(
+            current_idx=self._current_track_idx,
+            track_count=len(self._current_album.tracks),
+            shuffle=self._shuffle,
+            repeat=self._repeat,
+            force=force,
+        )
+        if next_idx is None:
+            self._player.stop()
+            self._current_track_idx = None
+            self._refresh_play_marker()
             return
-        if self._shuffle:
-            n = len(self._current_album.tracks)
-            if n <= 1:
-                self._player.stop()
-                return
-            choices = [i for i in range(n) if i != self._current_track_idx]
-            self._current_track_idx = random.choice(choices)
-            self._play_current()
-            return
-        next_idx = self._current_track_idx + 1
-        if next_idx < len(self._current_album.tracks):
-            self._current_track_idx = next_idx
-            self._play_current()
-            return
-        if self._repeat is RepeatMode.ALBUM:
-            self._current_track_idx = 0
-            self._play_current()
-            return
-        self._player.stop()
-        self._current_track_idx = None
-        self._refresh_play_marker()
+        self._current_track_idx = next_idx
+        self._play_current()
 
     # ------------------------------------------------------------------
     # Player callbacks (run on background threads)
