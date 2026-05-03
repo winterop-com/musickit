@@ -36,6 +36,10 @@ def tui(
         str | None,
         typer.Option("--password", help="Subsonic password. Falls back to state.json."),
     ] = None,
+    discover: Annotated[
+        bool,
+        typer.Option("--discover", help="Browse the LAN for musickit / Subsonic servers, print, and exit."),
+    ] = False,
 ) -> None:
     """Browse and play the converted library, internet radio, or any Subsonic server.
 
@@ -55,6 +59,10 @@ def tui(
     the remote library.
     """
     from musickit.tui.state import load_state, save_state
+
+    if discover:
+        _run_discover_and_exit()  # raises Exit
+        return
 
     saved = load_state()
     saved_subsonic = saved.get("subsonic") if isinstance(saved.get("subsonic"), dict) else {}
@@ -94,9 +102,49 @@ def tui(
         MusickitApp(root=None, subsonic_client=client).run()
         return
 
+    # Last fallback: if there's no DIR and no Subsonic creds, briefly browse
+    # mDNS for any musickit servers on the LAN and surface them as a hint
+    # before dropping into radio-only mode.
+    if target_dir is None:
+        _print_lan_hint_if_any()
+
     from musickit.tui.app import MusickitApp
 
     MusickitApp(target_dir.resolve() if target_dir is not None else None).run()
+
+
+def _run_discover_and_exit() -> None:
+    """Browse the LAN for Subsonic servers, print, exit."""
+    from musickit.tui.discovery import browse_subsonic_servers
+
+    typer.echo("Browsing for Subsonic servers (mDNS)…")
+    servers = browse_subsonic_servers(timeout=2.0)
+    if not servers:
+        typer.echo("  (none found — make sure `musickit serve` is running on the LAN)")
+        raise typer.Exit(0)
+    for s in servers:
+        marker = "musickit" if s.is_musickit else "other"
+        typer.echo(f"  • [{marker}] {s.name}  →  {s.url}")
+    typer.echo("\nConnect with:")
+    typer.echo(f"  musickit tui --server {servers[0].url} --user <U> --password <P>")
+    raise typer.Exit(0)
+
+
+def _print_lan_hint_if_any() -> None:
+    """Quick mDNS browse to nudge the user toward a server they didn't know about."""
+    from musickit.tui.discovery import browse_subsonic_servers
+
+    try:
+        servers = browse_subsonic_servers(timeout=1.0)
+    except Exception:  # pragma: no cover — discovery is best-effort
+        return
+    musickit_servers = [s for s in servers if s.is_musickit]
+    if not musickit_servers:
+        return
+    typer.echo(f"Found {len(musickit_servers)} musickit server(s) on the LAN:")
+    for s in musickit_servers[:3]:
+        typer.echo(f"  • {s.url}")
+    typer.echo(f"  Connect with: musickit tui --server {musickit_servers[0].url} --user <U> --password <P>\n")
 
 
 def _str_or_none(value: object) -> str | None:

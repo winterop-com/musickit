@@ -43,6 +43,10 @@ def serve(
         str | None,
         typer.Option("--password", help="Password override. Falls back to ~/.config/musickit/serve.toml."),
     ] = None,
+    no_mdns: Annotated[
+        bool,
+        typer.Option("--no-mdns", help="Skip mDNS / Bonjour advertisement."),
+    ] = False,
 ) -> None:
     """Start a Subsonic-compatible server for the converted library.
 
@@ -72,9 +76,25 @@ def serve(
     cache = fastapi_app.state.cache
     typer.echo(f"  {cache.artist_count} artists, {cache.album_count} albums, {cache.track_count} tracks\n")
 
+    mdns_handle = None
+    if not no_mdns:
+        from musickit.serve.discovery import register_service
+
+        mdns_handle = register_service(port=port)
+        if mdns_handle is not None:
+            _, info = mdns_handle
+            typer.echo(f"  mDNS: advertising as {info.name.rstrip('.')}")
+
     import uvicorn
 
-    uvicorn.run(fastapi_app, host=host, port=port, log_level="info")
+    try:
+        uvicorn.run(fastapi_app, host=host, port=port, log_level="info")
+    finally:
+        if mdns_handle is not None:
+            from musickit.serve.discovery import unregister_service
+
+            zc, info = mdns_handle
+            unregister_service(zc, info)
 
 
 def _print_startup_banner(*, host: str, port: int, root: Path) -> None:
