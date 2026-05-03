@@ -147,3 +147,17 @@ def test_get_users_returns_list_of_one(tmp_path: Path) -> None:
     users = body["subsonic-response"]["users"]["user"]
     assert len(users) == 1
     assert users[0]["username"] == "mort"
+
+
+def test_get_open_subsonic_extensions_returns_empty(tmp_path: Path) -> None:
+    """Feishin probes this on login — must 200, even with no extensions."""
+    body = _client(tmp_path).get("/rest/getOpenSubsonicExtensions", params=_params()).json()
+    inner = body["subsonic-response"]
+    assert inner["status"] == "ok"
+    assert inner["openSubsonicExtensions"] == []
+
+
+def test_get_genres_returns_empty(tmp_path: Path) -> None:
+    """Feishin polls genres repeatedly; 200 with empty list keeps the log clean."""
+    body = _client(tmp_path).get("/rest/getGenres", params=_params()).json()
+    assert body["subsonic-response"]["genres"] == {"genre": []}

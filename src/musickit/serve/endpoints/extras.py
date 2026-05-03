@@ -229,3 +229,33 @@ async def get_users(request: Request) -> dict:
     """Return all users — just the one we host."""
     cfg = request.app.state.cfg
     return envelope("users", {"user": [_user_payload(cfg.username)]})
+
+
+# ---------------------------------------------------------------------------
+# OpenSubsonic discovery — clients ask which extensions we support.
+# We don't implement any optional extensions yet, so return an empty list.
+# The `openSubsonic: true` flag in our standard envelope already advertises
+# basic OpenSubsonic compliance.
+# ---------------------------------------------------------------------------
+
+
+@router.api_route("/getOpenSubsonicExtensions", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getOpenSubsonicExtensions.view", methods=["GET", "POST", "HEAD"])
+async def get_open_subsonic_extensions() -> dict:
+    """Return the empty extensions list — no optional extensions implemented yet."""
+    return envelope("openSubsonicExtensions", [])
+
+
+# ---------------------------------------------------------------------------
+# Genres — Feishin / Supersonic show a "Genres" tab and probe this every
+# few seconds even when empty. We don't index genre data yet (LibraryTrack
+# doesn't carry it), so return an empty list. Wiring this through the scan
+# is a future addition.
+# ---------------------------------------------------------------------------
+
+
+@router.api_route("/getGenres", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getGenres.view", methods=["GET", "POST", "HEAD"])
+async def get_genres() -> dict:
+    """Return empty genres — we don't index genre data yet."""
+    return envelope("genres", {"genre": []})
