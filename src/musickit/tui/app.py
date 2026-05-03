@@ -1,11 +1,18 @@
-"""Textual app: ncmpcpp-styled library + now-playing + spectrum visualizer."""
+"""Textual app: ncmpcpp-styled library + now-playing + spectrum visualizer.
+
+Composition:
+  - `widgets.py` — every UI widget class (TopBar, SidebarStats, Visualizer,
+    BrowserList, TrackList, StatusBar, KeyBar, ScanOverlay, …) + the
+    central color palette + the `fmt_mmss` helper.
+  - `commands.py` — the Ctrl+P palette provider that surfaces playback verbs.
+  - `state.py` — `~/.config/musickit/state.json` for persistent theme.
+  - `app.py` (this file) — the orchestrator: wiring, actions, scan worker.
+"""
 
 from __future__ import annotations
 
-import json
 import logging
 import random
-from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,37 +20,42 @@ from typing import TYPE_CHECKING
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.command import DiscoveryHit, Hit, Hits, Provider
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.reactive import reactive
 from textual.widgets import ListItem, ListView, Static
 
 from musickit import library as library_mod
 from musickit import radio as radio_mod
+from musickit.tui.commands import MusickitCommands
 from musickit.tui.player import AudioPlayer
+from musickit.tui.state import load_state, save_state
+from musickit.tui.widgets import (
+    C_ACCENT,
+    C_DIM,
+    C_LABEL,
+    C_PEAK,
+    C_PLAYING,
+    C_WARM,
+    BrowserHeader,
+    BrowserInfo,
+    BrowserList,
+    KeyBar,
+    NowPlayingMeta,
+    ProgressLine,
+    ScanOverlay,
+    SidebarStats,
+    StatusBar,
+    TopBar,
+    TrackList,
+    TrackTableHeader,
+    Visualizer,
+    fmt_mmss,
+)
 
 if TYPE_CHECKING:
     from musickit.library import LibraryAlbum, LibraryIndex, LibraryTrack
     from musickit.radio import RadioStation
 
 log = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Palette (ncmpcpp-leaning: cyan headers, green meters, dim grey rules,
-# yellow=warning state, red=peaks). One central place so themes stay tight.
-# ---------------------------------------------------------------------------
-
-C_HEADER = "cyan"
-C_LABEL = "#7aa2f7"  # softer blue for "Artist:" / "Title:" labels
-C_PLAYING = "#9ece6a"  # green for "playing" state + meter fill
-C_PAUSED = "#e0af68"  # warm amber for paused
-C_PEAK = "#f7768e"  # peak / red zone in the visualizer
-C_WARM = "#e0af68"  # mid zone (yellow / amber)
-C_ACCENT = "#bb9af7"  # accent (e.g. "Favorites" style highlights)
-C_DIM = "#3a3a3a"
-C_MUTED = "#565f89"
-C_TIME = "#7aa2f7"
 
 
 class RepeatMode(str, Enum):
@@ -54,370 +66,6 @@ class RepeatMode(str, Enum):
     TRACK = "Track"
 
 
-# ---------------------------------------------------------------------------
-# Widgets
-# ---------------------------------------------------------------------------
-
-
-class TopBar(Static):
-    """Centered app title at the very top."""
-
-    DEFAULT_CSS = """
-    TopBar {
-        height: 1;
-        padding: 0 1;
-        content-align: center middle;
-        background: $boost;
-    }
-    """
-
-    def render(self) -> str:
-        return "[bold cyan]musickit[/]"
-
-
-class SidebarStats(Static):
-    """`Library` category list: counts of tracks / albums / artists / folders."""
-
-    DEFAULT_CSS = """
-    SidebarStats {
-        height: auto;
-        padding: 1 1;
-    }
-    """
-
-    track_count = reactive(0)
-    album_count = reactive(0)
-    artist_count = reactive(0)
-    folder_count = reactive(0)
-
-    def render(self) -> str:
-        rows = [
-            f"[{C_HEADER}]Library[/]",
-            "[dim]──────────[/]",
-            f" [{C_ACCENT}]♪[/]  Tracks   [dim]{self.track_count:>5}[/]",
-            f" [{C_ACCENT}]◉[/]  Albums   [dim]{self.album_count:>5}[/]",
-            f" [{C_ACCENT}]☺[/]  Artists  [dim]{self.artist_count:>5}[/]",
-            f" [{C_ACCENT}]▦[/]  Folders  [dim]{self.folder_count:>5}[/]",
-        ]
-        return "\n".join(rows)
-
-
-class NowPlayingMeta(Static):
-    """Right-side metadata grid: Artist / Title / Album / Year / Genre / Format."""
-
-    DEFAULT_CSS = """
-    NowPlayingMeta {
-        height: auto;
-        padding: 1 2;
-    }
-    """
-
-    artist = reactive("—")
-    title_text = reactive("—")
-    album = reactive("—")
-    year = reactive("—")
-    genre = reactive("—")
-    fmt = reactive("—")
-
-    def render(self) -> str:
-        rows = [
-            f"[{C_HEADER}]Now Playing[/]",
-            "[dim]──────────────────────────────────────────────[/]",
-            f"[{C_LABEL}]Artist:[/]  {self.artist}",
-            f"[{C_LABEL}]Title:[/]   [bold]{self.title_text}[/]",
-            f"[{C_LABEL}]Album:[/]   {self.album}",
-            f"[{C_LABEL}]Year:[/]    {self.year}",
-            f"[{C_LABEL}]Genre:[/]   {self.genre}",
-            f"[{C_LABEL}]Format:[/]  {self.fmt}",
-        ]
-        return "\n".join(rows)
-
-
-class Visualizer(Static):
-    """24-band spectrum analyzer in classic VU style.
-
-    Same green / yellow / red gradient across all bars, keyed off vertical
-    position (red top → yellow mid → green bottom). Sub-cell vertical
-    resolution via unicode partial blocks (`▁▂▃▄▅▆▇█`) on the top edge of
-    each bar so amplitude changes animate smoothly.
-    """
-
-    DEFAULT_CSS = """
-    Visualizer {
-        height: 6;
-        padding: 0 2;
-    }
-    Screen.fullscreen Visualizer {
-        height: 1fr;
-    }
-    """
-
-    _PARTIAL_BLOCKS = "▁▂▃▄▅▆▇█"  # 1/8th increments
-
-    levels = reactive([0.0] * 24)
-
-    def render(self) -> str:
-        rows = max(4, max(0, self.size.height - 1))
-        red_cutoff = max(1, rows // 5)
-        yellow_cutoff = red_cutoff + max(1, rows // 3)
-        # Spread bars across the full available width. Each bar gets
-        # `bar_width` block chars + 1 cell gap. Floor at 3 so it still looks
-        # like a meter on narrow terminals.
-        n_bars = len(self.levels) or 1
-        avail = max(0, self.size.width - 4)  # account for the widget's padding
-        bar_width = max(3, (avail - n_bars) // n_bars)
-        empty_cell = " " * bar_width
-        lines: list[str] = []
-        for row_idx in range(rows):
-            if row_idx < red_cutoff:
-                color = C_PEAK
-            elif row_idx < yellow_cutoff:
-                color = C_WARM
-            else:
-                color = C_PLAYING
-            row_top = 1.0 - row_idx / rows
-            row_bottom = 1.0 - (row_idx + 1) / rows
-            line_parts: list[str] = []
-            for level in self.levels:
-                if level >= row_top:
-                    line_parts.append(f"[{color}]{'█' * bar_width}[/]")
-                elif level > row_bottom:
-                    fraction = (level - row_bottom) / max(1e-6, row_top - row_bottom)
-                    block = self._PARTIAL_BLOCKS[
-                        min(len(self._PARTIAL_BLOCKS) - 1, int(fraction * len(self._PARTIAL_BLOCKS)))
-                    ]
-                    line_parts.append(f"[{color}]{block * bar_width}[/]")
-                else:
-                    line_parts.append(empty_cell)
-                line_parts.append(" ")
-            lines.append("".join(line_parts))
-        return "\n".join(lines)
-
-
-class ProgressLine(Static):
-    """`mm:ss [▰▰▰▰░░░░] mm:ss   [playing]` bar."""
-
-    DEFAULT_CSS = """
-    ProgressLine {
-        height: 1;
-        padding: 0 2;
-    }
-    """
-
-    position = reactive(0.0)
-    duration = reactive(0.0)
-    state = reactive("stopped")  # "playing" | "paused" | "stopped"
-
-    def render(self) -> str:
-        width = max(20, self.size.width - 30)
-        if self.duration <= 0:
-            bar = f"[{C_DIM}]{'─' * width}[/]"
-        else:
-            ratio = max(0.0, min(1.0, self.position / self.duration))
-            filled = int(round(ratio * width))
-            bar = f"[{C_TIME}]{'━' * filled}[/][{C_DIM}]{'─' * (width - filled)}[/]"
-        if self.state == "playing":
-            badge = f"[{C_PLAYING}][playing][/]"
-        elif self.state == "paused":
-            badge = f"[{C_PAUSED}][paused][/]"
-        else:
-            badge = "[dim][stopped][/]"
-        pos = _fmt_mmss(self.position)
-        dur = _fmt_mmss(self.duration)
-        return f"[{C_TIME}]{pos}[/]  {bar}  [{C_TIME}]{dur}[/]   {badge}"
-
-
-class TrackTableHeader(Static):
-    """Column headers for the track table (`#  Title  Artist  Time`)."""
-
-    DEFAULT_CSS = """
-    TrackTableHeader {
-        height: 2;
-        padding: 0 2;
-    }
-    """
-
-    def render(self) -> str:
-        return f"[{C_HEADER}]{'#':>3}  {'Title':<46}{'Artist':<28}{'Time':>6}[/]\n[dim]{'─' * 90}[/]"
-
-
-class TrackList(ListView):
-    """Focusable playlist (column-aligned rows)."""
-
-    DEFAULT_CSS = """
-    TrackList {
-        padding: 0 1;
-        height: 1fr;
-    }
-    TrackList > ListItem.--highlight {
-        background: $primary 30%;
-    }
-    """
-
-
-class BrowserHeader(Static):
-    """Path header above the browser list (`Browse` or `Browse · <Artist>`)."""
-
-    DEFAULT_CSS = """
-    BrowserHeader {
-        height: 2;
-        padding: 1 1 0 1;
-    }
-    """
-
-    path = reactive("Browse")
-
-    def render(self) -> str:
-        return f"[{C_HEADER}]{self.path}[/]\n[dim]──────────[/]"
-
-
-class BrowserList(ListView):
-    """Flat-list directory browser. Enter on a row drills in or goes up.
-
-    Replaces the older Tree-based navigator. Two levels deep:
-      - root: list of artist dirs
-      - inside an artist: a `..` entry + that artist's album dirs
-    Selecting an album row hands focus to the playlist (right column)
-    so Enter on a track plays it immediately.
-    """
-
-    DEFAULT_CSS = """
-    BrowserList {
-        height: 1fr;
-        padding: 0 1;
-        overflow-x: hidden;
-    }
-    BrowserList > ListItem {
-        height: 1;
-    }
-    BrowserList > ListItem.--highlight {
-        background: $primary 30%;
-    }
-    """
-
-
-class BrowserInfo(Static):
-    """Detail panel below the browser. Shows audit warnings for the highlighted album."""
-
-    DEFAULT_CSS = """
-    BrowserInfo {
-        height: auto;
-        max-height: 8;
-        padding: 1 1;
-        background: $boost;
-    }
-    """
-
-    body = reactive("")
-
-    def render(self) -> str:
-        return self.body or "[dim]Highlight an album to see audit warnings.[/]"
-
-
-class ScanOverlay(Static):
-    """Centered overlay shown during the initial library scan / rescans.
-
-    Sits on top of the body via Textual's `layer:` CSS feature so it doesn't
-    require recomposing the layout each time. Hidden when there's no scan in
-    flight.
-    """
-
-    DEFAULT_CSS = """
-    ScanOverlay {
-        /* Card-style modal: not full width. `layer: overlay` keeps it above
-           the body without a relayout when shown/hidden. */
-        layer: overlay;
-        offset: 50% 30%;
-        margin: 0 -30;  /* shift back by half-width so 50% lands on center */
-        width: 60;
-        height: auto;
-        padding: 1 2;
-        background: $surface;
-        border: round $primary;
-        text-align: center;
-        display: none;
-    }
-    ScanOverlay.visible {
-        display: block;
-    }
-    """
-
-    body = reactive("[bold cyan]Scanning library…[/]")
-
-    def render(self) -> str:
-        return self.body
-
-
-class StatusBar(Static):
-    """Bottom single-line status: Vol / Repeat / Shuffle / Time."""
-
-    DEFAULT_CSS = """
-    StatusBar {
-        height: 1;
-        padding: 0 2;
-        background: $boost;
-    }
-    """
-
-    volume = reactive(100)
-    repeat = reactive("Off")
-    shuffle = reactive("Off")
-    position = reactive(0.0)
-    duration = reactive(0.0)
-    album_label = reactive("—")
-    cursor_label = reactive("0/0")
-
-    def render(self) -> str:
-        vol_filled = int(round(self.volume / 100.0 * 12))
-        vol_bar = f"[{C_PLAYING}]{'|' * vol_filled}[/][{C_DIM}]{'-' * (12 - vol_filled)}[/]"
-        repeat_color = C_PLAYING if self.repeat != "Off" else C_DIM
-        shuffle_color = C_PLAYING if self.shuffle != "Off" else C_DIM
-        time_str = f"{_fmt_mmss(self.position)} / {_fmt_mmss(self.duration)}"
-        # `\\[…\\]` to render literal brackets around the volume bar in cliamp/
-        # ncmpcpp style, without confusing Rich's tag parser.
-        return (
-            f"[{C_LABEL}]Vol:[/] [{C_PLAYING}]{self.volume}%[/] \\[{vol_bar}\\]    "
-            f"[{C_LABEL}]Repeat:[/] [{repeat_color}]{self.repeat.lower()}[/]    "
-            f"[{C_LABEL}]Shuffle:[/] [{shuffle_color}]{self.shuffle.lower()}[/]    "
-            f"[{C_LABEL}]Album:[/] [{C_ACCENT}]{self.album_label}[/] [dim]({self.cursor_label})[/]"
-            f"    [{C_LABEL}]Time:[/] [{C_TIME}]{time_str}[/]"
-        )
-
-
-class KeyBar(Static):
-    """Bottom keybinding hint bar (ncmpcpp-style numbered shortcuts)."""
-
-    DEFAULT_CSS = """
-    KeyBar {
-        height: 1;
-        padding: 0 2;
-    }
-    """
-
-    def render(self) -> str:
-        items = [
-            ("space", "Play"),
-            ("enter", "Open"),
-            ("←/→", "Nav"),
-            ("</>", "Seek"),
-            ("n", "Next"),
-            ("p", "Prev"),
-            ("s", "Shuffle"),
-            ("r", "Repeat"),
-            ("f", "Fullscreen"),
-            ("^r", "Rescan"),
-            ("tab", "Focus"),
-            ("^←/→", "Resize"),
-            ("q", "Quit"),
-        ]
-        return "  ".join(f"[bold]{key}[/] [dim]{label}[/]" for key, label in items)
-
-
-# ---------------------------------------------------------------------------
-# App
-# ---------------------------------------------------------------------------
-
-
 _TREE_DEFAULT_WIDTH = 32
 _TREE_MIN_WIDTH = 20
 _TREE_MAX_WIDTH = 80
@@ -426,62 +74,11 @@ _TREE_RESIZE_STEP = 4
 _BROWSER_DECORATION_PAD = 8
 
 
-class MusickitCommands(Provider):
-    """Custom Ctrl+P palette entries for playback / navigation actions.
-
-    Textual's default palette only surfaces App-level keybindings. Adding
-    a Provider lets us list player verbs in the searchable picker so the
-    user doesn't have to remember `n` / `p` / `<` / `>` / `s` / `r` etc.
-    """
-
-    @property
-    def _commands(self) -> list[tuple[str, str, str]]:
-        return [
-            ("Play / Pause", "action_toggle_pause", "Toggle playback (Space)"),
-            ("Next track", "action_next_track", "Skip to next (n)"),
-            ("Previous track", "action_prev_track", "Go to previous (p)"),
-            ("Seek forward 5s", "action_seek_fwd", "+5 seconds (>)"),
-            ("Seek backward 5s", "action_seek_back", "-5 seconds (<)"),
-            ("Volume up", "action_vol_up", "+5% (+)"),
-            ("Volume down", "action_vol_down", "-5% (-)"),
-            ("Toggle shuffle", "action_toggle_shuffle", "On / Off (s)"),
-            ("Cycle repeat mode", "action_cycle_repeat", "Off → Album → Track (r)"),
-            ("Toggle fullscreen", "action_toggle_fullscreen", "Hide library, expand visualizer (f)"),
-            ("Toggle help panel", "action_toggle_help", "Show / hide the keybindings reference (?)"),
-            ("Rescan library", "action_rescan_library", "Re-walk the library root (Ctrl+R)"),
-            ("Quit", "action_quit", "Exit musickit (q)"),
-        ]
-
-    async def discover(self) -> Hits:
-        """Run the same commands when the palette is opened with no query."""
-        for name, action_name, help_text in self._commands:
-            yield DiscoveryHit(
-                name,
-                self._action(action_name),
-                help=help_text,
-            )
-
-    async def search(self, query: str) -> Hits:
-        matcher = self.matcher(query)
-        for name, action_name, help_text in self._commands:
-            score = matcher.match(name)
-            if score > 0:
-                yield Hit(
-                    score,
-                    matcher.highlight(name),
-                    self._action(action_name),
-                    help=help_text,
-                )
-
-    def _action(self, action_name: str) -> Callable[[], None]:
-        app = self.app
-
-        def runner() -> None:
-            method = getattr(app, action_name, None)
-            if callable(method):
-                method()
-
-        return runner
+def _truncate(value: str, max_len: int) -> str:
+    """Cap `value` at `max_len` cells with an ellipsis. Used by browser rows."""
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 1] + "…"
 
 
 class MusickitApp(App[None]):
@@ -504,6 +101,13 @@ class MusickitApp(App[None]):
     Screen.fullscreen #track-header { display: none; }
     Screen.fullscreen #track-scroll { display: none; }
     Screen.fullscreen #status { display: none; }
+    /* Scan-in-progress: hide the rest of the body so the centered scan
+       overlay is the only thing visible. Avoids the awkward half-empty
+       UI behind the scan card. */
+    Screen.scanning #topbar { display: none; }
+    Screen.scanning #body { display: none; }
+    Screen.scanning #status { display: none; }
+    Screen.scanning #keybar { display: none; }
     /* Command palette is a modal screen — keep it card-sized instead of
        sprawling across the full width. Targets Textual's internal layout. */
     CommandPalette {
@@ -555,10 +159,7 @@ class MusickitApp(App[None]):
         self._current_track_idx: int | None = None
         self._marker_idx: int | None = None
         self._shuffle = False
-        # Radio: curated streaming stations loaded from `~/.config/musickit/radio.toml`.
-        # When the user selects "Radio" in the browser, the right-side track
-        # list is populated with these (each station is a streaming "track")
-        # and the "current album" is the synthetic `_RADIO_VIEW`.
+        # Radio state.
         self._radio_stations: list[RadioStation] = []
         self._in_radio_view: bool = False
         # Set by AudioPlayer.on_metadata_change (worker thread). Drained in
@@ -566,17 +167,16 @@ class MusickitApp(App[None]):
         self._stream_metadata_dirty: bool = False
         self._repeat = RepeatMode.OFF
         self._end_pending = False
-        # Browser navigation state: None = at top level (artists);
-        # a string = drilled into that artist's albums.
+        # None = at top level (artists); a string = drilled into that artist.
         self._browse_artist: str | None = None
 
     def watch_theme(self, theme: str) -> None:
         """Persist theme changes (e.g. via the command palette) to disk."""
-        state = _load_state()
+        state = load_state()
         if state.get("theme") == theme:
             return
         state["theme"] = theme
-        _save_state(state)
+        save_state(state)
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="topbar")
@@ -602,42 +202,35 @@ class MusickitApp(App[None]):
         self.title = "musickit"
         # Restore the user's theme choice (set via the command palette) before
         # the first paint, so we don't flash the default theme on startup.
-        saved_theme = _load_state().get("theme")
+        saved_theme = load_state().get("theme")
         if isinstance(saved_theme, str):
             try:
                 self.theme = saved_theme
             except Exception:  # pragma: no cover — bad/old theme name
                 pass
-        # Visualizer animates at ~30 FPS so bars feel responsive to the audio.
-        # Other status (time, progress, meta) only needs ~4 FPS — saves redraw
-        # work since the surrounding text doesn't change frame-to-frame.
+        # Visualizer ticks at 30 FPS; status text only at 4 FPS to save
+        # redraws on text that doesn't need to change frame-to-frame.
         self.set_interval(1 / 30, self._refresh_visualizer)
         self.set_interval(0.25, self._refresh_status)
         self.set_interval(0.05, self._drain_end_pending)
         self.set_interval(0.5, self._drain_stream_metadata)
-        # Seed the user's `radio.toml` with starter stations on first run, then
-        # load. Cheap (no network).
+        # Seed the user's `radio.toml` template on first run, then load.
         try:
             radio_mod.seed_default_config()
         except OSError:  # pragma: no cover — read-only home, etc.
             pass
         self._radio_stations = radio_mod.load_stations()
         if self._root is None:
-            # Radio-only launch: skip the library scan, render the browser
-            # immediately with just the Radio entry, and drop straight into
-            # the station list on the right.
+            # Radio-only launch: skip the scan, drop directly into stations.
             self._populate_sidebar_stats()
             self._populate_browser()
             self._open_radio_view()
             return
-        # Kick off the initial scan in a worker thread so the TUI is
-        # responsive immediately. The overlay covers the body until the
-        # first index lands.
         self._show_scan_overlay("[bold cyan]Scanning library…[/]")
         self._scan_library_async(initial=True)
 
     # ------------------------------------------------------------------
-    # Sidebar / tree population
+    # Sidebar / browser population
     # ------------------------------------------------------------------
 
     def _populate_sidebar_stats(self) -> None:
@@ -655,20 +248,16 @@ class MusickitApp(App[None]):
         header = self.query_one(BrowserHeader)
         # Invalidate the cursor BEFORE mutating children. Otherwise a stale
         # index from the prior list (e.g. row 32 of a long album list) can
-        # leak into the new list (3-item artists view) and crash the next
-        # `↑`/`↓` keypress with an IndexError. `None` is the empty-list state.
+        # leak into the new list and crash the next ↑/↓ keypress.
         browser.index = None
         browser.clear()
         if self._index is None or not self._index.albums:
-            # Radio-only mode (or empty library): browser shows just the
-            # Radio entry. Selecting it fills the right pane with stations.
             header.path = "Browse"
             radio_item = ListItem(Static(f" [{C_ACCENT}]📻[/] [bold]Radio[/]  [dim]({len(self._radio_stations)})[/]"))
             radio_item.entry_kind = "radio"  # type: ignore[attr-defined]
             radio_item.entry_data = None  # type: ignore[attr-defined]
             browser.append(radio_item)
             if self._root is not None:
-                # Library was specified but had nothing. Surface that.
                 browser.append(ListItem(Static("[dim](no albums)[/]")))
             self._fit_sidebar_width()
             self.call_after_refresh(self._set_browser_cursor, 0)
@@ -680,9 +269,6 @@ class MusickitApp(App[None]):
             header.path = f"Browse · [bold]{self._browse_artist}[/]"
             self._populate_browser_albums(browser, self._browse_artist)
         self._fit_sidebar_width()
-        # Defer cursor placement until after the children have actually
-        # mounted. Setting `index` on a list whose children haven't been
-        # rendered yet doesn't paint the highlight reliably.
         target_index = 0
         if self._browse_artist is not None and len(browser.children) > 1:
             target_index = 1
@@ -691,10 +277,9 @@ class MusickitApp(App[None]):
     def _set_browser_cursor(self, target_index: int) -> None:
         """Place the cursor on `target_index` after children mount.
 
-        Also makes sure focus stays on the browser (Textual sometimes drops
-        focus when a widget's children get mass-replaced) and refreshes the
-        info panel manually — `index =` assignments don't always fire
-        `ListView.Highlighted` after a `clear()`+`append()` cycle.
+        Also refocuses the browser (Textual sometimes drops focus when a
+        widget's children get mass-replaced) and refreshes the info panel
+        — `index =` doesn't always fire `Highlighted` post clear+append.
         """
         browser = self.query_one(BrowserList)
         if target_index >= len(browser.children):
@@ -702,7 +287,6 @@ class MusickitApp(App[None]):
         browser.index = target_index
         if not browser.has_focus:
             browser.focus()
-        # Force an info-panel update for the new highlight.
         item = browser.children[target_index]
         self._update_browser_info(item if isinstance(item, ListItem) else None)
 
@@ -736,7 +320,6 @@ class MusickitApp(App[None]):
             info.body = ""
 
     def _fit_sidebar_width(self) -> None:
-        """Size the sidebar to fit the longest visible browser entry, capped at the max."""
         if self._index is None:
             return
         if self._browse_artist is None:
@@ -746,7 +329,6 @@ class MusickitApp(App[None]):
                 (len(a.album_dir) for a in self._index.albums if a.artist_dir == self._browse_artist),
                 default=0,
             )
-        # Also factor in the sidebar-stats labels — they shouldn't get truncated.
         target = max(_TREE_DEFAULT_WIDTH, longest + _BROWSER_DECORATION_PAD)
         target = min(_TREE_MAX_WIDTH, max(_TREE_MIN_WIDTH, target))
         sidebar = self.query_one("#sidebar")
@@ -754,8 +336,6 @@ class MusickitApp(App[None]):
 
     def _populate_browser_artists(self, browser: BrowserList) -> None:
         assert self._index is not None
-        # Radio sits at the very top — single click drops you into the
-        # station list (right pane), bypassing the artist→album drill.
         radio_item = ListItem(Static(f" [{C_ACCENT}]📻[/] [bold]Radio[/]  [dim]({len(self._radio_stations)})[/]"))
         radio_item.entry_kind = "radio"  # type: ignore[attr-defined]
         radio_item.entry_data = None  # type: ignore[attr-defined]
@@ -775,7 +355,6 @@ class MusickitApp(App[None]):
 
     def _populate_browser_albums(self, browser: BrowserList, artist: str) -> None:
         assert self._index is not None
-        # `..` to go back up.
         up_item = ListItem(Static(f" [{C_ACCENT}]..[/]  [dim]Back[/]"))
         up_item.entry_kind = "up"  # type: ignore[attr-defined]
         up_item.entry_data = None  # type: ignore[attr-defined]
@@ -794,8 +373,11 @@ class MusickitApp(App[None]):
             item.entry_data = album  # type: ignore[attr-defined]
             browser.append(item)
 
+    # ------------------------------------------------------------------
+    # ListView event dispatch
+    # ------------------------------------------------------------------
+
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Dispatch by which ListView fired the event."""
         browser = self.query_one(BrowserList)
         tracklist = self.query_one(TrackList)
         if event.list_view is browser:
@@ -811,40 +393,12 @@ class MusickitApp(App[None]):
                 self._play_current()
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        """Show audit warnings for the highlighted album in the info panel."""
         browser = self.query_one(BrowserList)
         if event.list_view is not browser:
             return
-        info = self.query_one(BrowserInfo)
-        item = event.item
-        if item is None:
-            info.body = ""
-            return
-        kind = getattr(item, "entry_kind", None)
-        data = getattr(item, "entry_data", None)
-        if kind == "radio":
-            n = len(self._radio_stations)
-            info.body = f"[{C_LABEL}]Radio[/]\n[dim]{n} curated station(s)[/]"
-        elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
-            if data.warnings:
-                lines = [f"[{C_PEAK}]⚠ {len(data.warnings)} warning(s)[/]"]
-                for w in data.warnings:
-                    lines.append(f"[{C_WARM}]·[/] {w}")
-                info.body = "\n".join(lines)
-            else:
-                info.body = f"[{C_PLAYING}]✓ no warnings[/]"
-        elif kind == "artist" and isinstance(data, str):
-            assert self._index is not None
-            albums = [a for a in self._index.albums if a.artist_dir == data]
-            flagged = sum(1 for a in albums if a.warnings)
-            if flagged:
-                info.body = f"[{C_LABEL}]{data}[/]\n[dim]{len(albums)} album(s)[/] [{C_PEAK}]· {flagged} flagged[/]"
-            else:
-                info.body = f"[{C_LABEL}]{data}[/]\n[dim]{len(albums)} album(s)[/]"
-        else:
-            info.body = ""
+        self._update_browser_info(event.item)
 
-    def _handle_browser_selection(self, item: ListItem) -> None:  # noqa: D102 — see body
+    def _handle_browser_selection(self, item: ListItem) -> None:
         kind_first = getattr(item, "entry_kind", None)
         if kind_first == "radio":
             self._open_radio_view()
@@ -853,12 +407,7 @@ class MusickitApp(App[None]):
         return self._handle_browser_selection_default(item)
 
     def _open_radio_view(self) -> None:
-        """Populate the right-pane track list with the curated radio stations.
-
-        Treated as a virtual album: `_in_radio_view=True` flips the playlist
-        repopulation to render `RadioStation` rows instead of `LibraryTrack`s.
-        Entering this view doesn't drill the browser — it stays where it is.
-        """
+        """Populate the right-pane track list with the curated radio stations."""
         self._in_radio_view = True
         self._current_album = None
         self._current_track_idx = None
@@ -881,7 +430,7 @@ class MusickitApp(App[None]):
             self.query_one(TrackList).focus()
 
     # ------------------------------------------------------------------
-    # Playlist rendering
+    # Playlist rendering (library tracks + radio stations)
     # ------------------------------------------------------------------
 
     def _set_current_album(self, album: LibraryAlbum, *, track_idx: int | None) -> None:
@@ -890,12 +439,8 @@ class MusickitApp(App[None]):
 
     def _repopulate_playlist(self) -> None:
         tracklist = self.query_one(TrackList)
-        # Same pattern as the browser: invalidate the cursor BEFORE clearing
-        # children, then defer the new cursor placement via
-        # `call_after_refresh` so it lands after the new ListItems mount.
-        # Without the defer, the second album in a row often shows no
-        # highlighted track because the previous album's children are still
-        # mid-unmount when the synchronous `index =` runs.
+        # Same defer-cursor pattern as the browser to avoid the
+        # second-album-no-highlight bug.
         tracklist.index = None
         tracklist.clear()
         if self._current_album is None:
@@ -922,18 +467,11 @@ class MusickitApp(App[None]):
             tracklist.index = target
 
     def _repopulate_radio_playlist(self) -> None:
-        """Render the curated radio stations as the right-side track list.
-
-        Each row carries a `RadioStation` instance via `item.station` so the
-        track-list selection handler can dispatch to `_play_station` instead
-        of the regular library-track path.
-        """
         tracklist = self.query_one(TrackList)
         tracklist.index = None
         tracklist.clear()
         if not self._radio_stations:
-            empty = ListItem(Static("[dim]No stations configured. Edit `~/.config/musickit/radio.toml`.[/]"))
-            tracklist.append(empty)
+            tracklist.append(ListItem(Static("[dim]No stations configured. Edit `~/.config/musickit/radio.toml`.[/]")))
             return
         for i, station in enumerate(self._radio_stations):
             label = self._format_station_row(i, station, marker=False)
@@ -958,14 +496,11 @@ class MusickitApp(App[None]):
         return f"{num} {glyph} {name_cell:<44}{desc_cell:<26} [dim]{'LIVE':>6}[/]"
 
     def _play_station(self, station: RadioStation) -> None:
-        """Start an internet-radio stream and mark the row as playing."""
         idx = self._radio_stations.index(station) if station in self._radio_stations else None
-        # `_marker_idx` follows the playing row's index; refresh both old + new.
         prev = self._marker_idx
         self._current_track_idx = idx
         self._marker_idx = idx
         self._player.play(station.url)
-        # Repaint just the affected rows.
         if prev is not None and prev != idx:
             try:
                 self.query_one(f"#track-row-{prev}", Static).update(
@@ -978,18 +513,6 @@ class MusickitApp(App[None]):
                 self.query_one(f"#track-row-{idx}", Static).update(self._format_station_row(idx, station, marker=True))
             except Exception:  # pragma: no cover
                 pass
-
-    def _on_stream_metadata_change(self) -> None:
-        """Player callback (off-thread) — flag the UI tick to redraw the title."""
-        self._stream_metadata_dirty = True
-
-    def _drain_stream_metadata(self) -> None:
-        """UI tick: pull fresh ICY title into the now-playing meta if the player set it."""
-        if not self._stream_metadata_dirty:
-            return
-        self._stream_metadata_dirty = False
-        # The status refresh path below already reads stream_title; just nudge it.
-        self._refresh_status()
 
     def _refresh_play_marker(self) -> None:
         if self._current_album is None:
@@ -1018,7 +541,7 @@ class MusickitApp(App[None]):
         glyph = f"[bold {C_PLAYING}]▶[/]" if marker else " "
         artist = (track.artist or album.artist_dir)[:26]
         title = (track.title or track.path.stem)[:44]
-        time_str = _fmt_mmss(track.duration_s) if track.duration_s > 0 else "  —  "
+        time_str = fmt_mmss(track.duration_s) if track.duration_s > 0 else "  —  "
         if marker:
             num = f"[{C_PLAYING}]{idx + 1:>3}[/]"
             artist_cell = f"[{C_PLAYING}]{artist}[/]"
@@ -1030,7 +553,7 @@ class MusickitApp(App[None]):
         return f"{num} {glyph} {title_cell:<44}{artist_cell:<26} [dim]{time_str:>6}[/]"
 
     # ------------------------------------------------------------------
-    # Status refresh
+    # Status refresh (UI ticks)
     # ------------------------------------------------------------------
 
     def _refresh_visualizer(self) -> None:
@@ -1064,7 +587,7 @@ class MusickitApp(App[None]):
                 meta.artist = track.artist or self._current_album.artist_dir if self._current_album else "—"
                 meta.album = self._current_album.album_dir if self._current_album else "—"
                 meta.year = track.year or "—"
-                meta.genre = "—"  # not tracked in light scan
+                meta.genre = "—"
                 meta.fmt = track.path.suffix.lstrip(".").upper()
                 progress.position = self._player.position
                 progress.duration = self._player.duration
@@ -1092,12 +615,6 @@ class MusickitApp(App[None]):
             status.cursor_label = "0/0"
 
     def _populate_meta_from_stream(self, meta: NowPlayingMeta) -> None:
-        """Now-playing meta when a live stream is active.
-
-        Title comes from ICY `StreamTitle` (current song), Album from
-        `icy-name` (station). When `StreamTitle` looks like `Artist - Title`,
-        we split it for the Artist/Title fields.
-        """
         station = self._player.stream_station_name or "Live Stream"
         raw = self._player.stream_title or ""
         artist = "—"
@@ -1118,6 +635,15 @@ class MusickitApp(App[None]):
             self._end_pending = False
             self._advance_track()
 
+    def _drain_stream_metadata(self) -> None:
+        if not self._stream_metadata_dirty:
+            return
+        self._stream_metadata_dirty = False
+        self._refresh_status()
+
+    def _on_stream_metadata_change(self) -> None:
+        self._stream_metadata_dirty = True
+
     def _currently_playing_track(self) -> LibraryTrack | None:
         if self._current_album is None or self._current_track_idx is None:
             return None
@@ -1126,27 +652,22 @@ class MusickitApp(App[None]):
         return None
 
     # ------------------------------------------------------------------
-    # Actions
+    # Actions / keybindings
     # ------------------------------------------------------------------
 
     def action_play_selected(self) -> None:
         tracklist = self.query_one(TrackList)
         browser = self.query_one(BrowserList)
         focused = self.focused
-        # Enter inside the playlist plays the highlighted track.
         if focused is tracklist and tracklist.highlighted_child is not None:
             idx = getattr(tracklist.highlighted_child, "track_index", None)
             if isinstance(idx, int):
                 self._current_track_idx = idx
                 self._play_current()
                 return
-        # Enter inside the browser drills in / goes up — see `on_list_view_selected`
-        # which fires for `Selected` events; this catches keyboard activation
-        # when ListView doesn't fire `Selected` (e.g. deselected highlight).
         if focused is browser and browser.highlighted_child is not None:
             self._handle_browser_selection(browser.highlighted_child)
             return
-        # Fallback: if an album is loaded, just play from the current cursor.
         if self._current_album is None:
             return
         if self._current_track_idx is None:
@@ -1173,13 +694,7 @@ class MusickitApp(App[None]):
         self._player.seek(max(0.0, self._player.position - 5.0))
 
     def action_left(self) -> None:
-        """←: navigation only — never seek.
-
-        Seek lives on `<` / `>` (always-on, focus-independent). Mixing seek
-        into ←/→ caused audible jumps when a track was playing — right after
-        Enter on an album the focus moves to TrackList, and the old fallback
-        would seek every right arrow.
-        """
+        """←: navigation only — never seek (use `<`)."""
         focused = self.focused
         if isinstance(focused, BrowserList):
             if self._browse_artist is not None:
@@ -1188,38 +703,26 @@ class MusickitApp(App[None]):
         if isinstance(focused, TrackList):
             self.query_one(BrowserList).focus()
 
-    def _pop_browser_one_level(self) -> None:
-        """Go from an artist's album list back to the artist list.
-
-        Restores the cursor onto the artist we just exited, which feels much
-        better than always snapping to row 0 of the artists list.
-        """
-        prior_artist = self._browse_artist
-        self._browse_artist = None
-        self._populate_browser()
-        if prior_artist is None or self._index is None:
-            return
-        # Compute the row index from the data model (artist names sorted
-        # case-insensitively, same key `_populate_browser_artists` uses) —
-        # NOT from `browser.children`. Right after a clear()+append() cycle,
-        # `browser.children` may still report the OLD items, so an index
-        # derived from it would be wrong by the time the deferred cursor
-        # set actually runs.
-        artist_names = sorted({a.artist_dir for a in self._index.albums}, key=str.lower)
-        try:
-            prior_idx = artist_names.index(prior_artist)
-        except ValueError:
-            return
-        # `_populate_browser` already scheduled `_set_browser_cursor(0)`.
-        # Schedule another with the prior-artist index — `call_after_refresh`
-        # is FIFO so the later schedule wins.
-        self.call_after_refresh(self._set_browser_cursor, prior_idx)
-
     def action_right(self) -> None:
         """→: drill into the browser only — never seek (use `>`)."""
         focused = self.focused
         if isinstance(focused, BrowserList) and focused.highlighted_child is not None:
             self._handle_browser_selection(focused.highlighted_child)
+
+    def _pop_browser_one_level(self) -> None:
+        prior_artist = self._browse_artist
+        self._browse_artist = None
+        self._populate_browser()
+        if prior_artist is None or self._index is None:
+            return
+        # Compute prior-artist row index from the data model — `browser.children`
+        # can still report stale items mid clear+append.
+        artist_names = sorted({a.artist_dir for a in self._index.albums}, key=str.lower)
+        try:
+            prior_idx = artist_names.index(prior_artist)
+        except ValueError:
+            return
+        self.call_after_refresh(self._set_browser_cursor, prior_idx)
 
     def action_vol_up(self) -> None:
         self._player.set_volume(min(100, self._player.volume + 5))
@@ -1240,19 +743,21 @@ class MusickitApp(App[None]):
     def action_tree_narrower(self) -> None:
         self._resize_sidebar(-_TREE_RESIZE_STEP)
 
+    def _resize_sidebar(self, delta: int) -> None:
+        sidebar = self.query_one("#sidebar")
+        current = sidebar.styles.width
+        try:
+            current_cells = int(current.value) if current is not None else _TREE_DEFAULT_WIDTH
+        except (TypeError, ValueError):
+            current_cells = _TREE_DEFAULT_WIDTH
+        new_width = max(_TREE_MIN_WIDTH, min(_TREE_MAX_WIDTH, current_cells + delta))
+        sidebar.styles.width = new_width
+
     def action_browser_up(self) -> None:
-        """Backspace: pop one level in the browser if drilled into an artist."""
         if self._browse_artist is not None:
             self._pop_browser_one_level()
 
     def action_rescan_library(self) -> None:
-        """Re-walk the library root and refresh the browser.
-
-        There's no on-disk DB — the index is built fresh on `on_mount` and
-        kept in memory. Use this binding (Ctrl+R / F5) when you've moved
-        files around outside the TUI and want the changes reflected. In
-        radio-only mode (no library), reload the radio config instead.
-        """
         if self._root is None:
             self._radio_stations = radio_mod.load_stations()
             self._populate_browser()
@@ -1262,6 +767,25 @@ class MusickitApp(App[None]):
         self._show_scan_overlay("[bold cyan]Rescanning library…[/]")
         self._scan_library_async(initial=False)
 
+    def action_toggle_fullscreen(self) -> None:
+        if self.screen.has_class("fullscreen"):
+            self.screen.remove_class("fullscreen")
+            self.query_one(Visualizer).styles.height = 6
+        else:
+            self.screen.add_class("fullscreen")
+            self.query_one(Visualizer).styles.height = "1fr"
+
+    def action_toggle_help(self) -> None:
+        """`?` shows / hides Textual's full keybindings help panel."""
+        from textual.widgets import HelpPanel
+
+        try:
+            panel = self.query_one(HelpPanel)
+        except Exception:
+            self.action_show_help_panel()
+        else:
+            panel.remove()
+
     # ------------------------------------------------------------------
     # Async library scan
     # ------------------------------------------------------------------
@@ -1270,14 +794,17 @@ class MusickitApp(App[None]):
         overlay = self.query_one(ScanOverlay)
         overlay.body = body
         overlay.add_class("visible")
+        # Hide everything else while scanning so the centered card is the
+        # only thing on screen.
+        self.screen.add_class("scanning")
 
     def _hide_scan_overlay(self) -> None:
         overlay = self.query_one(ScanOverlay)
         overlay.remove_class("visible")
+        self.screen.remove_class("scanning")
 
     @work(thread=True, exclusive=True, group="scan")
     def _scan_library_async(self, *, initial: bool) -> None:
-        """Run `library.scan` in a worker thread; route progress + result back."""
         if self._root is None:
             return
         prior_artist = self._browse_artist
@@ -1302,48 +829,13 @@ class MusickitApp(App[None]):
         overlay.body = f"[bold cyan]Scanning library…[/]\n\n{bar}\n[dim]{idx} / {total}[/]\n\n[dim]{name}[/]"
 
     def _on_scan_complete(self, new_index: LibraryIndex, prior_artist: str | None, initial: bool) -> None:
-        del initial  # current behaviour is the same for first-mount and rescan
+        del initial
         self._index = new_index
         if prior_artist is not None and not any(a.artist_dir == prior_artist for a in self._index.albums):
             self._browse_artist = None
         self._populate_sidebar_stats()
         self._populate_browser()
         self._hide_scan_overlay()
-
-    def _resize_sidebar(self, delta: int) -> None:
-        sidebar = self.query_one("#sidebar")
-        current = sidebar.styles.width
-        try:
-            current_cells = int(current.value) if current is not None else _TREE_DEFAULT_WIDTH
-        except (TypeError, ValueError):
-            current_cells = _TREE_DEFAULT_WIDTH
-        new_width = max(_TREE_MIN_WIDTH, min(_TREE_MAX_WIDTH, current_cells + delta))
-        sidebar.styles.width = new_width
-
-    def action_toggle_fullscreen(self) -> None:
-        if self.screen.has_class("fullscreen"):
-            self.screen.remove_class("fullscreen")
-            self.query_one(Visualizer).styles.height = 6
-        else:
-            self.screen.add_class("fullscreen")
-            self.query_one(Visualizer).styles.height = "1fr"
-
-    def action_toggle_help(self) -> None:
-        """`?` shows / hides Textual's full keybindings help panel.
-
-        The bottom keybar stays visible always — it's the at-a-glance
-        cheatsheet. The help panel has every binding (including the ones
-        not shown in the keybar) and full descriptions; press `?` to
-        dismiss when done.
-        """
-        from textual.widgets import HelpPanel
-
-        try:
-            panel = self.query_one(HelpPanel)
-        except Exception:
-            self.action_show_help_panel()
-        else:
-            panel.remove()
 
     # ------------------------------------------------------------------
     # Playback orchestration
@@ -1385,7 +877,7 @@ class MusickitApp(App[None]):
         self._refresh_play_marker()
 
     # ------------------------------------------------------------------
-    # Player callbacks
+    # Player callbacks (run on background threads)
     # ------------------------------------------------------------------
 
     def _on_track_end(self) -> None:
@@ -1394,47 +886,3 @@ class MusickitApp(App[None]):
     def _on_track_failed(self, path: Path | str, message: str) -> None:
         log.warning("track failed: %s — %s", path, message)
         self._end_pending = True
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _state_path() -> Path:
-    """Persistent UI state (theme selection, etc.) lives in `state.json`."""
-    return Path.home() / ".config" / "musickit" / "state.json"
-
-
-def _load_state() -> dict[str, object]:
-    p = _state_path()
-    if not p.exists():
-        return {}
-    try:
-        with p.open() as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def _save_state(state: dict[str, object]) -> None:
-    p = _state_path()
-    try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("w") as f:
-            json.dump(state, f, indent=2)
-    except OSError:  # pragma: no cover — read-only home etc.
-        pass
-
-
-def _fmt_mmss(seconds: float) -> str:
-    seconds = max(0, int(seconds))
-    return f"{seconds // 60:02d}:{seconds % 60:02d}"
-
-
-def _truncate(value: str, max_len: int) -> str:
-    """Cap `value` at `max_len` cells, ending with `…` when truncated."""
-    if len(value) <= max_len:
-        return value
-    return value[: max_len - 1] + "…"
