@@ -175,6 +175,9 @@ class MusickitApp(App[None]):
         self._player.on_track_failed = self._on_track_failed
         self._current_album: LibraryAlbum | None = None
         self._current_track_idx: int | None = None
+        # Last index that visibly carries the `▶` marker — needed so we can
+        # clear it without a full rebuild when the marker moves to a new row.
+        self._marker_idx: int | None = None
         self._shuffle = False
         self._repeat = RepeatMode.OFF
         self._end_pending = False  # set by callback thread, drained by UI tick
@@ -220,7 +223,7 @@ class MusickitApp(App[None]):
         data = event.node.data
         if isinstance(data, library_mod.LibraryAlbum):
             self._set_current_album(data, track_idx=None)
-            self._render_playlist()
+            self._repopulate_playlist()
             # Hand focus to the track list so Enter plays the track right away.
             tracklist = self.query_one(TrackList)
             tracklist.focus()
@@ -229,7 +232,7 @@ class MusickitApp(App[None]):
         data = event.node.data
         if isinstance(data, library_mod.LibraryAlbum) and self._current_album is not data:
             self._set_current_album(data, track_idx=None)
-            self._render_playlist()
+            self._repopulate_playlist()
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Enter on a track row plays that track."""
@@ -246,13 +249,73 @@ class MusickitApp(App[None]):
         self._current_album = album
         self._current_track_idx = track_idx
 
-    def _render_playlist(self) -> None:
+    def _repopulate_playlist(self) -> None:
+        """Full rebuild — only call when the album changes.
+
+        Track-change-within-same-album should call `_refresh_play_marker`
+        instead so we don't clear+rebuild the whole list (visible flash).
+        """
         header = self.query_one(PlaylistHeader)
         tracklist = self.query_one(TrackList)
         if self._current_album is None:
             header.body = "[dim]Select an album in the library to populate the playlist.[/dim]"
             tracklist.clear()
+            self._marker_idx = None
             return
+        self._update_playlist_header()
+        prev_cursor = tracklist.index
+        tracklist.clear()
+        album = self._current_album
+        for i, track in enumerate(album.tracks):
+            label = self._format_track_row(i, track, album, marker=(i == self._current_track_idx))
+            item = ListItem(Static(label, id=f"track-row-{i}"))
+            item.track_index = i  # type: ignore[attr-defined]
+            tracklist.append(item)
+        self._marker_idx = self._current_track_idx
+        if prev_cursor is not None and 0 <= prev_cursor < len(album.tracks):
+            tracklist.index = prev_cursor
+
+    def _refresh_play_marker(self) -> None:
+        """Move the `▶` marker to `self._current_track_idx` without rebuilding.
+
+        Touches only the previously-marked row and the new row's Static labels.
+        Eliminates the full-rebuild flash when starting a new track in the
+        same album (mouse click was the most visible offender).
+        """
+        if self._current_album is None:
+            return
+        album = self._current_album
+        old, new = self._marker_idx, self._current_track_idx
+        if old == new:
+            self._update_playlist_header()
+            return
+        if old is not None and 0 <= old < len(album.tracks):
+            self._update_track_row_label(old, marker=False)
+        if new is not None and 0 <= new < len(album.tracks):
+            self._update_track_row_label(new, marker=True)
+        self._marker_idx = new
+        self._update_playlist_header()
+
+    def _update_track_row_label(self, idx: int, *, marker: bool) -> None:
+        if self._current_album is None:
+            return
+        try:
+            label_widget = self.query_one(f"#track-row-{idx}", Static)
+        except Exception:
+            return
+        track = self._current_album.tracks[idx]
+        label_widget.update(self._format_track_row(idx, track, self._current_album, marker=marker))
+
+    def _format_track_row(self, idx: int, track: LibraryTrack, album: LibraryAlbum, *, marker: bool) -> str:
+        glyph = "[bold green]▶[/bold green]" if marker else " "
+        artist = track.artist or album.artist_dir
+        title = track.title or track.path.stem
+        return f"{glyph} {idx + 1:>2}.  {artist} - {title}"
+
+    def _update_playlist_header(self) -> None:
+        if self._current_album is None:
+            return
+        header = self.query_one(PlaylistHeader)
         album = self._current_album
         shuffle = "On" if self._shuffle else "Off"
         repeat = self._repeat.value
@@ -265,20 +328,6 @@ class MusickitApp(App[None]):
             f"[bold]── Playlist ──[/bold] [Shuffle: {shuffle}] [Repeat: {repeat}] [{idx_label}]\n"
             f"[bold cyan]── {album.album_dir} ──[/bold cyan]"
         )
-        # Repopulate the listview. Preserve highlighted index when possible.
-        prev_index = tracklist.index
-        tracklist.clear()
-        for i, track in enumerate(album.tracks):
-            marker = "▶" if i == self._current_track_idx else " "
-            artist = track.artist or album.artist_dir
-            title = track.title or track.path.stem
-            label = f"{marker} {i + 1:>2}.  {artist} - {title}"
-            item = ListItem(Static(label))
-            # Stash the index on the item so the on_list_view_selected handler can recover it.
-            item.track_index = i  # type: ignore[attr-defined]
-            tracklist.append(item)
-        if prev_index is not None and 0 <= prev_index < len(album.tracks):
-            tracklist.index = prev_index
 
     # ------------------------------------------------------------------
     # Header / status refresh
@@ -372,12 +421,12 @@ class MusickitApp(App[None]):
 
     def action_toggle_shuffle(self) -> None:
         self._shuffle = not self._shuffle
-        self._render_playlist()
+        self._update_playlist_header()
 
     def action_cycle_repeat(self) -> None:
         order = [RepeatMode.OFF, RepeatMode.ALBUM, RepeatMode.TRACK]
         self._repeat = order[(order.index(self._repeat) + 1) % len(order)]
-        self._render_playlist()
+        self._update_playlist_header()
 
     def action_tree_wider(self) -> None:
         self._resize_tree(_TREE_RESIZE_STEP)
@@ -405,7 +454,9 @@ class MusickitApp(App[None]):
         if track is None:
             return
         self._player.play(track.path)
-        self._render_playlist()
+        # Same album → only update markers (no flash). Different album path
+        # is handled in `on_tree_node_selected` which already repopulates.
+        self._refresh_play_marker()
 
     def _advance_track(self, *, force: bool = False) -> None:
         if self._current_album is None or self._current_track_idx is None:
@@ -433,7 +484,8 @@ class MusickitApp(App[None]):
             return
         # End of album, no repeat — stop and clear marker.
         self._player.stop()
-        self._render_playlist()
+        self._current_track_idx = None
+        self._refresh_play_marker()
 
     # ------------------------------------------------------------------
     # Player callbacks (run on background threads)
