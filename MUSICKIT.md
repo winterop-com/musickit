@@ -237,14 +237,15 @@ Both documented in README's "Edge-case behaviours worth knowing" section.
 2. **`LibraryTrack.stream_url: str | None = None`** — when set, `MusickitApp._play_current` passes the URL to `AudioPlayer.play()` instead of `track.path`. AudioPlayer already handles URLs (radio uses them), so the playback path is identical.
 3. **state.json persistence** — after a successful `client.ping()` the CLI writes `{"subsonic": {"url": ..., "user": ..., "password": ...}}` to `~/.config/musickit/state.json`. Subsequent `musickit tui --server URL` launches drop the user/password flags; bare `musickit tui` resumes the last server when state has creds and no local DIR is given.
 
-Round-trip cost on launch: 1 (`getArtists`) + N_artists (`getArtist`) + N_albums (`getAlbum`). For an 800-album library that's ~900 calls, slow over Tailscale but tolerable for v1. Lazy per-album loading is the top roadmap item.
+**Lazy loading is the default.** `build_index(client)` makes only 1 + N_artists calls (`getArtists` + `getArtist` per artist) and returns shell `LibraryAlbum`s with `subsonic_id` set but `tracks=[]`. When the user opens an album in the browser, `_hydrate_album_async` runs a Textual `@work(thread=True)` worker that calls `client.get_album(id)` and populates tracks in place; while it's in flight the tracklist shows a single `Loading tracks…` row. The hydrated tracks stay in memory for the rest of the session, so re-opening an album is instant. Pass `eager=True` to `build_index` for the old behaviour (every track pre-fetched at launch — useful if you want full-library shuffle without per-album hydration delay).
 
-Verified end-to-end against the local `musickit serve` test client — six tests cover ping (success + failure), get_artists, build_index walk + progress callback, and stream_url / cover_url construction with auth params.
+For an 800-album library, lazy mode cuts startup from ~900 calls to ~80 — well under a second over Tailscale.
+
+Verified end-to-end against the local `musickit serve` TestClient: nine tests cover ping (success + failure), get_artists, lazy + eager build_index, hydrate_album_tracks (populates in place + idempotent), and stream_url / cover_url construction with auth params.
 
 ## Roadmap (current)
 
-1. **Lazy-load tracks in TUI client mode** — fetch `getAlbum` on album-click instead of pre-walking every album. Cuts startup from ~900 calls to 1+N_artists.
-2. **Serve hardening**: no-op stubs for `scrobble`, `getStarred2`, `star`/`unstar`, `getRandomSongs`, `getPlaylists` (read-only first). Per-client transcoding (`?format=mp3` / `?maxBitRate=N`) only if a real client demands it.
+1. **Serve hardening**: no-op stubs for `scrobble`, `getStarred2`, `star`/`unstar`, `getRandomSongs`, `getPlaylists` (read-only first). Per-client transcoding (`?format=mp3` / `?maxBitRate=N`) only if a real client demands it.
 3. **mDNS / Bonjour advertisement** for `musickit serve` so clients on the LAN auto-discover it.
 4. **`musickit cover-pick`**: open musichoarders.xyz pre-filled per album for manual cover selection.
 5. Fill in artist / release-group / per-track recording MBIDs from the existing MB query.

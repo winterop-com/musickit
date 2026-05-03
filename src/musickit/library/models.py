@@ -47,6 +47,10 @@ class LibraryAlbum(BaseModel):
     cover_pixels: int = 0
     tracks: list[LibraryTrack] = []
     warnings: list[str] = []
+    # When set, this album was sourced from a Subsonic server with this ID.
+    # The TUI uses it to lazy-load tracks via `getAlbum?id=...` when the
+    # user opens the album, instead of pre-fetching every track at launch.
+    subsonic_id: str | None = None
 
 
 class LibraryIndex(BaseModel):

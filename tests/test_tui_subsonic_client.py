@@ -77,25 +77,67 @@ def test_get_artists_returns_two(tmp_path: Path) -> None:
     assert names == {"ABBA", "Beck"}
 
 
-def test_build_index_walks_full_library(tmp_path: Path) -> None:
-    progress_calls: list[tuple[str, int, int]] = []
+def test_build_index_lazy_returns_shell_albums(tmp_path: Path) -> None:
+    """Default (eager=False): albums have IDs + counts but no tracks yet."""
     sc = _subsonic(_serve_test_client(tmp_path))
 
-    index = build_index(sc, on_progress=lambda name, idx, total: progress_calls.append((name, idx, total)))
+    index = build_index(sc)
 
-    # Ordered by (artist, album).
     assert [(a.artist_dir, a.album_dir) for a in index.albums] == [
         ("ABBA", "Arrival"),
         ("Beck", "Sea Change"),
     ]
-    # Each album has its tracks populated with stream URLs ready for AudioPlayer.
+    arrival = index.albums[0]
+    assert arrival.tracks == []
+    assert arrival.subsonic_id is not None
+    assert arrival.track_count == 2  # from album metadata, not a track walk
+
+
+def test_build_index_eager_walks_full_library(tmp_path: Path) -> None:
+    progress_calls: list[tuple[str, int, int]] = []
+    sc = _subsonic(_serve_test_client(tmp_path))
+
+    index = build_index(
+        sc,
+        eager=True,
+        on_progress=lambda name, idx, total: progress_calls.append((name, idx, total)),
+    )
+
     arrival = index.albums[0]
     assert len(arrival.tracks) == 2
     assert all(t.stream_url and t.stream_url.startswith("http://testserver/rest/stream") for t in arrival.tracks)
-    # Progress callback fired once per album with rising idx + correct total.
     assert len(progress_calls) == 2
-    assert [c[1] for c in progress_calls] == [1, 2]
-    assert {c[2] for c in progress_calls} == {2}
+
+
+def test_hydrate_album_tracks_populates_in_place(tmp_path: Path) -> None:
+    """Lazy flow: build_index → click album → hydrate fills tracks."""
+    from musickit.tui.subsonic_client import hydrate_album_tracks
+
+    sc = _subsonic(_serve_test_client(tmp_path))
+    index = build_index(sc)
+    arrival = index.albums[0]
+    assert arrival.tracks == []
+
+    hydrate_album_tracks(sc, arrival)
+
+    assert len(arrival.tracks) == 2
+    assert arrival.track_count == 2
+    titles = [t.title for t in arrival.tracks]
+    assert titles == ["Dancing Queen", "Money Money Money"]
+    assert all(t.stream_url for t in arrival.tracks)
+
+
+def test_hydrate_album_tracks_idempotent(tmp_path: Path) -> None:
+    """Calling hydrate twice doesn't duplicate tracks."""
+    from musickit.tui.subsonic_client import hydrate_album_tracks
+
+    sc = _subsonic(_serve_test_client(tmp_path))
+    index = build_index(sc)
+    arrival = index.albums[0]
+
+    hydrate_album_tracks(sc, arrival)
+    hydrate_album_tracks(sc, arrival)
+    assert len(arrival.tracks) == 2
 
 
 def test_stream_url_includes_auth_params(tmp_path: Path) -> None:

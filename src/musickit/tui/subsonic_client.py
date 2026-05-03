@@ -110,19 +110,25 @@ def build_index(
     client: SubsonicClient,
     *,
     on_progress: Callable[[str, int, int], None] | None = None,
+    eager: bool = False,
 ) -> LibraryIndex:
     """Walk the Subsonic API to build a `LibraryIndex`.
 
-    Round-trip cost: 1 (getArtists) + N_artists (getArtist) + N_albums
-    (getAlbum). For a typical library that's 100s of requests — slow over
-    Tailscale but tolerable for v1. Lazy per-album loading is a follow-up.
+    Default (`eager=False`): fetch only artists + their album metadata.
+    Tracks are populated lazily by `hydrate_album_tracks` when the user
+    opens an album. Round-trip cost: 1 + N_artists. For an 800-album
+    library that's ~80 calls instead of ~900.
+
+    `eager=True`: also fetch every album's tracks at launch time.
+    Slower (1 + N_artists + N_albums calls) but every album is ready
+    to play with no further network IO. Useful when the client wants
+    to support full-library shuffle without waiting on hydration.
 
     `on_progress(album_label, idx, total)` mirrors the local-scan callback
     so the existing TUI overlay drives both paths unchanged.
     """
     artists = client.get_artists()
 
-    # Pre-walk to count albums so progress shows the real total.
     pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for artist in artists:
         try:
@@ -138,17 +144,60 @@ def build_index(
     for idx, (artist, album_meta) in enumerate(pairs, start=1):
         if on_progress is not None:
             on_progress(album_meta.get("name", "?"), idx, total)
-        try:
-            full = client.get_album(album_meta["id"])
-        except SubsonicError as exc:  # pragma: no cover — skip the album, don't crash
-            log.warning("getAlbum(%s) failed: %s", album_meta.get("id"), exc)
-            continue
-        library_albums.append(_album_from_subsonic(client, artist, full))
+        if eager:
+            try:
+                full = client.get_album(album_meta["id"])
+            except SubsonicError as exc:  # pragma: no cover — skip the album, don't crash
+                log.warning("getAlbum(%s) failed: %s", album_meta.get("id"), exc)
+                continue
+            library_albums.append(_album_from_subsonic(client, artist, full))
+        else:
+            library_albums.append(_shell_album_from_subsonic(artist, album_meta))
 
     library_albums.sort(key=lambda a: (a.artist_dir.lower(), a.album_dir.lower()))
     # `LibraryIndex.root` is a Path, but in client mode there's no real
     # filesystem root — store the server URL as a Path to keep typing happy.
     return LibraryIndex(root=Path(client.base_url), albums=library_albums)
+
+
+def hydrate_album_tracks(client: SubsonicClient, album: LibraryAlbum) -> None:
+    """Populate `album.tracks` in place from `getAlbum?id=...`. No-op if already loaded."""
+    if not album.subsonic_id:
+        return
+    if album.tracks:
+        return
+    full = client.get_album(album.subsonic_id)
+    artist = {"id": "", "name": album.artist_dir}
+    populated = _album_from_subsonic(client, artist, full)
+    album.tracks = populated.tracks
+    album.track_count = len(populated.tracks)
+    if not album.tag_year and populated.tag_year:
+        album.tag_year = populated.tag_year
+
+
+def _shell_album_from_subsonic(
+    artist: dict[str, Any],
+    album_meta: dict[str, Any],
+) -> LibraryAlbum:
+    """Build a track-less `LibraryAlbum` from `getArtist`'s embedded album metadata."""
+    artist_name = artist.get("name", "?")
+    album_name = album_meta.get("name", "?")
+    year_raw = album_meta.get("year")
+    year = str(year_raw) if year_raw else None
+    return LibraryAlbum(
+        path=Path("/subsonic") / artist_name / album_name,
+        artist_dir=artist_name,
+        album_dir=album_name,
+        tag_album=album_name,
+        tag_year=year,
+        tag_album_artist=artist_name,
+        track_count=int(album_meta.get("songCount", 0) or 0),
+        is_compilation=False,
+        has_cover=bool(album_meta.get("coverArt")),
+        tracks=[],
+        warnings=[],
+        subsonic_id=str(album_meta["id"]) if album_meta.get("id") else None,
+    )
 
 
 def _album_from_subsonic(
@@ -199,4 +248,5 @@ def _album_from_subsonic(
         has_cover=bool(album_data.get("coverArt")),
         tracks=tracks,
         warnings=[],
+        subsonic_id=str(album_data["id"]) if album_data.get("id") else None,
     )

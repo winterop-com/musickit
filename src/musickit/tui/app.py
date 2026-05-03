@@ -417,8 +417,52 @@ class MusickitApp(App[None]):
         elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
             self._in_radio_view = False
             self._set_current_album(data, track_idx=None)
+            # Subsonic lazy-load: shell albums have no tracks until clicked.
+            # Show a "Loading…" placeholder + kick a worker; the worker calls
+            # back to repopulate when the API returns.
+            if not data.tracks and self._subsonic_client is not None and data.subsonic_id is not None:
+                self._show_loading_tracklist()
+                self.query_one(TrackList).focus()
+                self._hydrate_album_async(data)
+                return
             self._repopulate_playlist()
             self.query_one(TrackList).focus()
+
+    def _show_loading_tracklist(self) -> None:
+        """Drop a single Loading… row into the tracklist while the API call is in flight."""
+        tracklist = self.query_one(TrackList)
+        tracklist.index = None
+        tracklist.clear()
+        tracklist.append(ListItem(Static(f"[{C_DIM}]Loading tracks…[/]")))
+
+    @work(thread=True, exclusive=True, group="hydrate")
+    def _hydrate_album_async(self, album: LibraryAlbum) -> None:
+        """Fetch tracks for `album` via getAlbum, then repopulate on the UI thread."""
+        if self._subsonic_client is None:
+            return
+        from musickit.tui.subsonic_client import SubsonicError, hydrate_album_tracks
+
+        try:
+            hydrate_album_tracks(self._subsonic_client, album)
+        except SubsonicError as exc:
+            log.warning("hydrate failed for %s: %s", album.album_dir, exc)
+            self.call_from_thread(self._on_hydrate_failed, album, str(exc))
+            return
+        self.call_from_thread(self._on_hydrate_complete, album)
+
+    def _on_hydrate_complete(self, album: LibraryAlbum) -> None:
+        # Guard against the user having moved on to a different album while
+        # the API call was in flight — only repaint if we're still on this one.
+        if self._current_album is album:
+            self._repopulate_playlist()
+
+    def _on_hydrate_failed(self, album: LibraryAlbum, message: str) -> None:
+        if self._current_album is not album:
+            return
+        tracklist = self.query_one(TrackList)
+        tracklist.index = None
+        tracklist.clear()
+        tracklist.append(ListItem(Static(f"[red]Failed to load tracks: {message}[/]")))
 
     # ------------------------------------------------------------------
     # Playlist rendering (library tracks + radio stations)
