@@ -796,7 +796,8 @@ class MusickitApp(App[None]):
     # ------------------------------------------------------------------
 
     def _refresh_visualizer(self) -> None:
-        """High-FPS visualizer tick. Cheap: only mutates the Visualizer's `levels`."""
+        """High-FPS visualizer tick — runs the FFT off the audio thread."""
+        self._player.update_band_levels()
         self.query_one(Visualizer).levels = self._player.band_levels
 
     def _refresh_status(self) -> None:

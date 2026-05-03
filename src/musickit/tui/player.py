@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 _SAMPLE_RATE = 44100
 _CHANNELS = 2
 _DTYPE = "float32"
-_QUEUE_MAX_CHUNKS = 64
+_QUEUE_MAX_CHUNKS = 128  # ~3 seconds of buffered float32 stereo at 44.1kHz
 _CHUNK_FRAMES = 1024  # frames per output callback iteration
 _VIS_BANDS = 24
 _VIS_DECAY = 0.85  # per-callback decay of the band level (smooths the bars)
@@ -62,9 +62,11 @@ class AudioPlayer:
         self._frames_played: int = 0
         self._duration: float = 0.0
         self._current_path: Path | None = None
-        # 8-band amplitude levels (0.0–1.0), driven by the audio callback.
-        # The UI thread reads these every render tick to draw the visualizer.
+        # 8-band amplitude levels (0.0–1.0), driven by the UI tick (NOT the
+        # audio callback). The callback only stores the last-played chunk;
+        # `update_band_levels()` reads it and runs FFT off the audio thread.
         self._band_levels: list[float] = [0.0] * _VIS_BANDS
+        self._latest_chunk: np.ndarray | None = None
         # Filled per-`play()`:
         self._queue: queue.Queue[np.ndarray | None] | None = None
         self._decoder_thread: threading.Thread | None = None
@@ -323,17 +325,23 @@ class AudioPlayer:
         if size < frames:
             outdata[size:].fill(0)
         self._frames_played += size
-        self._update_band_levels(chunk[:size])
+        # Stash the just-played chunk so the UI thread can compute FFT bands
+        # off the audio thread. The audio callback's job is to deliver PCM
+        # on time; doing FFT work here was a real CPU-spike risk on slow
+        # machines and could slow playback.
+        self._latest_chunk = chunk[:size]
 
-    def _update_band_levels(self, chunk: np.ndarray) -> None:
-        """Cheap N-band peak meter via real FFT (~50µs on 1024 samples).
+    def update_band_levels(self) -> None:
+        """Compute FFT band levels from the most recently played chunk.
 
-        Mix to mono, take rfft, split bins into log-ish bands, and decay-blend
-        with the previous frame so bars don't strobe. Band edges are cached
-        per spectrum-size — runs hot in the audio callback, so skip the
-        `np.geomspace` call when the chunk size hasn't changed.
+        Called from the UI thread (~30Hz) — explicitly NOT from the audio
+        callback. If no fresh chunk is available (paused / between tracks),
+        bars decay toward silence.
         """
-        if chunk.size == 0:
+        chunk = self._latest_chunk
+        if chunk is None or chunk.size == 0:
+            for i in range(_VIS_BANDS):
+                self._band_levels[i] *= _VIS_DECAY
             return
         mono = chunk.mean(axis=1) if chunk.ndim == 2 else chunk
         spectrum = np.abs(np.fft.rfft(mono))
