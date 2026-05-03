@@ -451,7 +451,11 @@ class MusickitApp(App[None]):
         library_mod.audit(self._index)
         self._populate_sidebar_stats()
         self._populate_browser()
-        self.set_interval(0.1, self._refresh_status)
+        # Visualizer animates at ~30 FPS so bars feel responsive to the audio.
+        # Other status (time, progress, meta) only needs ~4 FPS — saves redraw
+        # work since the surrounding text doesn't change frame-to-frame.
+        self.set_interval(1 / 30, self._refresh_visualizer)
+        self.set_interval(0.25, self._refresh_status)
         self.set_interval(0.05, self._drain_end_pending)
 
     # ------------------------------------------------------------------
@@ -668,11 +672,14 @@ class MusickitApp(App[None]):
     # Status refresh
     # ------------------------------------------------------------------
 
+    def _refresh_visualizer(self) -> None:
+        """High-FPS visualizer tick. Cheap: only mutates the Visualizer's `levels`."""
+        self.query_one(Visualizer).levels = self._player.band_levels
+
     def _refresh_status(self) -> None:
         meta = self.query_one(NowPlayingMeta)
         progress = self.query_one(ProgressLine)
         status = self.query_one(StatusBar)
-        visualizer = self.query_one(Visualizer)
         track = self._currently_playing_track()
         if track is None:
             meta.title_text = "—"
@@ -711,7 +718,6 @@ class MusickitApp(App[None]):
         else:
             status.album_label = "—"
             status.cursor_label = "0/0"
-        visualizer.levels = self._player.band_levels
 
     def _drain_end_pending(self) -> None:
         if self._end_pending:
