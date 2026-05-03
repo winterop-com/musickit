@@ -45,6 +45,24 @@ def test_va_aliases_include_localised_forms():
         assert is_various_artists(alias) is True, alias
 
 
+def test_leading_year_from_folder_extracts_canonical_date():
+    """Hand-curated leading year wins over reissue years inside the dir name."""
+    from musickit.naming import leading_year_from_folder
+
+    assert leading_year_from_folder("1983. Now That's What I Call Music! [2018 Reissue]") == "1983"
+    assert leading_year_from_folder("2012 - Night Visions") == "2012"
+    assert leading_year_from_folder("2007_Album") == "2007"
+    assert leading_year_from_folder("1999.Some Album") == "1999"
+    # Year not at start → no match (falls through to per-tag majority).
+    assert leading_year_from_folder("Album 2012") is None
+    # Wrapper/disco folders with a leading number that isn't a year.
+    assert leading_year_from_folder("100 Hits") is None
+    # Boundary years (year alone, no separator) — not a leading-year prefix.
+    assert leading_year_from_folder("2012") is None
+    assert leading_year_from_folder(None) is None
+    assert leading_year_from_folder("") is None
+
+
 def test_folder_name_implies_va_for_scene_naming():
     """Scene-rip dir names like `VA-Absolute_Music_60` should signal compilation."""
     from musickit.naming import folder_name_implies_va

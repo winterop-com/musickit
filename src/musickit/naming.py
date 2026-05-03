@@ -96,6 +96,11 @@ _FOLDER_TAG_RE = re.compile(
     re.IGNORECASE,
 )
 _FOLDER_YEAR_RE = re.compile(r"[\(\[]?((?:19|20)\d{2})[\)\]]?")
+# Year at the very start of the dir name (`1983. ` / `2012 - ` / `2007_`) —
+# treated as a hand-curated canonical date that overrides reissue dates from
+# track tags. Real example: `1983. Now That's What I Call Music! [2018 Reissue]`
+# ships MP3s tagged `TDRC=2018`, but the user clearly intends 1983.
+_LEADING_FOLDER_YEAR_RE = re.compile(r"^\s*((?:19|20)\d{2})[\s.\-_]")
 _VA_PREFIX_RE = re.compile(r"^\s*(?:VA|Various)\s*-\s*", re.IGNORECASE)
 
 
@@ -116,6 +121,19 @@ def clean_folder_album_name(name: str) -> tuple[str, str | None]:
     cleaned = _VA_PREFIX_RE.sub("", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" -_")
     return cleaned or name, year
+
+
+def leading_year_from_folder(name: str | None) -> str | None:
+    """Return the 4-digit year iff `name` starts with one followed by a separator.
+
+    Used by the convert pipeline to override reissue years that survive in
+    track tags when the input dir is hand-named with the original year (e.g.
+    `1983. Album! [2018 Reissue]` should yield 1983, not 2018).
+    """
+    if not name:
+        return None
+    match = _LEADING_FOLDER_YEAR_RE.match(name)
+    return match.group(1) if match else None
 
 
 def is_various_artists(album_artist: str | None) -> bool:

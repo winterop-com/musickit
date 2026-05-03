@@ -293,14 +293,20 @@ def test_scene_encoded_heuristic_does_not_fire_on_legit_99plus_album(
 
 
 def test_collision_disambiguation_keeps_every_track(silent_flac_template: Path, tmp_path: Path) -> None:
-    """Two tracks sharing track-no + title must both end up on disk, not silently dropped."""
+    """Two tracks sharing track-no + title must both end up on disk, not silently dropped.
+
+    Distinct durations let dedup correctly classify them as remix-vs-original
+    (keep both via collision rename) rather than rip-group dups (drop second).
+    """
     from mutagen.flac import FLAC
+
+    from tests.conftest import make_silent_flac
 
     album_dir = tmp_path / "input" / "DupAlbum"
     album_dir.mkdir(parents=True)
-    for src_name in ["a.flac", "b.flac"]:
+    for src_name, duration in [("a.flac", 0.2), ("b.flac", 1.0)]:
         dst = album_dir / src_name
-        shutil.copy2(silent_flac_template, dst)
+        make_silent_flac(dst, duration=duration)
         flac = FLAC(dst)
         flac["TITLE"] = "Same"
         flac["ARTIST"] = "Solo"
@@ -367,12 +373,15 @@ def test_collision_disambiguation_handles_pre_renamed_collisions(silent_flac_tem
     """A third track titled `Same (2)` must not clobber the auto-renamed second `Same`."""
     from mutagen.flac import FLAC
 
+    from tests.conftest import make_silent_flac
+
     album_dir = tmp_path / "input" / "DupAlbum"
     album_dir.mkdir(parents=True)
-    titles = ["Same", "Same", "Same (2)"]
-    for i, title in enumerate(titles, start=1):
+    # Distinct durations → distinct sizes → dedup keeps all three.
+    titles_with_durations = [("Same", 0.2), ("Same", 1.0), ("Same (2)", 1.5)]
+    for i, (title, duration) in enumerate(titles_with_durations, start=1):
         dst = album_dir / f"src{i}.flac"
-        shutil.copy2(silent_flac_template, dst)
+        make_silent_flac(dst, duration=duration)
         flac = FLAC(dst)
         flac["TITLE"] = title
         flac["ARTIST"] = "Solo"
@@ -493,6 +502,81 @@ def test_cover_collects_every_distinct_embedded_picture(silent_flac_template: Pa
     assert best is not None
     # The 1200×1200 picture wins on pixel area.
     assert best.width == 1200 and best.height == 1200
+
+
+def test_dedupe_drops_duplicate_tracks_with_same_disc_track_title_artist(tmp_path: Path) -> None:
+    """Same tags AND ~same audio duration → same content shipped twice → drop the second."""
+    from musickit.metadata import SourceTrack
+    from musickit.pipeline import _dedupe_duplicate_tracks
+
+    a = tmp_path / "01. Artist - Title.flac"
+    b = tmp_path / "01 Title.flac"
+    c = tmp_path / "02. Artist - Other.flac"
+    a.touch()
+    b.touch()
+    c.touch()
+
+    tracks = [
+        SourceTrack(path=a, title="Title", artist="Artist", track_no=1, disc_no=1, duration_s=180.5),
+        SourceTrack(path=b, title="Title", artist="Artist", track_no=1, disc_no=1, duration_s=180.6),
+        SourceTrack(path=c, title="Other", artist="Artist", track_no=2, disc_no=1, duration_s=210.0),
+    ]
+    warnings: list[str] = []
+    deduped = _dedupe_duplicate_tracks(tracks, warnings)
+    assert len(deduped) == 2
+    assert [t.path.name for t in deduped] == ["01. Artist - Title.flac", "02. Artist - Other.flac"]
+    assert any("dropped duplicate" in w for w in warnings)
+
+
+def test_dedupe_keeps_same_tag_distinct_duration(tmp_path: Path) -> None:
+    """Same tags but DIFFERENT audio duration → keep both (remix-vs-original at same track_no)."""
+    from musickit.metadata import SourceTrack
+    from musickit.pipeline import _dedupe_duplicate_tracks
+
+    a = tmp_path / "a.flac"
+    b = tmp_path / "b.flac"
+    a.touch()
+    b.touch()
+
+    tracks = [
+        SourceTrack(path=a, title="Same", artist="A", track_no=1, disc_no=1, duration_s=180.0),
+        SourceTrack(path=b, title="Same", artist="A", track_no=1, disc_no=1, duration_s=240.0),
+    ]
+    warnings: list[str] = []
+    deduped = _dedupe_duplicate_tracks(tracks, warnings)
+    assert len(deduped) == 2
+    assert warnings == []
+
+
+def test_dedupe_keeps_both_when_duration_unknown(tmp_path: Path) -> None:
+    """If we can't read duration on either side, prefer keep-both (collision-rename handles it)."""
+    from musickit.metadata import SourceTrack
+    from musickit.pipeline import _dedupe_duplicate_tracks
+
+    tracks = [
+        SourceTrack(path=tmp_path / "a.flac", title="X", artist="A", track_no=1),
+        SourceTrack(path=tmp_path / "b.flac", title="X", artist="A", track_no=1),
+    ]
+    deduped = _dedupe_duplicate_tracks(tracks, [])
+    assert len(deduped) == 2
+
+
+def test_dedupe_keeps_distinct_tracks(tmp_path: Path) -> None:
+    """Different titles or different track numbers are kept as-is."""
+    from pathlib import Path as PathType
+
+    from musickit.metadata import SourceTrack
+    from musickit.pipeline import _dedupe_duplicate_tracks
+
+    tracks = [
+        SourceTrack(path=PathType("/01.flac"), title="Track 1", artist="A", track_no=1),
+        SourceTrack(path=PathType("/02.flac"), title="Track 2", artist="A", track_no=2),
+        SourceTrack(path=PathType("/03.flac"), title="Track 1", artist="B", track_no=1),
+    ]
+    warnings: list[str] = []
+    deduped = _dedupe_duplicate_tracks(tracks, warnings)
+    assert len(deduped) == 3
+    assert warnings == []
 
 
 def test_cover_discovery_matches_token_keywords(tmp_path: Path) -> None:

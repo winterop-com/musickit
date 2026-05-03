@@ -132,6 +132,7 @@ class SourceTrack(BaseModel):
     embedded_picture: bytes | None = None
     embedded_picture_mime: str | None = None
     embedded_picture_pixels: int = 0
+    duration_s: float | None = None  # audio duration; used by dedup to discriminate same-tag distinct content
 
 
 class AlbumSummary(BaseModel):
@@ -183,6 +184,18 @@ def read_source(path: Path) -> SourceTrack:
     track.artist = smart_title_case(track.artist)
     track.album = smart_title_case(track.album)
     track.album_artist = smart_title_case(track.album_artist)
+    if track.duration_s is None:
+        # Pull `info.length` via the format-agnostic mutagen entry point.
+        # Used by dedup to tell same-tag-same-content (rip-group dups) apart
+        # from same-tag-different-content (remixes that share a track_no).
+        try:
+            mfile = _mutagen.File(path)  # pyright: ignore[reportPrivateImportUsage]
+            if mfile is not None and mfile.info is not None:
+                length = getattr(mfile.info, "length", None)
+                if length is not None:
+                    track.duration_s = float(length)
+        except Exception:  # pragma: no cover — duration is best-effort
+            pass
     return track
 
 

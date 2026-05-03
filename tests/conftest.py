@@ -44,3 +44,32 @@ def silent_flac(silent_flac_template: Path, tmp_path: Path) -> Path:
     dst = tmp_path / "silent.flac"
     shutil.copy2(silent_flac_template, dst)
     return dst
+
+
+def make_silent_flac(dst: Path, *, duration: float = 0.2) -> Path:
+    """Encode a silent FLAC of `duration` seconds at `dst`. Used for tests
+    that need distinct file sizes (e.g. dedup logic that gates on size).
+    """
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not on PATH")
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=stereo",
+            "-t",
+            str(duration),
+            "-c:a",
+            "flac",
+            str(dst),
+        ],
+        check=True,
+    )
+    return dst
