@@ -36,6 +36,11 @@ class SourceTrack(BaseModel):
     embedded_picture_mime: str | None = None
     embedded_picture_pixels: int = 0
     duration_s: float | None = None  # audio duration; used by dedup to discriminate same-tag distinct content
+    # MusicBrainz recording MBID (per-track, distinct from the album-level
+    # release MBID). Populated by the MB enrichment follow-up call when
+    # `--enrich` is on. Picard convention: stored as `MusicBrainz Track Id`
+    # on MP4 freeform / `MusicBrainz Recording Id` on ID3 TXXX.
+    mb_recording_id: str | None = None
 
 
 class AlbumSummary(BaseModel):
@@ -54,12 +59,15 @@ class AlbumSummary(BaseModel):
 
 
 class MusicBrainzIds(BaseModel):
-    """MusicBrainz IDs supplied by an --enrich provider."""
+    """Album-level MusicBrainz IDs supplied by an --enrich provider.
+
+    Per-track recording MBIDs live on `SourceTrack.mb_recording_id` —
+    they vary per track and don't belong on an album-scope object.
+    """
 
     album_id: str | None = None
     artist_id: str | None = None
     release_group_id: str | None = None
-    track_id: str | None = None
 
 
 class TagOverrides(BaseModel):

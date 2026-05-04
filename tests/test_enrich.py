@@ -75,8 +75,108 @@ def test_musicbrainz_fills_artist_and_release_group_ids_when_present() -> None:
     assert result.musicbrainz.album_id == "rel-mbid"
     assert result.musicbrainz.artist_id == "art-mbid"
     assert result.musicbrainz.release_group_id == "rg-mbid"
-    # Per-track recording MBIDs aren't fetched yet — should remain None.
-    assert result.musicbrainz.track_id is None
+    # Per-track recording MBIDs live on SourceTrack.mb_recording_id; the
+    # album-level MusicBrainzIds no longer carries a track_id field.
+    assert not hasattr(result.musicbrainz, "track_id")
+
+
+def test_musicbrainz_fills_per_track_recording_ids_via_followup_call() -> None:
+    """After release-search succeeds, fetch recordings to fill mb_recording_id per track."""
+    from pathlib import Path as _Path
+
+    from musickit.metadata import SourceTrack
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/release/"):
+            # Search response — score>=90 so the lookup proceeds.
+            return httpx.Response(
+                200,
+                json={"releases": [{"id": "rel-abc", "score": 100, "title": "Arrival"}]},
+            )
+        # Per-release recordings lookup.
+        if "/release/rel-abc" in request.url.path:
+            assert request.url.params.get("inc") == "recordings"
+            return httpx.Response(
+                200,
+                json={
+                    "id": "rel-abc",
+                    "media": [
+                        {
+                            "position": 1,
+                            "tracks": [
+                                {"position": 1, "title": "Dancing Queen", "recording": {"id": "rec-001"}},
+                                {"position": 2, "title": "Money", "recording": {"id": "rec-002"}},
+                            ],
+                        }
+                    ],
+                },
+            )
+        raise AssertionError(f"unexpected URL: {request.url}")
+
+    tracks = [
+        SourceTrack(path=_Path("/x/01.flac"), title="Dancing Queen", track_no=1, disc_no=1),
+        SourceTrack(path=_Path("/x/02.flac"), title="Money", track_no=2, disc_no=1),
+    ]
+    summary = AlbumSummary(album="Arrival", album_artist="ABBA")
+    result = MusicBrainzProvider(client=_client_with(handler)).enrich(summary, tracks)
+    assert result.musicbrainz is not None
+    assert result.musicbrainz.album_id == "rel-abc"
+    assert tracks[0].mb_recording_id == "rec-001"
+    assert tracks[1].mb_recording_id == "rec-002"
+
+
+def test_musicbrainz_per_track_recording_ids_handle_multi_disc() -> None:
+    """Per-track lookup maps by (disc, position) for multi-disc releases."""
+    from pathlib import Path as _Path
+
+    from musickit.metadata import SourceTrack
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/release/"):
+            return httpx.Response(200, json={"releases": [{"id": "rel-x", "score": 100}]})
+        return httpx.Response(
+            200,
+            json={
+                "id": "rel-x",
+                "media": [
+                    {"position": 1, "tracks": [{"position": 1, "recording": {"id": "rec-d1t1"}}]},
+                    {"position": 2, "tracks": [{"position": 1, "recording": {"id": "rec-d2t1"}}]},
+                ],
+            },
+        )
+
+    tracks = [
+        SourceTrack(path=_Path("/x/d1.flac"), track_no=1, disc_no=1),
+        SourceTrack(path=_Path("/x/d2.flac"), track_no=1, disc_no=2),
+    ]
+    MusicBrainzProvider(client=_client_with(handler)).enrich(AlbumSummary(album="Multi", album_artist="X"), tracks)
+    assert tracks[0].mb_recording_id == "rec-d1t1"
+    assert tracks[1].mb_recording_id == "rec-d2t1"
+
+
+def test_musicbrainz_per_track_lookup_failure_is_non_fatal() -> None:
+    """A 500 on the per-track call doesn't block the album-level enrichment."""
+    from pathlib import Path as _Path
+
+    from musickit.metadata import SourceTrack
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/release/"):
+            return httpx.Response(200, json={"releases": [{"id": "rel-y", "score": 100}]})
+        return httpx.Response(503, text="MB unavailable")
+
+    tracks = [SourceTrack(path=_Path("/x/01.flac"), track_no=1, disc_no=1)]
+    result = MusicBrainzProvider(client=_client_with(handler)).enrich(
+        AlbumSummary(album="Album", album_artist="Artist"),
+        tracks,
+    )
+    # Album-level IDs still populated.
+    assert result.musicbrainz is not None
+    assert result.musicbrainz.album_id == "rel-y"
+    # Per-track recording ID left unset.
+    assert tracks[0].mb_recording_id is None
+    # Warning surfaced.
+    assert any("per-track lookup failed" in n for n in result.notes)
 
 
 def test_musicbrainz_handles_missing_artist_credit_gracefully() -> None:

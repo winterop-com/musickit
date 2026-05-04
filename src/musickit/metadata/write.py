@@ -102,7 +102,13 @@ def write_mp4_tags(
         _set_freeform(tags, "MusicBrainz Album Id", musicbrainz.album_id)
         _set_freeform(tags, "MusicBrainz Artist Id", musicbrainz.artist_id)
         _set_freeform(tags, "MusicBrainz Release Group Id", musicbrainz.release_group_id)
-        _set_freeform(tags, "MusicBrainz Track Id", musicbrainz.track_id)
+    # Per-track recording MBID — Picard convention is to store this as
+    # the iTunes "MusicBrainz Track Id" freeform (despite the name, it's
+    # the recording MBID, not the release-track MBID). Written even when
+    # no album-level musicbrainz block is present, since per-track lookups
+    # via AcoustID can produce recording IDs without an album hit.
+    if track.mb_recording_id:
+        _set_freeform(tags, "MusicBrainz Track Id", track.mb_recording_id)
 
     if cover_bytes:
         cover_format = MP4Cover.FORMAT_PNG if (cover_mime or "").lower().endswith("png") else MP4Cover.FORMAT_JPEG
@@ -182,11 +188,15 @@ def write_id3_tags(
             ("MusicBrainz Album Id", musicbrainz.album_id),
             ("MusicBrainz Artist Id", musicbrainz.artist_id),
             ("MusicBrainz Release Group Id", musicbrainz.release_group_id),
-            ("MusicBrainz Track Id", musicbrainz.track_id),
         ]
         for desc, mb_value in mb_pairs:
             if mb_value:
                 id3.add(TXXX(encoding=3, desc=desc, text=mb_value))
+    # Per-track recording MBID — Picard's `MusicBrainz Recording Id` TXXX
+    # frame. Independent of the album-level block above so that AcoustID-
+    # only lookups can still emit a recording MBID.
+    if track.mb_recording_id:
+        id3.add(TXXX(encoding=3, desc="MusicBrainz Recording Id", text=track.mb_recording_id))
 
     if cover_bytes:
         mime = "image/png" if (cover_mime or "").lower().endswith("png") else "image/jpeg"

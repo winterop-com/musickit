@@ -341,3 +341,62 @@ def test_round_trip_flac_to_alac_preserves_tags(silent_flac: Path, tmp_path: Pat
 
     # Confirm the audio is actually ALAC, not lossy.
     assert mp4.info.codec == "alac"
+
+
+def test_write_mp4_tags_emits_per_track_recording_mbid(silent_flac: Path, tmp_path: Path) -> None:
+    """SourceTrack.mb_recording_id → MP4 freeform `MusicBrainz Track Id` (Picard convention)."""
+    track = read_source(silent_flac)
+    track.mb_recording_id = "rec-mbid-xyz"
+    summary = AlbumSummary(album="Album", album_artist="Artist")
+
+    out = tmp_path / "01.m4a"
+    convert.to_alac(silent_flac, out)
+    write_mp4_tags(out, track, summary, cover_bytes=None, cover_mime=None, musicbrainz=None)
+
+    tags = MP4(out).tags
+    assert tags is not None
+    assert bytes(tags["----:com.apple.iTunes:MusicBrainz Track Id"][0]).decode() == "rec-mbid-xyz"
+
+
+def test_write_id3_tags_emits_per_track_recording_mbid(silent_flac: Path, tmp_path: Path) -> None:
+    """SourceTrack.mb_recording_id → ID3 `TXXX:MusicBrainz Recording Id`."""
+    import shutil
+    import subprocess
+
+    from mutagen.id3 import ID3
+
+    from musickit.metadata import write_id3_tags
+
+    if shutil.which("ffmpeg") is None:
+        import pytest
+
+        pytest.skip("ffmpeg not on PATH")
+
+    out = tmp_path / "01.mp3"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(silent_flac),
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            "128k",
+            str(out),
+        ],
+        check=True,
+    )
+
+    track = read_source(silent_flac)
+    track.mb_recording_id = "rec-mbid-zzz"
+    summary = AlbumSummary(album="Album", album_artist="Artist")
+    write_id3_tags(out, track, summary, cover_bytes=None, cover_mime=None, musicbrainz=None)
+
+    id3 = ID3(out)
+    txxx_frames = {f.desc: f.text[0] for f in id3.getall("TXXX")}
+    assert txxx_frames.get("MusicBrainz Recording Id") == "rec-mbid-zzz"

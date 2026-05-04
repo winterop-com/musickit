@@ -44,8 +44,21 @@ class MusicBrainzProvider:
                 artist_query = "Various Artists"
 
         client = self._client or get_client()
+        notes: list[str] = []
         try:
             ids = self._search_release(client, title, artist_query, len(tracks))
+            if ids is not None and ids.album_id and tracks:
+                # Follow-up: per-track recording MBIDs aren't in the search
+                # response. Fetch the release with `inc=recordings`, map by
+                # (disc, position) to our SourceTrack instances. Best-effort
+                # — failure here just leaves track.mb_recording_id unset and
+                # the album-level IDs are still written. Skipped when we
+                # have no tracks to map (e.g. dry-run / metadata probe).
+                try:
+                    self._apply_recording_ids(client, ids.album_id, tracks)
+                except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+                    log.debug("musicbrainz recordings lookup failed: %s", exc)
+                    notes.append(f"musicbrainz: per-track lookup failed ({exc!s})")
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             # Catch a wider net than just transport errors: malformed JSON,
             # unexpected response shapes (HTML error pages, missing keys),
@@ -58,9 +71,9 @@ class MusicBrainzProvider:
                 client.close()
 
         if ids is None:
-            return EnrichmentResult(notes=[f"musicbrainz: no release matched {title!r}"])
+            return EnrichmentResult(notes=[f"musicbrainz: no release matched {title!r}", *notes])
 
-        return EnrichmentResult(musicbrainz=ids)
+        return EnrichmentResult(musicbrainz=ids, notes=notes)
 
     def _search_release(self, client: httpx.Client, title: str, artist: str, track_count: int) -> MusicBrainzIds | None:
         """Return the best-match release with album/artist/release-group MBIDs filled in.
@@ -115,6 +128,47 @@ class MusicBrainzProvider:
             artist_id=artist_id,
             release_group_id=release_group_id,
         )
+
+    def _apply_recording_ids(self, client: httpx.Client, release_mbid: str, tracks: list[SourceTrack]) -> None:
+        """Fetch `release/<mbid>?inc=recordings` and set `mb_recording_id` per track.
+
+        Maps MB tracks to our `SourceTrack`s by `(disc_position, track_position)`.
+        MB indexes both 1-based; our tracks may have `disc_no=None` for single-disc
+        albums in which case we treat them as disc 1 for the lookup.
+        """
+        response = throttled_get(
+            client,
+            f"{MB_BASE}/release/{release_mbid}",
+            host_key=MB_HOST_KEY,
+            params={"inc": "recordings", "fmt": "json"},
+        )
+        response.raise_for_status()
+        data = response.json()
+        # Build an index: (disc_pos, track_pos) → recording MBID.
+        recording_by_position: dict[tuple[int, int], str] = {}
+        media = data.get("media") or []
+        for medium in media:
+            disc_pos = int(medium.get("position", 1) or 1)
+            for mb_track in medium.get("tracks") or []:
+                track_pos = mb_track.get("position")
+                if track_pos is None:
+                    continue
+                recording = mb_track.get("recording") or {}
+                rec_id = recording.get("id")
+                if not rec_id:
+                    continue
+                recording_by_position[(disc_pos, int(track_pos))] = str(rec_id)
+        if not recording_by_position:
+            return
+        # Mutate matching tracks in place. Albums with a single disc and no
+        # explicit `disc_no` tag (the common case) are treated as disc 1.
+        for track in tracks:
+            if track.track_no is None:
+                continue
+            disc = track.disc_no if track.disc_no is not None else 1
+            rec_id = recording_by_position.get((disc, track.track_no))
+            if rec_id is not None:
+                track.mb_recording_id = rec_id
 
 
 def lookup_release_year(
