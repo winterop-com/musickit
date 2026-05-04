@@ -7,8 +7,9 @@ state via `query_one(...)`.
 
 from __future__ import annotations
 
+from textual.binding import Binding
 from textual.reactive import reactive
-from textual.widgets import ListView, Static
+from textual.widgets import Input, ListView, Static
 
 # ---------------------------------------------------------------------------
 # Palette (ncmpcpp-leaning: cyan headers, green meters, dim grey rules,
@@ -31,6 +32,29 @@ def fmt_mmss(seconds: float) -> str:
     """`123.4` → `02:03`. Used by ProgressLine, StatusBar, and the App."""
     seconds = max(0, int(seconds))
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
+
+
+class FilterInput(Input):
+    """One-line filter bar mounted above the browser or tracklist.
+
+    Overrides the inherited Enter binding with `priority=True` so Enter is
+    fully consumed by the input (posts `Input.Submitted`) and never bubbles
+    up to the App's Enter binding (which would trigger track selection on
+    the focused list — defeating the whole filter UX).
+    """
+
+    BINDINGS = [
+        Binding("enter", "submit", "Submit", show=False, priority=True),
+    ]
+
+    DEFAULT_CSS = """
+    FilterInput {
+        height: 1;
+        border: none;
+        padding: 0 1;
+        background: $boost;
+    }
+    """
 
 
 # ---------------------------------------------------------------------------

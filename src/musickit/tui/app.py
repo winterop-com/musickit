@@ -15,11 +15,11 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from textual import work
+from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import ListItem, ListView, Static
+from textual.widgets import Input, ListItem, ListView, Static
 
 from musickit import library as library_mod
 from musickit import radio as radio_mod
@@ -47,6 +47,7 @@ from musickit.tui.widgets import (
     BrowserHeader,
     BrowserInfo,
     BrowserList,
+    FilterInput,
     KeyBar,
     NowPlayingMeta,
     ProgressLine,
@@ -133,6 +134,7 @@ class MusickitApp(App[None]):
         Binding("ctrl+r,f5", "rescan_library", "Rescan", show=False),
         Binding("question_mark", "toggle_help", "Help", show=False),
         Binding("a", "airplay_picker", "AirPlay", show=False),
+        Binding("slash", "start_filter", "Filter", show=False),
     ]
 
     def __init__(
@@ -165,6 +167,10 @@ class MusickitApp(App[None]):
         self._end_pending = False
         # None = at top level (artists); a string = drilled into that artist.
         self._browse_artist: str | None = None
+        # `/` filter — narrows the focused pane via case-insensitive
+        # substring match. Empty = inactive.
+        self._browser_filter: str = ""
+        self._tracklist_filter: str = ""
 
     def watch_theme(self, theme: str) -> None:
         """Persist theme changes (e.g. via the command palette) to disk."""
@@ -313,7 +319,10 @@ class MusickitApp(App[None]):
         if target_index >= len(browser.children):
             return
         browser.index = target_index
-        if not browser.has_focus:
+        # Don't yank focus back to the browser if the user is typing in a
+        # filter input — the filter is a sibling and would lose focus on
+        # every keystroke otherwise.
+        if not browser.has_focus and not isinstance(self.focused, FilterInput):
             browser.focus()
         item = browser.children[target_index]
         self._update_browser_info(item if isinstance(item, ListItem) else None)
@@ -364,15 +373,22 @@ class MusickitApp(App[None]):
 
     def _populate_browser_artists(self, browser: BrowserList) -> None:
         assert self._index is not None
-        radio_item = ListItem(Static(f" [{C_ACCENT}]📻[/] [bold]Radio[/]  [dim]({len(self._radio_stations)})[/]"))
-        radio_item.entry_kind = "radio"  # type: ignore[attr-defined]
-        radio_item.entry_data = None  # type: ignore[attr-defined]
-        browser.append(radio_item)
+        # Hide Radio while a filter is active — the user is searching for an
+        # artist, surfacing Radio is just noise.
+        if not self._browser_filter:
+            radio_item = ListItem(Static(f" [{C_ACCENT}]📻[/] [bold]Radio[/]  [dim]({len(self._radio_stations)})[/]"))
+            radio_item.entry_kind = "radio"  # type: ignore[attr-defined]
+            radio_item.entry_data = None  # type: ignore[attr-defined]
+            browser.append(radio_item)
         by_artist: dict[str, list[LibraryAlbum]] = {}
         for album in self._index.albums:
             by_artist.setdefault(album.artist_dir, []).append(album)
         max_name = _TREE_MAX_WIDTH - _BROWSER_DECORATION_PAD
+        needle = self._browser_filter.casefold()
+        matched = 0
         for artist in sorted(by_artist, key=str.lower):
+            if needle and needle not in artist.casefold():
+                continue
             count = len(by_artist[artist])
             name = _truncate(artist, max_name)
             label = f" [{C_ACCENT}]▸[/] {name}  [dim]({count})[/]"
@@ -380,9 +396,13 @@ class MusickitApp(App[None]):
             item.entry_kind = "artist"  # type: ignore[attr-defined]
             item.entry_data = artist  # type: ignore[attr-defined]
             browser.append(item)
+            matched += 1
+        if needle and matched == 0:
+            browser.append(ListItem(Static("[dim](no matches)[/]")))
 
     def _populate_browser_albums(self, browser: BrowserList, artist: str) -> None:
         assert self._index is not None
+        # `..` Back row stays visible regardless of filter — always need an exit.
         up_item = ListItem(Static(f" [{C_ACCENT}]..[/]  [dim]Back[/]"))
         up_item.entry_kind = "up"  # type: ignore[attr-defined]
         up_item.entry_data = None  # type: ignore[attr-defined]
@@ -392,7 +412,11 @@ class MusickitApp(App[None]):
             key=lambda a: a.album_dir.lower(),
         )
         max_name = _TREE_MAX_WIDTH - _BROWSER_DECORATION_PAD
+        needle = self._browser_filter.casefold()
+        matched = 0
         for album in artist_albums:
+            if needle and needle not in album.album_dir.casefold():
+                continue
             warn = f" [{C_PEAK}]⚠[/]" if album.warnings else ""
             name = _truncate(album.album_dir, max_name)
             label = f" [{C_ACCENT}]♪[/] {name}{warn}"
@@ -400,6 +424,9 @@ class MusickitApp(App[None]):
             item.entry_kind = "album"  # type: ignore[attr-defined]
             item.entry_data = album  # type: ignore[attr-defined]
             browser.append(item)
+            matched += 1
+        if needle and matched == 0:
+            browser.append(ListItem(Static("[dim](no matches)[/]")))
 
     # ------------------------------------------------------------------
     # ListView event dispatch
@@ -436,6 +463,7 @@ class MusickitApp(App[None]):
 
     def _open_radio_view(self) -> None:
         """Populate the right-pane track list with the curated radio stations."""
+        self._clear_tracklist_filter()
         self._in_radio_view = True
         self._current_album = None
         self._current_track_idx = None
@@ -448,9 +476,11 @@ class MusickitApp(App[None]):
         if kind == "up":
             self._pop_browser_one_level()
         elif kind == "artist" and isinstance(data, str):
+            self._clear_browser_filter()
             self._browse_artist = data
             self._populate_browser()
         elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
+            self._clear_tracklist_filter()
             self._in_radio_view = False
             self._set_current_album(data, track_idx=None)
             # Subsonic lazy-load: shell albums have no tracks until clicked.
@@ -518,12 +548,22 @@ class MusickitApp(App[None]):
             self._marker_idx = None
             return
         album = self._current_album
+        needle = self._tracklist_filter.casefold()
+        matched = 0
         for i, track in enumerate(album.tracks):
+            if needle:
+                hay = f"{track.title or ''} {track.artist or ''}".casefold()
+                if needle not in hay:
+                    continue
             label = format_track_row(i, track, album, marker=(i == self._current_track_idx))
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             tracklist.append(item)
+            matched += 1
         self._marker_idx = self._current_track_idx
+        if needle and matched == 0:
+            tracklist.append(ListItem(Static("[dim](no matches)[/]")))
+            return
         if self._current_track_idx is not None and 0 <= self._current_track_idx < len(album.tracks):
             target = self._current_track_idx
         elif album.tracks:
@@ -544,12 +584,19 @@ class MusickitApp(App[None]):
         if not self._radio_stations:
             tracklist.append(ListItem(Static("[dim]No stations configured. Edit `~/.config/musickit/radio.toml`.[/]")))
             return
+        needle = self._tracklist_filter.casefold()
+        matched = 0
         for i, station in enumerate(self._radio_stations):
+            if needle and needle not in station.name.casefold():
+                continue
             label = format_station_row(i, station, marker=False)
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             item.station = station  # type: ignore[attr-defined]
             tracklist.append(item)
+            matched += 1
+        if needle and matched == 0:
+            tracklist.append(ListItem(Static("[dim](no matches)[/]")))
         self.call_after_refresh(self._set_tracklist_cursor, 0)
 
     def _play_station(self, station: RadioStation) -> None:
@@ -761,6 +808,7 @@ class MusickitApp(App[None]):
 
     def _pop_browser_one_level(self) -> None:
         prior_artist = self._browse_artist
+        self._clear_browser_filter()
         self._browse_artist = None
         self._populate_browser()
         if prior_artist is None or self._index is None:
@@ -843,6 +891,105 @@ class MusickitApp(App[None]):
         from musickit.tui.airplay_picker import AirPlayPickerScreen
 
         self.push_screen(AirPlayPickerScreen(self))
+
+    def action_start_filter(self) -> None:
+        """`/`: open a filter input above the focused pane (browser or tracklist)."""
+        from textual.widget import Widget
+
+        focused = self.focused
+        anchor: Widget
+        if isinstance(focused, BrowserList):
+            target_id = "browser"
+            parent = self.query_one("#sidebar", Vertical)
+            anchor = self.query_one(BrowserList)
+        elif isinstance(focused, TrackList):
+            target_id = "tracklist"
+            parent = self.query_one("#main", Vertical)
+            # Mount above the scroll wrapper, not inside it.
+            anchor = self.query_one("#track-scroll", VerticalScroll)
+        else:
+            return  # `/` is a no-op when neither list is focused
+        # If a filter is already open, just refocus it.
+        existing = list(self.query(FilterInput))
+        if existing:
+            existing[0].focus()
+            return
+        inp = FilterInput(placeholder=f"filter {target_id}…", id=f"filter-{target_id}")
+        inp.target_pane = target_id  # type: ignore[attr-defined]
+        parent.mount(inp, before=anchor)
+        inp.focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Live-narrow the targeted pane as the user types."""
+        if not isinstance(event.input, FilterInput):
+            return
+        target = getattr(event.input, "target_pane", None)
+        if target == "browser":
+            self._browser_filter = event.value
+            self._populate_browser()
+        elif target == "tracklist":
+            self._tracklist_filter = event.value
+            if self._in_radio_view:
+                self._repopulate_radio_playlist()
+            else:
+                self._repopulate_playlist()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Enter on the filter input → dismiss the input, keep the filter active.
+
+        The narrowed list remains; the user can navigate it with arrows + Enter
+        to play. To clear the filter entirely, press `/` again and Esc, or
+        navigate to a different pane (which auto-clears).
+        """
+        if not isinstance(event.input, FilterInput):
+            return
+        target = getattr(event.input, "target_pane", None)
+        event.input.remove()
+        pane = self.query_one(BrowserList if target == "browser" else TrackList)
+        pane.focus()
+        event.stop()
+
+    async def on_key(self, event: events.Key) -> None:
+        """Esc on a focused FilterInput dismisses the filter + restores the list."""
+        if event.key != "escape":
+            return
+        if not isinstance(self.focused, FilterInput):
+            return
+        target = getattr(self.focused, "target_pane", None)
+        self._dismiss_filter(target)
+        event.stop()
+
+    def _dismiss_filter(self, target: str | None) -> None:
+        """Remove the filter input, clear its filter string, repopulate, refocus."""
+        for inp in list(self.query(FilterInput)):
+            inp.remove()
+        if target == "browser":
+            self._browser_filter = ""
+            self._populate_browser()
+            self.query_one(BrowserList).focus()
+        elif target == "tracklist":
+            self._tracklist_filter = ""
+            if self._in_radio_view:
+                self._repopulate_radio_playlist()
+            else:
+                self._repopulate_playlist()
+            self.query_one(TrackList).focus()
+
+    def _clear_browser_filter(self) -> None:
+        """Drop any active browser filter + dismiss its input. Used on pane navigation."""
+        if not self._browser_filter and not self.query(FilterInput):
+            return
+        self._browser_filter = ""
+        for inp in list(self.query("#filter-browser")):
+            inp.remove()
+
+    def _clear_tracklist_filter(self) -> None:
+        """Drop any active tracklist filter + dismiss its input. Used on pane navigation."""
+        if not self._tracklist_filter and not self.query(FilterInput):
+            return
+        self._tracklist_filter = ""
+        for inp in list(self.query("#filter-tracklist")):
+            inp.remove()
 
     @property
     def airplay(self) -> AirPlayController | None:
