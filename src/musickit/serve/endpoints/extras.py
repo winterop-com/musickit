@@ -242,8 +242,22 @@ async def get_users(request: Request) -> dict:
 @router.api_route("/getOpenSubsonicExtensions", methods=["GET", "POST", "HEAD"])
 @router.api_route("/getOpenSubsonicExtensions.view", methods=["GET", "POST", "HEAD"])
 async def get_open_subsonic_extensions() -> dict:
-    """Return the empty extensions list — no optional extensions implemented yet."""
-    return envelope("openSubsonicExtensions", [])
+    """Advertise the OpenSubsonic extensions we actually support.
+
+    Clients use this to light up extra UI:
+    - `formPost` lets them submit credentials in a POST body instead of the
+      query string. Implemented by `PostFormToQueryMiddleware`.
+    - `transcodeOffset` lets them seek mid-transcode by passing
+      `?timeOffset=N` to `/stream`. Implemented by ffmpeg `-ss N` in
+      `_transcode_response`.
+    """
+    return envelope(
+        "openSubsonicExtensions",
+        [
+            {"name": "formPost", "versions": [1]},
+            {"name": "transcodeOffset", "versions": [1]},
+        ],
+    )
 
 
 # ---------------------------------------------------------------------------

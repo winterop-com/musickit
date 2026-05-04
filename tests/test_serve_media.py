@@ -231,6 +231,43 @@ def test_stream_max_bit_rate_zero_means_no_transcode(tmp_path: Path) -> None:
     assert response.content == track.path.read_bytes()
 
 
+def test_stream_time_offset_passes_to_ffmpeg(tmp_path: Path) -> None:
+    """`timeOffset` (OpenSubsonic transcodeOffset) skips the first N seconds of the transcode."""
+    album = _real_album_with_one_track(tmp_path)
+    client = _client_with_index(tmp_path, [album])
+    track = album.tracks[0]
+
+    # Full transcode for reference.
+    full = client.get("/rest/stream", params=_params(id=track_id(track), format="mp3")).content
+
+    # 10s offset on a 0.5s track produces a much shorter (often empty-ish) MP3
+    # — we just assert the response succeeds and is shorter than the full one.
+    offset = client.get(
+        "/rest/stream",
+        params=_params(id=track_id(track), format="mp3", timeOffset=10),
+    )
+    assert offset.status_code == 200
+    assert offset.headers["content-type"] == "audio/mpeg"
+    assert len(offset.content) < len(full)
+
+
+def test_stream_time_offset_ignored_for_raw(tmp_path: Path) -> None:
+    """timeOffset is only meaningful for transcoded streams; raw uses Range."""
+    album = _real_album_with_one_track(tmp_path)
+    client = _client_with_index(tmp_path, [album])
+    track = album.tracks[0]
+
+    # format=raw + timeOffset → still raw, full bytes, Range available.
+    response = client.get(
+        "/rest/stream",
+        params=_params(id=track_id(track), format="raw", timeOffset=10),
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/mp4"
+    assert response.headers.get("accept-ranges") == "bytes"
+    assert response.content == track.path.read_bytes()
+
+
 def test_download_never_transcodes(tmp_path: Path) -> None:
     """`download` ignores format/maxBitRate per spec — always raw."""
     album = _real_album_with_one_track(tmp_path)

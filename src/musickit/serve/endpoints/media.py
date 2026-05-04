@@ -63,16 +63,26 @@ def _resolve_transcode(
     return False, 0
 
 
-def _transcode_response(path: Path, *, bitrate_kbps: int) -> StreamingResponse:
-    """Pipe ffmpeg stdout into the HTTP response body as MP3."""
+def _transcode_response(path: Path, *, bitrate_kbps: int, time_offset_s: int = 0) -> StreamingResponse:
+    """Pipe ffmpeg stdout into the HTTP response body as MP3.
+
+    `time_offset_s` skips the first N seconds — used by the OpenSubsonic
+    `transcodeOffset` extension so clients can seek into a transcoded
+    stream without the server transcoding from 0 every time. Placed
+    BEFORE `-i` so ffmpeg uses fast format-level seeking.
+    """
 
     async def stream_iter() -> AsyncIterator[bytes]:
-        process = await asyncio.create_subprocess_exec(
+        args = [
             "ffmpeg",
             "-nostdin",
             "-hide_banner",
             "-loglevel",
             "error",
+        ]
+        if time_offset_s > 0:
+            args += ["-ss", str(time_offset_s)]
+        args += [
             "-i",
             str(path),
             "-vn",  # drop any embedded picture stream
@@ -83,6 +93,9 @@ def _transcode_response(path: Path, *, bitrate_kbps: int) -> StreamingResponse:
             "-f",
             "mp3",
             "-",
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -113,6 +126,11 @@ async def stream(
     id: str = Query(...),
     format: str | None = Query(default=None, description="raw | mp3 (default: original)"),
     maxBitRate: int | None = Query(default=None, ge=0, le=512),
+    timeOffset: int | None = Query(
+        default=None,
+        ge=0,
+        description="OpenSubsonic transcodeOffset — start the transcode N seconds in.",
+    ),
 ) -> Response:
     """Audio bytes for a track. Transcodes to MP3 when the client asks; otherwise raw with Range."""
     cache = _get_cache(request)
@@ -124,12 +142,19 @@ async def stream(
 
     transcode, bitrate = _resolve_transcode(track, format, maxBitRate)
     if not transcode:
+        # `timeOffset` is meaningful only on transcoded streams. Raw playback
+        # has Range support so the client can seek without our help; ignoring
+        # the param here matches the spec.
         return FileResponse(
             track.path,
             media_type=content_type(track),
             headers={"Accept-Ranges": "bytes"},
         )
-    return _transcode_response(track.path, bitrate_kbps=bitrate)
+    return _transcode_response(
+        track.path,
+        bitrate_kbps=bitrate,
+        time_offset_s=timeOffset or 0,
+    )
 
 
 @router.api_route("/download", methods=["GET", "POST", "HEAD"])

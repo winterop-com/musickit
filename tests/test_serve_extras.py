@@ -149,12 +149,17 @@ def test_get_users_returns_list_of_one(tmp_path: Path) -> None:
     assert users[0]["username"] == "mort"
 
 
-def test_get_open_subsonic_extensions_returns_empty(tmp_path: Path) -> None:
-    """Feishin probes this on login — must 200, even with no extensions."""
+def test_get_open_subsonic_extensions_advertises_supported(tmp_path: Path) -> None:
+    """Advertise the extensions we actually implement (formPost, transcodeOffset)."""
     body = _client(tmp_path).get("/rest/getOpenSubsonicExtensions", params=_params()).json()
     inner = body["subsonic-response"]
     assert inner["status"] == "ok"
-    assert inner["openSubsonicExtensions"] == []
+    extensions = inner["openSubsonicExtensions"]
+    by_name = {e["name"]: e for e in extensions}
+    assert "formPost" in by_name
+    assert "transcodeOffset" in by_name
+    assert by_name["formPost"]["versions"] == [1]
+    assert by_name["transcodeOffset"]["versions"] == [1]
 
 
 def test_get_genres_returns_empty_when_no_genre_data(tmp_path: Path) -> None:
