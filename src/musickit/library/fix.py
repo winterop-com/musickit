@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from musickit import naming
@@ -12,6 +13,9 @@ from musickit.metadata import TagOverrides, apply_tag_overrides
 if TYPE_CHECKING:
     from rich.console import Console
 
+FixProgressCallback = Callable[[LibraryAlbum, int, int], None]
+"""`(album, idx, total)` — called once per flagged album, idx 1-indexed."""
+
 
 def fix_index(
     index: LibraryIndex,
@@ -20,6 +24,7 @@ def fix_index(
     console: Console | None = None,
     year_lookup: object | None = None,
     prefer_dirname: bool = False,
+    on_album: FixProgressCallback | None = None,
 ) -> list[str]:
     """Apply deterministic fixes to every flagged album in `index`.
 
@@ -31,16 +36,23 @@ def fix_index(
     get rewritten from the dir name instead of the dir being renamed from
     the tag. Use this when you've hand-curated the directory layout and
     want the tags to follow.
+
+    `on_album(album, idx, total)` fires once per FLAGGED album right
+    before its fixes run; clean albums (no warnings) are skipped silently
+    and don't count against the total. Used by the CLI to drive a
+    progress bar through the slow MB lookups.
     """
     if year_lookup is None:
         from musickit.enrich.musicbrainz import lookup_release_year
 
         year_lookup = lookup_release_year
 
+    flagged = [a for a in index.albums if a.warnings]
+    total = len(flagged)
     actions: list[str] = []
-    for album in index.albums:
-        if not album.warnings:
-            continue
+    for idx, album in enumerate(flagged, start=1):
+        if on_album is not None:
+            on_album(album, idx, total)
         actions.extend(
             fix_album(
                 album,

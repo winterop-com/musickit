@@ -158,6 +158,15 @@ def library_fix(
     full_rescan: _FullRescanOpt = False,
 ) -> None:
     """Apply deterministic fixes to flagged albums (MB year, tag/dir rename)."""
+    from rich.progress import (
+        BarColumn,
+        MofNCompleteColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
+
     console = Console()
     verbose = bool(ctx.obj and ctx.obj.get("verbose"))
     index = _scan_with_progress(
@@ -168,12 +177,42 @@ def library_fix(
         use_cache=not no_cache,
         force=full_rescan,
     )
-    actions = library_mod.fix_index(
-        index,
-        dry_run=dry_run,
+
+    # Progress bar over the flagged-album subset. MB year lookups are slow
+    # (one HTTP call per album), so silence here looks like a hang on a
+    # 1k-album library; the per-album spinner makes that wait visible.
+    flagged_count = sum(1 for a in index.albums if a.warnings)
+    if flagged_count == 0:
+        console.print("[green]nothing to fix[/green] — every album passes audit")
+        return
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
         console=console,
-        prefer_dirname=prefer_dirname,
-    )
+        transient=True,
+    ) as progress:
+        task = progress.add_task("[cyan]Fixing", total=flagged_count)
+
+        def on_album(album: library_mod.LibraryAlbum, idx: int, total: int) -> None:
+            del idx, total
+            label = f"{album.artist_dir} / {album.album_dir}"
+            if len(label) > 60:
+                label = label[:59] + "…"
+            progress.update(task, advance=1, description=f"[cyan]Fixing[/] [dim]·[/] {label}")
+
+        actions = library_mod.fix_index(
+            index,
+            dry_run=dry_run,
+            console=console,
+            prefer_dirname=prefer_dirname,
+            on_album=on_album,
+        )
+
     prefix = "[yellow]would apply[/yellow]" if dry_run else "[cyan]applied[/cyan]"
     console.print(f"{prefix} {len(actions)} fix(es)")
 

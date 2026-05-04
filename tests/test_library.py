@@ -537,5 +537,50 @@ def test_fix_does_not_clobber_existing_target_dir(silent_flac_template: Path, tm
     assert (root / "Artist" / "2020 - Right Title").is_dir()
 
 
+def test_fix_on_album_callback_fires_only_for_flagged(silent_flac_template: Path, tmp_path: Path) -> None:
+    """`fix_index(on_album=...)` reports progress over flagged albums only — clean ones are silent."""
+    root = tmp_path / "lib"
+
+    # Flagged album (missing year).
+    _make_track(
+        root / "Various Artists" / "Absolute Music 70",
+        silent_flac_template,
+        filename="01 - T.m4a",
+        album="Absolute Music 70",
+        album_artist="Various Artists",
+        year=None,
+    )
+    # Clean album.
+    _make_track(
+        root / "Imagine Dragons" / "2012 - Night Visions",
+        silent_flac_template,
+        filename="01 - Radioactive.m4a",
+        title="Radioactive",
+        artist="Imagine Dragons",
+        album_artist="Imagine Dragons",
+        album="Night Visions",
+        year="2012",
+        cover_size=(1000, 1000),
+    )
+
+    def fake_lookup(album: str, artist: str) -> str | None:
+        return "2012"
+
+    seen: list[tuple[str, int, int]] = []
+
+    def on_album(album: library.LibraryAlbum, idx: int, total: int) -> None:
+        seen.append((album.album_dir, idx, total))
+
+    index = library.scan(root)
+    library.audit(index)
+    library.fix_index(index, year_lookup=fake_lookup, on_album=on_album)
+
+    # Only the flagged album was reported, with a 1/1 total.
+    assert len(seen) == 1
+    assert seen[0][0] == "Absolute Music 70"
+    assert seen[0][1] == 1
+    assert seen[0][2] == 1
+
+
 # Silence pytest "unused import" via PIL/MP4 in lint-only contexts.
 _ = pytest
