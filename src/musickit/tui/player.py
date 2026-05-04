@@ -250,6 +250,12 @@ class AudioPlayer:
                 log.warning("AirPlay play_url failed for %s: %s", source, exc)
                 if self.on_track_failed is not None:
                     self.on_track_failed(source, f"airplay: {exc}")
+                return
+            # `_teardown_playback` left `_stopped = True`; flip it back so
+            # `is_playing` reports correctly while AirPlay is the output.
+            with self._lock:
+                self._stopped = False
+                self._paused = False
             return
 
         self._opener_gen += 1

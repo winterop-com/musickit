@@ -183,6 +183,53 @@ async def test_no_match_shows_placeholder_row(silent_flac_template: Path, tmp_pa
 
 
 @pytest.mark.asyncio
+async def test_filtered_tracklist_uses_visible_row_for_cursor(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Cursor target after filter must be a VISIBLE row index, not the model
+    track index. Regression: with `_current_track_idx = 2` and a filter that
+    leaves only one match (whose original index is 2), the cursor used to be
+    set to child index 2, which is out of bounds → no row highlighted →
+    Enter became a no-op.
+    """
+    from musickit.tui.app import BrowserList, MusickitApp, TrackList
+
+    root = tmp_path / "lib"
+    album_dir = root / "Radiohead" / "2007 - In Rainbows"
+    for n, title in enumerate(["15 Step", "Bodysnatchers", "Nude", "Reckoner"], start=1):
+        _make_track(
+            album_dir,
+            silent_flac_template,
+            filename=f"{n:02d} - {title}.m4a",
+            title=title,
+            artist="Radiohead",
+        )
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        browser = pilot.app.query_one(BrowserList)
+        artist_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        pilot.app._handle_browser_selection(artist_row)  # type: ignore[attr-defined]
+        await pilot.pause()
+        album_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        pilot.app._handle_browser_selection(album_row)  # type: ignore[attr-defined]
+        await pilot.pause()
+        # Pretend track index 2 (Nude) is the one playing.
+        pilot.app._current_track_idx = 2  # type: ignore[attr-defined]
+        # Open filter on the tracklist + narrow to "nu" (matches only "Nude").
+        pilot.app.query_one(TrackList).focus()
+        await pilot.pause()
+        await pilot.press("slash")
+        await pilot.pause()
+        await pilot.press("n", "u")
+        await pilot.pause()
+        tracklist = pilot.app.query_one(TrackList)
+        track_rows = [c for c in tracklist.children if getattr(c, "track_index", None) is not None]
+        assert len(track_rows) == 1
+        assert track_rows[0].track_index == 2  # type: ignore[attr-defined]
+        # Cursor must land on the (only) visible row, not on out-of-bounds child 2.
+        assert tracklist.index == 0
+
+
+@pytest.mark.asyncio
 async def test_filter_works_on_tracklist(silent_flac_template: Path, tmp_path: Path) -> None:
     """`/` while the tracklist is focused narrows tracks by title."""
     from musickit.tui.app import BrowserList, MusickitApp, TrackList

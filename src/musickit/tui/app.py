@@ -564,13 +564,33 @@ class MusickitApp(App[None]):
         if needle and matched == 0:
             tracklist.append(ListItem(Static("[dim](no matches)[/]")))
             return
-        if self._current_track_idx is not None and 0 <= self._current_track_idx < len(album.tracks):
-            target = self._current_track_idx
-        elif album.tracks:
-            target = 0
-        else:
+        # Defer to dodge the second-album-no-highlight bug (children
+        # not yet mounted at this point — `append()` returns an
+        # AwaitMount). The deferred call resolves the visible row at
+        # execution time so it sees the current filter state.
+        self.call_after_refresh(self._set_tracklist_cursor_for_track, self._current_track_idx)
+
+    def _visible_row_for_track(self, tracklist: TrackList, track_idx: int | None) -> int | None:
+        """Map a model track index to its visible row index (or first row when not visible)."""
+        if track_idx is not None:
+            for visible_idx, child in enumerate(tracklist.children):
+                if getattr(child, "track_index", None) == track_idx:
+                    return visible_idx
+        # Current track not visible (filtered out) — fall back to the first
+        # row that has a track_index, if any.
+        for visible_idx, child in enumerate(tracklist.children):
+            if getattr(child, "track_index", None) is not None:
+                return visible_idx
+        return None
+
+    def _set_tracklist_cursor_for_track(self, model_track_idx: int | None) -> None:
+        """Place the cursor on the visible row for `model_track_idx` (or first row)."""
+        tracklist = self.query_one(TrackList)
+        target = self._visible_row_for_track(tracklist, model_track_idx)
+        if target is None:
             return
-        self.call_after_refresh(self._set_tracklist_cursor, target)
+        if 0 <= target < len(tracklist.children):
+            tracklist.index = target
 
     def _set_tracklist_cursor(self, target: int) -> None:
         tracklist = self.query_one(TrackList)
@@ -1003,12 +1023,16 @@ class MusickitApp(App[None]):
         creating one until the user actually opens the picker. Once created
         it sticks around for the rest of the session and gets cleaned up
         in `on_unmount`.
+
+        Does NOT wire the controller into the audio player — that happens
+        in `switch_airplay` once the user actually picks a device. Wiring
+        here would call `player.set_airplay(...)` which calls `stop()`,
+        interrupting current playback the moment the picker opens.
         """
         if self._airplay is None:
             from musickit.tui.airplay import AirPlayController
 
             self._airplay = AirPlayController()
-            self._player.set_airplay(self._airplay)
         return self._airplay
 
     def switch_airplay(self, device: AirPlayDevice | None) -> None:

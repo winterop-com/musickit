@@ -87,6 +87,55 @@ def test_controller_routes_play_url_to_pyatv() -> None:
         controller.disconnect()
 
 
+def test_get_or_create_airplay_does_not_stop_player() -> None:
+    """Opening the AirPlay picker (which lazy-creates the controller) must
+    not call `player.set_airplay` — that triggers `stop()` and would
+    interrupt current playback the moment the picker is opened.
+    Wiring the controller into the player is `switch_airplay`'s job,
+    once the user actually picks a device.
+    """
+    from musickit.tui.app import MusickitApp
+
+    app = MusickitApp(root=None)
+    set_airplay_calls: list[object] = []
+    original = app._player.set_airplay
+
+    def spy(controller: object) -> None:
+        set_airplay_calls.append(controller)
+        original(controller)  # type: ignore[arg-type]
+
+    app._player.set_airplay = spy  # type: ignore[method-assign]
+    try:
+        controller = app.get_or_create_airplay()
+        assert controller is not None
+        assert set_airplay_calls == [], "get_or_create_airplay must not wire the controller into the player"
+    finally:
+        if app._airplay is not None:
+            app._airplay.disconnect()
+
+
+def test_player_airplay_path_reports_playing_after_play_url() -> None:
+    """After `play(url)` while AirPlay is connected, `is_playing` must be True.
+    Regression: `_teardown_playback` set `_stopped = True` and the AirPlay
+    branch never flipped it back, so `is_playing` returned False even
+    while the AirPlay device was streaming.
+    """
+    from musickit.tui.player import AudioPlayer
+
+    fake_controller = MagicMock()
+    fake_controller.device = MagicMock()  # truthy = "connected"
+    fake_controller.play_url = MagicMock()
+
+    player = AudioPlayer(airplay=fake_controller)
+    try:
+        player.play("http://example/stream.m3u")
+        fake_controller.play_url.assert_called_once_with("http://example/stream.m3u")
+        assert player.is_playing
+        assert not player.is_paused
+    finally:
+        player.stop()
+
+
 def test_controller_detach_keeps_loop_alive_for_reuse() -> None:
     """detach() resets the device but the controller's loop stays usable."""
     from pyatv.const import Protocol
