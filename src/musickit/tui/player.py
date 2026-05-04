@@ -157,6 +157,10 @@ class AudioPlayer:
         # `stream_title` is the most recent ICY `StreamTitle` (current song)
         # — updated by the decoder thread polling `container.metadata`.
         self._is_live: bool = False
+        # True iff the current playback was routed to AirPlay rather than
+        # decoded in-process. Pause / volume need to know which target to
+        # talk to (the local callback or pyatv).
+        self._airplay_active: bool = False
         self._stream_title: str | None = None
         self._stream_station_name: str | None = None
         # 8-band amplitude levels (0.0–1.0), driven by the UI tick (NOT the
@@ -256,6 +260,7 @@ class AudioPlayer:
             with self._lock:
                 self._stopped = False
                 self._paused = False
+                self._airplay_active = True
             return
 
         self._opener_gen += 1
@@ -303,6 +308,9 @@ class AudioPlayer:
         self._end_fired = False
         self._paused = False
         self._stopped = False
+        # Local in-process playback — clear the AirPlay routing flag so
+        # subsequent pause/volume calls hit the local audio callback.
+        self._airplay_active = False
         self._current_source = source
         # Per-decoder queue + stop event. The decoder thread captures these
         # references; even if the previous decoder didn't join in time, it
@@ -382,6 +390,7 @@ class AudioPlayer:
         """
         with self._lock:
             self._stopped = True
+            self._airplay_active = False
             self._band_levels = [0.0] * _VIS_BANDS
         # Signal the OLD decoder via its captured stop event. Even if it
         # doesn't exit before the next _setup_playback installs new state,
@@ -414,6 +423,20 @@ class AudioPlayer:
     def toggle_pause(self) -> None:
         with self._lock:
             self._paused = not self._paused
+            now_paused = self._paused
+        # When routed to AirPlay the audio is decoded on the remote
+        # device; pausing the local callback (which is just writing
+        # silence at this point) doesn't stop the speaker. Forward
+        # the pause/resume command to pyatv so the device matches the
+        # UI state.
+        if self._airplay_active and self._airplay is not None:
+            try:
+                if now_paused:
+                    self._airplay.pause()
+                else:
+                    self._airplay.resume()
+            except Exception:  # pragma: no cover — best-effort
+                log.warning("airplay pause/resume failed", exc_info=True)
 
     def seek(self, seconds: float) -> None:
         """Seek to absolute position `seconds` from start."""
@@ -423,8 +446,17 @@ class AudioPlayer:
             self._seek_target = max(0.0, min(seconds, self._duration))
 
     def set_volume(self, percent: int) -> None:
+        clamped = max(0, min(100, percent))
         with self._lock:
-            self._volume = max(0.0, min(1.0, percent / 100.0))
+            self._volume = clamped / 100.0
+        # When the AirPlay device is the actual output, the local
+        # software gain in the audio callback isn't applied to
+        # anything — forward the volume to the device too.
+        if self._airplay_active and self._airplay is not None:
+            try:
+                self._airplay.set_volume(clamped)
+            except Exception:  # pragma: no cover — best-effort
+                log.warning("airplay set_volume failed", exc_info=True)
 
     @property
     def position(self) -> float:

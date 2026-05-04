@@ -146,6 +146,59 @@ class AirPlayController:
         except Exception:  # pragma: no cover
             pass
 
+    def pause(self) -> None:
+        """Pause playback on the device. Best-effort."""
+        if self._atv is None:
+            return
+        future = asyncio.run_coroutine_threadsafe(self._pause(), self._loop)
+        try:
+            future.result(timeout=3.0)
+        except Exception:  # pragma: no cover — best-effort
+            pass
+
+    async def _pause(self) -> None:
+        assert self._atv is not None
+        try:
+            await self._atv.remote_control.pause()
+        except Exception:  # pragma: no cover
+            pass
+
+    def resume(self) -> None:
+        """Resume playback on the device. Best-effort."""
+        if self._atv is None:
+            return
+        future = asyncio.run_coroutine_threadsafe(self._resume(), self._loop)
+        try:
+            future.result(timeout=3.0)
+        except Exception:  # pragma: no cover — best-effort
+            pass
+
+    async def _resume(self) -> None:
+        assert self._atv is not None
+        try:
+            await self._atv.remote_control.play()
+        except Exception:  # pragma: no cover
+            pass
+
+    def set_volume(self, percent: int) -> None:
+        """Set device volume from a 0-100 percentage. Best-effort."""
+        if self._atv is None:
+            return
+        level = max(0.0, min(100.0, float(percent)))
+        future = asyncio.run_coroutine_threadsafe(self._set_volume(level), self._loop)
+        try:
+            future.result(timeout=3.0)
+        except Exception:  # pragma: no cover — best-effort
+            pass
+
+    async def _set_volume(self, level: float) -> None:
+        assert self._atv is not None
+        # pyatv's audio.set_volume expects 0.0-100.0 (float).
+        try:
+            await self._atv.audio.set_volume(level)
+        except Exception:  # pragma: no cover — devices vary in audio support
+            pass
+
     def detach(self) -> None:
         """Close the device session but keep the loop alive for re-use.
 

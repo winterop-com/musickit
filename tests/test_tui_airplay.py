@@ -114,6 +114,80 @@ def test_get_or_create_airplay_does_not_stop_player() -> None:
             app._airplay.disconnect()
 
 
+def test_player_toggle_pause_routes_to_airplay() -> None:
+    """`toggle_pause` while AirPlay is the active output sends pause/resume
+    to pyatv. Regression: it only flipped the local `_paused` flag, so the
+    remote device kept playing while the UI showed paused.
+    """
+    from musickit.tui.player import AudioPlayer
+
+    fake_controller = MagicMock()
+    fake_controller.device = MagicMock()
+    fake_controller.play_url = MagicMock()
+    fake_controller.pause = MagicMock()
+    fake_controller.resume = MagicMock()
+
+    player = AudioPlayer(airplay=fake_controller)
+    try:
+        player.play("http://example/stream.m3u")
+        # First toggle: paused → must call airplay.pause().
+        player.toggle_pause()
+        fake_controller.pause.assert_called_once()
+        fake_controller.resume.assert_not_called()
+        # Second toggle: resumed → must call airplay.resume().
+        player.toggle_pause()
+        fake_controller.resume.assert_called_once()
+    finally:
+        player.stop()
+
+
+def test_player_set_volume_routes_to_airplay() -> None:
+    """`set_volume` while AirPlay is the active output forwards the level to
+    the device. Regression: only `_volume` (local software gain) changed,
+    which has no effect when audio is decoded on the remote device.
+    """
+    from musickit.tui.player import AudioPlayer
+
+    fake_controller = MagicMock()
+    fake_controller.device = MagicMock()
+    fake_controller.play_url = MagicMock()
+    fake_controller.set_volume = MagicMock()
+
+    player = AudioPlayer(airplay=fake_controller)
+    try:
+        player.play("http://example/stream.m3u")
+        player.set_volume(40)
+        fake_controller.set_volume.assert_called_once_with(40)
+    finally:
+        player.stop()
+
+
+def test_player_local_playback_does_not_route_to_airplay() -> None:
+    """Pause / volume on a LOCAL playback (no AirPlay device) must not call
+    pyatv even when an AirPlayController is attached but no device picked.
+    """
+    from musickit.tui.player import AudioPlayer
+
+    fake_controller = MagicMock()
+    fake_controller.device = None  # controller present, no device picked
+    fake_controller.pause = MagicMock()
+    fake_controller.resume = MagicMock()
+    fake_controller.set_volume = MagicMock()
+
+    player = AudioPlayer(airplay=fake_controller)
+    try:
+        # Without a device, play() falls through to local decode — but we
+        # don't actually need to start anything. Just confirm the routing
+        # gate.
+        player.toggle_pause()
+        player.set_volume(50)
+        fake_controller.pause.assert_not_called()
+        fake_controller.resume.assert_not_called()
+        fake_controller.set_volume.assert_not_called()
+    finally:
+        player.stop()
+
+
 def test_player_airplay_path_reports_playing_after_play_url() -> None:
     """After `play(url)` while AirPlay is connected, `is_playing` must be True.
     Regression: `_teardown_playback` set `_stopped = True` and the AirPlay
