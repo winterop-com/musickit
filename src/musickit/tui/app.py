@@ -19,6 +19,7 @@ from textual import events, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.css.query import NoMatches
 from textual.widgets import Input, ListItem, ListView, Static
 
 from musickit import library as library_mod
@@ -668,12 +669,21 @@ class MusickitApp(App[None]):
     def _refresh_visualizer(self) -> None:
         """High-FPS visualizer tick — runs the FFT off the audio thread."""
         self._player.update_band_levels()
-        self.query_one(Visualizer).levels = self._player.band_levels
+        try:
+            visualizer = self.query_one(Visualizer)
+        except NoMatches:
+            # Tick fired after the DOM was torn down (e.g. mid-shutdown
+            # in tests). Bail; the timer will be reaped along with the app.
+            return
+        visualizer.levels = self._player.band_levels
 
     def _refresh_status(self) -> None:
-        meta = self.query_one(NowPlayingMeta)
-        progress = self.query_one(ProgressLine)
-        status = self.query_one(StatusBar)
+        try:
+            meta = self.query_one(NowPlayingMeta)
+            progress = self.query_one(ProgressLine)
+            status = self.query_one(StatusBar)
+        except NoMatches:
+            return
         if self._player.is_live:
             self._populate_meta_from_stream(meta)
             progress.position = 0.0
@@ -740,9 +750,15 @@ class MusickitApp(App[None]):
         meta.fmt = "STREAM"
 
     def _drain_end_pending(self) -> None:
-        if self._end_pending:
-            self._end_pending = False
+        if not self._end_pending:
+            return
+        self._end_pending = False
+        try:
             self._advance_track()
+        except NoMatches:
+            # Timer fired during/after unmount — widget queries inside
+            # the advance chain will fail; safe to skip this tick.
+            return
 
     def _drain_stream_metadata(self) -> None:
         if not self._stream_metadata_dirty:

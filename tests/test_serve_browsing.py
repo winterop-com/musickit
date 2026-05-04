@@ -284,6 +284,40 @@ def test_get_album_list2_by_genre_filters_correctly(tmp_path: Path) -> None:
     assert names == ["Sea Change"]
 
 
+def test_get_album_list2_by_genre_matches_multi_genre_track(tmp_path: Path) -> None:
+    """byGenre must consult `track.genres[]`, not just the legacy single `track.genre`.
+    Regression: a track tagged `genres=["Rock", "Indie"]` was advertised as
+    Indie in `getAlbum` but did not appear under `byGenre=Indie` because
+    the filter only checked `track.genre` (which was "Rock").
+    """
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    multi = LibraryAlbum(
+        path=tmp_path / "Beck" / "Sea Change",
+        artist_dir="Beck",
+        album_dir="Sea Change",
+        tag_album="Sea Change",
+        tag_genre="Rock",
+        track_count=1,
+        tracks=[
+            LibraryTrack(
+                path=tmp_path / "Beck" / "Sea Change" / "01.m4a",
+                title="Lost Cause",
+                artist="Beck",
+                album="Sea Change",
+                genre="Rock",
+                genres=["Rock", "Indie"],
+                track_no=1,
+                duration_s=180.0,
+            )
+        ],
+    )
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=[multi]))  # noqa: SLF001
+    body = TestClient(app).get("/rest/getAlbumList2", params=_params(type="byGenre", genre="Indie", size=10)).json()
+    names = [a["name"] for a in body["subsonic-response"]["albumList2"]["album"]]
+    assert names == ["Sea Change"]
+
+
 def test_album_payload_includes_genres_list(tmp_path: Path) -> None:
     """OpenSubsonic multipleGenres: album payload exposes `genres: [{name}]` union."""
     cfg = ServeConfig(username="mort", password="secret")

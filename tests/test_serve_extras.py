@@ -226,3 +226,42 @@ def test_get_genres_counts_songs_and_albums(tmp_path: Path) -> None:
     assert by_name["Rock"]["albumCount"] == 1
     assert by_name["Pop"]["songCount"] == 1
     assert by_name["Pop"]["albumCount"] == 1
+
+
+def test_get_genres_counts_each_track_genre_under_multiple_genres(tmp_path: Path) -> None:
+    """A track tagged `genres=["Rock", "Indie"]` contributes one song to BOTH
+    counts and its album shows up under both album counts.
+    Regression: getGenres only consulted `track.genre`, so multi-genre
+    tracks were under-counted.
+    """
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    album = LibraryAlbum(
+        path=tmp_path / "Beck" / "Sea Change",
+        artist_dir="Beck",
+        album_dir="Sea Change",
+        tag_album="Sea Change",
+        tag_genre="Rock",
+        track_count=1,
+        tracks=[
+            LibraryTrack(
+                path=tmp_path / "Beck" / "Sea Change" / "01.m4a",
+                title="Lost Cause",
+                artist="Beck",
+                album="Sea Change",
+                genre="Rock",
+                genres=["Rock", "Indie"],
+                track_no=1,
+                duration_s=180.0,
+            ),
+        ],
+    )
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=[album]))  # noqa: SLF001
+    body = TestClient(app).get("/rest/getGenres", params=_params()).json()
+    genres = body["subsonic-response"]["genres"]["genre"]
+    by_name = {g["value"]: g for g in genres}
+    assert "Indie" in by_name, "multi-genre 'Indie' must surface in getGenres"
+    assert by_name["Indie"]["songCount"] == 1
+    assert by_name["Indie"]["albumCount"] == 1
+    assert by_name["Rock"]["songCount"] == 1
+    assert by_name["Rock"]["albumCount"] == 1

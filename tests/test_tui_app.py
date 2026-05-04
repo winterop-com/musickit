@@ -147,6 +147,31 @@ async def test_browser_drills_into_artist_and_back(silent_flac_template: Path, t
 
 
 @pytest.mark.asyncio
+async def test_tick_handlers_safe_after_unmount(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Timer ticks fired after the DOM is gone must not raise.
+    Regression: `_refresh_visualizer` and friends used to call `query_one`
+    unconditionally; if a tick was in-flight when the app unmounted,
+    `NoMatches` would propagate and fail other tests in the suite.
+    """
+    from musickit.tui.app import MusickitApp
+
+    root = tmp_path / "lib"
+    _make_track(root / "A" / "2020 - X", silent_flac_template, filename="01 - T.m4a", title="T", artist="A")
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        app = pilot.app
+    # Outside the context: app has unmounted. Calling the tick handlers
+    # directly must not raise.
+    app._refresh_visualizer()  # type: ignore[attr-defined]
+    app._refresh_status()  # type: ignore[attr-defined]
+    app._end_pending = True  # type: ignore[attr-defined]
+    app._drain_end_pending()  # type: ignore[attr-defined]
+    app._stream_metadata_dirty = True  # type: ignore[attr-defined]
+    app._drain_stream_metadata()  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
 async def test_pop_browser_restores_correct_artist_cursor(silent_flac_template: Path, tmp_path: Path) -> None:
     """After drilling into an artist + popping out, the cursor lands on that
     artist (not the previous one). Regression: the prepended Radio row used

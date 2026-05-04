@@ -271,18 +271,28 @@ async def get_open_subsonic_extensions() -> dict:
 @router.api_route("/getGenres", methods=["GET", "POST", "HEAD"])
 @router.api_route("/getGenres.view", methods=["GET", "POST", "HEAD"])
 async def get_genres(request: Request) -> dict:
-    """Distinct genres + per-genre song / album counts."""
+    """Distinct genres + per-genre song / album counts.
+
+    Honours the OpenSubsonic `multipleGenres` extension: a track tagged
+    `genres=["Rock", "Indie"]` contributes one song to BOTH counts, and
+    its album is counted under both. Falls back to the legacy single
+    `track.genre` (and album-level `tag_genre`) when the multi-list is
+    absent.
+    """
     cache = _get_cache(request)
     song_counts: dict[str, int] = {}
     album_genres: dict[str, set[str]] = {}  # genre → set of album IDs
     for album_id_str, album in cache.albums_by_id.items():
         seen_in_album: set[str] = set()
         for track in album.tracks:
-            name = track.genre or album.tag_genre
-            if not name:
-                continue
-            song_counts[name] = song_counts.get(name, 0) + 1
-            seen_in_album.add(name)
+            track_genres = list(track.genres) if track.genres else []
+            if not track_genres and track.genre:
+                track_genres = [track.genre]
+            if not track_genres and album.tag_genre:
+                track_genres = [album.tag_genre]
+            for name in track_genres:
+                song_counts[name] = song_counts.get(name, 0) + 1
+                seen_in_album.add(name)
         # Also count album-level tag_genre even when no track had it explicitly.
         if album.tag_genre:
             seen_in_album.add(album.tag_genre)

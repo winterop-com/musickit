@@ -145,8 +145,7 @@ async def get_album_list2(  # noqa: PLR0912 — Subsonic's `type` enum has many 
         albums = [
             a
             for a in albums
-            if (a.tag_genre and a.tag_genre.casefold() == target)
-            or any((t.genre or "").casefold() == target for t in a.tracks)
+            if (a.tag_genre and a.tag_genre.casefold() == target) or any(_track_has_genre(t, target) for t in a.tracks)
         ]
         albums.sort(key=lambda a: (a.tag_album or a.album_dir).casefold())
     elif type == "alphabeticalByArtist":
@@ -159,6 +158,23 @@ async def get_album_list2(  # noqa: PLR0912 — Subsonic's `type` enum has many 
 
     page = albums[offset : offset + size]
     return envelope("albumList2", {"album": [album_payload(a, with_songs=False) for a in page]})
+
+
+def _track_has_genre(track: object, target_casefold: str) -> bool:
+    """Match a track's genre by either its single `genre` or any of its `genres[]`.
+
+    OpenSubsonic's `multipleGenres` extension exposes per-track lists; the
+    legacy single-genre field is still populated, but a track tagged
+    `genres=["Rock", "Indie"]` should match `byGenre=Indie` even when
+    `track.genre == "Rock"`.
+    """
+    single = getattr(track, "genre", None) or ""
+    if single.casefold() == target_casefold:
+        return True
+    for g in getattr(track, "genres", None) or ():
+        if g.casefold() == target_casefold:
+            return True
+    return False
 
 
 def _year_int(year: str) -> int:
