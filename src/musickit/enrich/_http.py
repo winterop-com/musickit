@@ -10,7 +10,7 @@ import httpx
 
 from musickit import __version__
 
-USER_AGENT = f"musickit/{__version__} ( https://github.com/morten-hansen/musickit )"
+USER_AGENT = f"musickit/{__version__} ( https://github.com/winterop-com/musickit )"
 DEFAULT_TIMEOUT = 15.0
 RATE_LIMIT_SECONDS = 1.0  # MusicBrainz allows 1 req/sec for anonymous use.
 

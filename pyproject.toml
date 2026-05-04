@@ -1,9 +1,38 @@
 [project]
 name = "musickit"
-version = "0.3.0"
+version = "0.4.0"
 description = "Self-hosted music toolkit: convert / audit / retag rips into a clean tagged library, browse + play via a Textual TUI (local / internet radio / Subsonic-client / AirPlay), and stream over Tailscale via a Subsonic-compatible HTTP server."
 readme = "README.md"
 requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "Morten Hansen", email = "morten@winterop.com" },
+]
+keywords = [
+  "audio",
+  "music",
+  "ffmpeg",
+  "subsonic",
+  "tui",
+  "library-manager",
+  "musicbrainz",
+  "airplay",
+  "tailscale",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Multimedia :: Sound/Audio",
+  "Topic :: Multimedia :: Sound/Audio :: Conversion",
+  "Topic :: Multimedia :: Sound/Audio :: Players",
+  "Typing :: Typed",
+]
 dependencies = [
   "typer>=0.24.2",
   "mutagen>=1.47.0",
@@ -22,6 +51,13 @@ dependencies = [
   "watchdog>=6.0.0",
   "tomli-w>=1.2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/winterop-com/musickit"
+Repository = "https://github.com/winterop-com/musickit"
+Documentation = "https://winterop-com.github.io/musickit"
+Issues = "https://github.com/winterop-com/musickit/issues"
+Changelog = "https://github.com/winterop-com/musickit/releases"
 
 [project.scripts]
 musickit = "musickit.cli:app"
