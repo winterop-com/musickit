@@ -446,8 +446,7 @@ class MusickitApp(App[None]):
         kind = getattr(item, "entry_kind", None)
         data = getattr(item, "entry_data", None)
         if kind == "up":
-            self._browse_artist = None
-            self._populate_browser()
+            self._pop_browser_one_level()
         elif kind == "artist" and isinstance(data, str):
             self._browse_artist = data
             self._populate_browser()
@@ -767,10 +766,12 @@ class MusickitApp(App[None]):
         if prior_artist is None or self._index is None:
             return
         # Compute prior-artist row index from the data model — `browser.children`
-        # can still report stale items mid clear+append.
+        # can still report stale items mid clear+append. Row 0 is the Radio
+        # entry that `_populate_browser_artists` always prepends, so the
+        # artist's row is `data_index + 1`.
         artist_names = sorted({a.artist_dir for a in self._index.albums}, key=str.lower)
         try:
-            prior_idx = artist_names.index(prior_artist)
+            prior_idx = artist_names.index(prior_artist) + 1
         except ValueError:
             return
         self.call_after_refresh(self._set_browser_cursor, prior_idx)

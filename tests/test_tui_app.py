@@ -144,3 +144,38 @@ async def test_browser_drills_into_artist_and_back(silent_flac_template: Path, t
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
         # Back at root: radio + the one artist.
         assert kinds == ["radio", "artist"]
+
+
+@pytest.mark.asyncio
+async def test_pop_browser_restores_correct_artist_cursor(silent_flac_template: Path, tmp_path: Path) -> None:
+    """After drilling into an artist + popping out, the cursor lands on that
+    artist (not the previous one). Regression: the prepended Radio row used
+    to shift the cursor up by one — drilling into Radiohead landed on
+    Metallica on pop.
+    """
+    from musickit.tui.app import BrowserList, MusickitApp
+
+    root = tmp_path / "lib"
+    for artist in ("Metallica", "Radiohead"):
+        _make_track(
+            root / artist / "2000 - Album",
+            silent_flac_template,
+            filename="01 - Track.m4a",
+            title="Track",
+            artist=artist,
+        )
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        browser = pilot.app.query_one(BrowserList)
+        # Drill into Radiohead (alphabetical: row 0=radio, 1=Metallica, 2=Radiohead).
+        radiohead_row = next(c for c in browser.children if getattr(c, "entry_data", None) == "Radiohead")
+        pilot.app._handle_browser_selection(radiohead_row)  # type: ignore[attr-defined]
+        await pilot.pause()
+        # Now pop out via the `..` row.
+        pilot.app._handle_browser_selection(browser.children[0])  # type: ignore[attr-defined]
+        await pilot.pause()
+        # Cursor must land on Radiohead, not Metallica.
+        highlighted = browser.highlighted_child
+        assert highlighted is not None
+        assert getattr(highlighted, "entry_data", None) == "Radiohead"
