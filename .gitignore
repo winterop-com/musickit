@@ -37,3 +37,6 @@ output/*
 
 # Ad-hoc debug logs
 *.log
+
+# mkdocs build output
+site/

@@ -1,4 +1,4 @@
-.PHONY: help install lint test coverage clean
+.PHONY: help install lint test coverage docs docs-serve docs-build clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -6,11 +6,14 @@ help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  install    Install dependencies"
-	@echo "  lint       Run ruff + mypy + pyright"
-	@echo "  test       Run pytest"
-	@echo "  coverage   Run pytest with coverage"
-	@echo "  clean      Remove caches and build artifacts"
+	@echo "  install      Install dependencies"
+	@echo "  lint         Run ruff + mypy + pyright"
+	@echo "  test         Run pytest"
+	@echo "  coverage     Run pytest with coverage"
+	@echo "  docs-serve   Serve documentation locally with live reload"
+	@echo "  docs-build   Build static documentation site to ./site"
+	@echo "  docs         Alias for docs-serve"
+	@echo "  clean        Remove caches and build artifacts"
 
 install:
 	@echo ">>> Installing dependencies"
@@ -34,6 +37,16 @@ coverage:
 	@$(UV) run coverage report
 	@$(UV) run coverage xml
 
+docs-serve:
+	@echo ">>> Serving documentation at http://127.0.0.1:8000"
+	@$(UV) run mkdocs serve
+
+docs-build:
+	@echo ">>> Building documentation site"
+	@$(UV) run mkdocs build
+
+docs: docs-serve
+
 clean:
 	@echo ">>> Cleaning up"
 	@find . -type f -name "*.pyc" -delete
@@ -44,5 +57,6 @@ clean:
 	@rm -rf .coverage htmlcov coverage.xml
 	@rm -rf .pyright
 	@rm -rf dist build *.egg-info
+	@rm -rf site
 
 .DEFAULT_GOAL := help
