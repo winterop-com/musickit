@@ -1,7 +1,7 @@
 [project]
 name = "musickit"
-version = "0.1.0"
-description = "Convert messy audio rips into a clean, tagged, organised library — uniform 256k AAC m4a by default (lossless ALAC also supported)."
+version = "0.2.0"
+description = "Self-hosted music toolkit: convert / audit / retag rips into a clean tagged library, browse + play via a Textual TUI (local / internet radio / Subsonic-client / AirPlay), and stream over Tailscale via a Subsonic-compatible HTTP server."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

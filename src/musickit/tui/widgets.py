@@ -79,7 +79,9 @@ class TopBar(Static):
     """
 
     def render(self) -> str:
-        return "[bold cyan]musickit[/]"
+        from musickit import __version__
+
+        return f"[bold cyan]musickit[/] [dim]v{__version__}[/]"
 
 
 class SidebarStats(Static):
@@ -157,7 +159,7 @@ class Visualizer(Static):
 
     DEFAULT_CSS = """
     Visualizer {
-        height: 7;
+        height: 12;
         padding: 0 2;
         border: round $primary 30%;
     }

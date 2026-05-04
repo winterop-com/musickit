@@ -6,4 +6,14 @@ multi-disc layouts, VA / compilation handling, atomic per-album writes,
 parallel encoding, optional MusicBrainz / Cover Art Archive enrichment.
 """
 
-__version__ = "0.1.0"
+from __future__ import annotations
+
+# Single source of truth: read the version from package metadata
+# (pyproject.toml `[project] version`). Avoids drift between the lockfile,
+# the dist info, and a hardcoded constant in code.
+try:
+    from importlib.metadata import version as _get_version
+
+    __version__ = _get_version("musickit")
+except Exception:  # pragma: no cover — uninstalled / dev tree
+    __version__ = "unknown"

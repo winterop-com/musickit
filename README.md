@@ -33,7 +33,7 @@ Or jump straight to:
 
 ## Status
 
-247 tests, ruff + mypy + pyright clean. All seven user-facing commands shipped (`convert`, `inspect`, `library`, `retag`, `cover`, `cover-pick`, `tui`, `serve`). Real-world tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop.
+v0.2.0 · 294 tests, ruff + mypy + pyright clean. All eight user-facing commands shipped: `convert`, `inspect`, `library`, `retag`, `cover`, `cover-pick`, `tui`, `serve`. The TUI ships local-library playback, internet radio, Subsonic-client mode, AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, an incremental `/`-filter, and a 24-band FFT visualiser. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions) and tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop.
 
 ## License
 
