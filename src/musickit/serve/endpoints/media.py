@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+import asyncio
+from collections.abc import AsyncIterator
+from pathlib import Path
 
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+
+from musickit.library.models import LibraryTrack
 from musickit.serve.app import error_envelope
 from musickit.serve.covers import load_album_cover, resize
 from musickit.serve.index import IndexCache
 from musickit.serve.payloads import content_type
 
 router = APIRouter()
+
+# Subsonic spec: transcoding default target is MP3. 192k is a reasonable
+# quality/size compromise; clients can lower it via `maxBitRate`.
+_DEFAULT_TRANSCODE_BITRATE_KBPS = 192
 
 
 def _get_cache(request: Request) -> IndexCache:
@@ -30,10 +39,103 @@ def _safe_path_under_root(cache: IndexCache, path_id: str) -> JSONResponse | Non
     return None
 
 
+def _resolve_transcode(
+    track: LibraryTrack,
+    fmt: str | None,
+    max_bitrate: int | None,
+) -> tuple[bool, int]:
+    """Decide whether to transcode and at what bitrate (Kbps).
+
+    `format=raw` always wins (no transcode). `format=mp3` with a non-MP3
+    source triggers a transcode. `maxBitRate>0` alone also triggers a
+    transcode to MP3 — the spec says clients use that to cap delivered
+    bitrate. The common case (no params) returns False so the
+    FileResponse Range path stays free.
+    """
+    fmt_l = (fmt or "").lower()
+    if fmt_l == "raw":
+        return False, 0
+    if fmt_l == "mp3" and track.path.suffix.lower() != ".mp3":
+        target = max_bitrate if (max_bitrate and max_bitrate > 0) else _DEFAULT_TRANSCODE_BITRATE_KBPS
+        return True, target
+    if max_bitrate and max_bitrate > 0:
+        return True, max_bitrate
+    return False, 0
+
+
+def _transcode_response(path: Path, *, bitrate_kbps: int) -> StreamingResponse:
+    """Pipe ffmpeg stdout into the HTTP response body as MP3."""
+
+    async def stream_iter() -> AsyncIterator[bytes]:
+        process = await asyncio.create_subprocess_exec(
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(path),
+            "-vn",  # drop any embedded picture stream
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            f"{bitrate_kbps}k",
+            "-f",
+            "mp3",
+            "-",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        try:
+            assert process.stdout is not None
+            while True:
+                chunk = await process.stdout.read(64 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            # Ensure ffmpeg exits if the client disconnects mid-stream — without
+            # this the subprocess would linger and pin a CPU core.
+            if process.returncode is None:
+                try:
+                    process.kill()
+                except ProcessLookupError:  # pragma: no cover — already exited
+                    pass
+                await process.wait()
+
+    return StreamingResponse(stream_iter(), media_type="audio/mpeg")
+
+
 @router.api_route("/stream", methods=["GET", "POST", "HEAD"])
 @router.api_route("/stream.view", methods=["GET", "POST", "HEAD"])
-async def stream(request: Request, id: str = Query(...)) -> Response:
-    """Audio bytes for a track. Starlette's FileResponse handles HTTP Range natively."""
+async def stream(
+    request: Request,
+    id: str = Query(...),
+    format: str | None = Query(default=None, description="raw | mp3 (default: original)"),
+    maxBitRate: int | None = Query(default=None, ge=0, le=512),
+) -> Response:
+    """Audio bytes for a track. Transcodes to MP3 when the client asks; otherwise raw with Range."""
+    cache = _get_cache(request)
+    err = _safe_path_under_root(cache, id)
+    if err is not None:
+        return err
+    pair = cache.tracks_by_id[id]
+    _, track = pair
+
+    transcode, bitrate = _resolve_transcode(track, format, maxBitRate)
+    if not transcode:
+        return FileResponse(
+            track.path,
+            media_type=content_type(track),
+            headers={"Accept-Ranges": "bytes"},
+        )
+    return _transcode_response(track.path, bitrate_kbps=bitrate)
+
+
+@router.api_route("/download", methods=["GET", "POST", "HEAD"])
+@router.api_route("/download.view", methods=["GET", "POST", "HEAD"])
+async def download(request: Request, id: str = Query(...)) -> Response:
+    """Always raw bytes — `download` skips transcoding by spec."""
     cache = _get_cache(request)
     err = _safe_path_under_root(cache, id)
     if err is not None:
@@ -45,13 +147,6 @@ async def stream(request: Request, id: str = Query(...)) -> Response:
         media_type=content_type(track),
         headers={"Accept-Ranges": "bytes"},
     )
-
-
-@router.api_route("/download", methods=["GET", "POST", "HEAD"])
-@router.api_route("/download.view", methods=["GET", "POST", "HEAD"])
-async def download(request: Request, id: str = Query(...)) -> Response:
-    """Same as `stream` for now — we never transcode, so there's no distinction."""
-    return await stream(request, id=id)
 
 
 @router.api_route("/getCoverArt", methods=["GET", "POST", "HEAD"])

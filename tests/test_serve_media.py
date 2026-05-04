@@ -177,3 +177,70 @@ def test_get_cover_art_via_track_id_resolves_to_album(tmp_path: Path) -> None:
     response = client.get("/rest/getCoverArt", params=_params(id=track_id(album.tracks[0])))
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("image/")
+
+
+# ---------------------------------------------------------------------------
+# stream — transcoding
+# ---------------------------------------------------------------------------
+
+
+def test_stream_format_raw_returns_original_bytes(tmp_path: Path) -> None:
+    """`format=raw` is the explicit no-transcode opt-out; original bytes + Range stay."""
+    album = _real_album_with_one_track(tmp_path)
+    client = _client_with_index(tmp_path, [album])
+    track = album.tracks[0]
+    response = client.get("/rest/stream", params=_params(id=track_id(track), format="raw"))
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/mp4"
+    assert response.headers.get("accept-ranges") == "bytes"
+    assert response.content == track.path.read_bytes()
+
+
+def test_stream_format_mp3_transcodes(tmp_path: Path) -> None:
+    """`format=mp3` against an m4a source triggers an ffmpeg transcode."""
+    album = _real_album_with_one_track(tmp_path)
+    client = _client_with_index(tmp_path, [album])
+    track = album.tracks[0]
+    response = client.get("/rest/stream", params=_params(id=track_id(track), format="mp3"))
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/mpeg"
+    # ffmpeg writes an ID3v2 header (`ID3`, 49 44 33) before the MPEG frames;
+    # an untagged stream would start with the frame sync 0xFF. Either is valid.
+    assert len(response.content) > 0
+    assert response.content[:3] == b"ID3" or response.content[0] == 0xFF
+
+
+def test_stream_max_bit_rate_triggers_transcode(tmp_path: Path) -> None:
+    """`maxBitRate=128` (no `format`) also triggers an MP3 transcode per Subsonic spec."""
+    album = _real_album_with_one_track(tmp_path)
+    client = _client_with_index(tmp_path, [album])
+    track = album.tracks[0]
+    response = client.get("/rest/stream", params=_params(id=track_id(track), maxBitRate=128))
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/mpeg"
+    assert len(response.content) > 0
+
+
+def test_stream_max_bit_rate_zero_means_no_transcode(tmp_path: Path) -> None:
+    """`maxBitRate=0` is the spec's 'unlimited' value — no transcode."""
+    album = _real_album_with_one_track(tmp_path)
+    client = _client_with_index(tmp_path, [album])
+    track = album.tracks[0]
+    response = client.get("/rest/stream", params=_params(id=track_id(track), maxBitRate=0))
+    assert response.headers["content-type"] == "audio/mp4"
+    assert response.content == track.path.read_bytes()
+
+
+def test_download_never_transcodes(tmp_path: Path) -> None:
+    """`download` ignores format/maxBitRate per spec — always raw."""
+    album = _real_album_with_one_track(tmp_path)
+    client = _client_with_index(tmp_path, [album])
+    track = album.tracks[0]
+    # Even when format=mp3 is passed, download must give the original.
+    response = client.get(
+        "/rest/download",
+        params=_params(id=track_id(track), format="mp3", maxBitRate=128),
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/mp4"
+    assert response.content == track.path.read_bytes()
