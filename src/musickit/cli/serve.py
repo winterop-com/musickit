@@ -20,9 +20,9 @@ def serve(
         typer.Argument(
             exists=True,
             file_okay=False,
-            help="Library root to expose. Defaults to ./output.",
+            help="Library root to expose.",
         ),
-    ] = Path("./output"),
+    ],
     host: Annotated[
         str,
         typer.Option(
