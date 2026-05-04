@@ -95,8 +95,14 @@ class StartedPayload:
 # Defined here so both sides agree on the layout.
 # ---------------------------------------------------------------------------
 
-VIS_BANDS = 24
-"""Number of FFT bins surfaced to the UI for the spectrum visualizer."""
+VIS_BANDS = 48
+"""Number of FFT bins surfaced to the UI for the spectrum visualizer.
+
+48 bands gives roughly one bar per 2 columns on an 80-cell terminal —
+enough horizontal resolution that adjacent harmonics are visually
+distinguishable. Bumping past 48 starts to look noisy; halving to 24
+loses the harmonic detail.
+"""
 
 SAMPLE_RATE = 44100
 """Output sample rate the engine resamples everything to."""

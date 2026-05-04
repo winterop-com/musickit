@@ -151,7 +151,7 @@ class NowPlayingMeta(Static):
 
 
 class Visualizer(Static):
-    """24-band spectrum analyzer in classic VU style.
+    """48-band spectrum analyzer in classic VU style.
 
     Same green / yellow / red gradient across all bars, keyed off vertical
     position (red top → yellow mid → green bottom). Sub-cell vertical
@@ -175,19 +175,25 @@ class Visualizer(Static):
 
     _PARTIAL_BLOCKS = "▁▂▃▄▅▆▇█"  # 1/8th increments
 
-    levels = reactive([0.0] * 24)
+    levels = reactive([0.0] * 48)
 
     def render(self) -> str:
         rows = max(4, max(0, self.size.height - 1))
         red_cutoff = max(1, rows // 5)
         yellow_cutoff = red_cutoff + max(1, rows // 3)
         # Spread bars across the full available width. Each bar gets
-        # `bar_width` block chars + 1 cell gap. Floor at 3 so it still looks
-        # like a meter on narrow terminals.
+        # `bar_width` block chars + `gap` empty cells between them. We
+        # drop the gap entirely on narrow terminals where each bar is
+        # already 1 cell — without that the meter overflows. On wider
+        # terminals bars get 2-3 cells with a 1-cell gap for a classic
+        # banded VU look.
         n_bars = len(self.levels) or 1
         avail = max(0, self.size.width - 4)  # account for the widget's padding
-        bar_width = max(3, (avail - n_bars) // n_bars)
+        # Try with gap=1 first; fall back to gap=0 if bars would be < 1.
+        bar_width = max(1, (avail - (n_bars - 1)) // n_bars)
+        gap = 1 if bar_width >= 2 else 0
         empty_cell = " " * bar_width
+        gap_str = " " * gap
         lines: list[str] = []
         for row_idx in range(rows):
             if row_idx < red_cutoff:
@@ -210,7 +216,7 @@ class Visualizer(Static):
                     line_parts.append(f"[{color}]{block * bar_width}[/]")
                 else:
                     line_parts.append(empty_cell)
-                line_parts.append(" ")
+                line_parts.append(gap_str)
             lines.append("".join(line_parts))
         return "\n".join(lines)
 
