@@ -7,7 +7,9 @@ state via `query_one(...)`.
 
 from __future__ import annotations
 
+from textual import events
 from textual.binding import Binding
+from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import Input, ListItem, ListView, Static
 
@@ -301,6 +303,17 @@ class TrackList(ListView):
     """
 
     _DOUBLE_CLICK_WINDOW_S = 0.4
+
+    class FocusLost(Message):
+        """Posted when the TrackList loses focus.
+
+        App listens to snap the cursor back to the currently-playing track.
+        """
+
+    def _on_blur(self, event: events.Blur) -> None:  # noqa: PLW3201
+        """Surface a `FocusLost` message; App listens to snap the cursor."""
+        del event
+        self.post_message(self.FocusLost())
 
     def _on_list_item__child_clicked(self, event: ListItem._ChildClicked) -> None:  # noqa: PLW3201
         """Override Textual's default click → Selected behaviour.

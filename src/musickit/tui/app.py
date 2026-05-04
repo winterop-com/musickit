@@ -176,6 +176,17 @@ class MusickitApp(App[None]):
         self._browser_filter: str = ""
         self._tracklist_filter: str = ""
 
+    def on_track_list_focus_lost(self, event: TrackList.FocusLost) -> None:
+        """When focus leaves TrackList, snap its cursor to the playing track.
+
+        Otherwise the highlight on a non-playing row sticks around while
+        the user navigates the browser, which looks like a stale
+        selection. Coming back to the tracklist should land on what's
+        playing, not on the row the user happened to last hover.
+        """
+        del event  # unused
+        self._snap_tracklist_cursor_to_playing_track()
+
     def watch_theme(self, theme: str) -> None:
         """Persist theme changes (e.g. via the command palette) to disk."""
         state = load_state()
@@ -484,7 +495,13 @@ class MusickitApp(App[None]):
         elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
             self._clear_tracklist_filter()
             self._in_radio_view = False
-            self._set_current_album(data, track_idx=None)
+            # Re-entering the SAME album that's currently playing keeps
+            # `_current_track_idx` so the ▶ marker, NowPlayingMeta, and the
+            # cursor land on the playing track. Switching to a DIFFERENT
+            # album resets to None (default to row 0).
+            same_album = self._current_album is data and self._current_track_idx is not None
+            preserved_idx = self._current_track_idx if same_album else None
+            self._set_current_album(data, track_idx=preserved_idx)
             # Subsonic lazy-load: shell albums have no tracks until clicked.
             # Show a "Loading…" placeholder + kick a worker; the worker calls
             # back to repopulate when the API returns.
@@ -848,6 +865,11 @@ class MusickitApp(App[None]):
         self._clear_browser_filter()
         self._browse_artist = None
         self._populate_browser()
+        # When leaving the album view, reset the tracklist cursor back to
+        # the playing track (or clear it if nothing's playing) so the row
+        # the user happened to be hovering on doesn't keep its highlight
+        # while the user is browsing albums.
+        self._snap_tracklist_cursor_to_playing_track()
         if prior_artist is None or self._index is None:
             return
         # Compute prior-artist row index from the data model — `browser.children`
@@ -860,6 +882,19 @@ class MusickitApp(App[None]):
         except ValueError:
             return
         self.call_after_refresh(self._set_browser_cursor, prior_idx)
+
+    def _snap_tracklist_cursor_to_playing_track(self) -> None:
+        """Move the tracklist cursor to the playing track (or clear it)."""
+        try:
+            tracklist = self.query_one(TrackList)
+        except NoMatches:
+            return
+        if self._current_track_idx is not None:
+            self.call_after_refresh(self._set_tracklist_cursor_for_track, self._current_track_idx)
+        else:
+            from typing import cast as _cast
+
+            tracklist.index = _cast("int | None", None)
 
     def action_vol_up(self) -> None:
         self._player.set_volume(min(100, self._player.volume + 5))
