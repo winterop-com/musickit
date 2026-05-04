@@ -252,7 +252,12 @@ class ProgressLine(Static):
 
 
 class TrackTableHeader(Static):
-    """Column headers for the track table (`#  Title  Artist  Time`)."""
+    """Column headers for the track table (`#  Title  Artist  Time`).
+
+    Title column stretches to fill the available width; the # / Artist /
+    Time columns stay fixed at the same widths used in `format_track_row`
+    so the header lines up with the rows below it.
+    """
 
     DEFAULT_CSS = """
     TrackTableHeader {
@@ -263,10 +268,18 @@ class TrackTableHeader(Static):
     """
 
     def render(self) -> str:
-        # `padding: 0 2` → 2 cells reserved on each side.
+        from musickit.tui.formatters import ARTIST_WIDTH, TIME_WIDTH, compute_title_width
+
         rule_width = max(20, self.size.width - 4)
         rule = "─" * rule_width
-        return f"[{C_HEADER}]{'#':>3}  {'Title':<46}{'Artist':<28}{'Time':>6}[/]\n[dim]{rule}[/]"
+        # The header has 4 cells of horizontal padding; tracklist rows
+        # have 2 (their own padding only). The title column is the same
+        # in both, so this matches up.
+        title_width = compute_title_width(self.size.width, header_padding=4)
+        return (
+            f"[{C_HEADER}]{'#':>3} {'Title':<{title_width + 2}}{'Artist':<{ARTIST_WIDTH}} {'Time':>{TIME_WIDTH}}[/]\n"
+            f"[dim]{rule}[/]"
+        )
 
 
 class TrackList(ListView):

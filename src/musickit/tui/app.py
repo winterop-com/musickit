@@ -176,6 +176,61 @@ class MusickitApp(App[None]):
         self._browser_filter: str = ""
         self._tracklist_filter: str = ""
 
+    def on_resize(self, event: events.Resize) -> None:
+        """Reflow track rows when the terminal resizes.
+
+        The TrackTableHeader and the visualizer recompute their layout
+        from `self.size.width` every render, so they adapt automatically.
+        Each track row, on the other hand, is a `ListItem(Static(...))`
+        with a label baked in at populate time — without this hook, long
+        titles stay clipped at the OLD title width even after a resize.
+        Updates the label string in place, preserving the cursor index.
+        """
+        del event
+        from musickit.tui.formatters import compute_title_width
+
+        try:
+            tracklist = self.query_one(TrackList)
+        except NoMatches:
+            return
+        title_width = compute_title_width(tracklist.size.width, header_padding=2)
+        if self._in_radio_view:
+            for child in tracklist.children:
+                if not isinstance(child, ListItem):
+                    continue
+                station = getattr(child, "station", None)
+                idx = getattr(child, "track_index", None)
+                if station is None or not isinstance(idx, int):
+                    continue
+                rows = child.query(Static)
+                if rows:
+                    rows.first().update(
+                        format_station_row(idx, station, marker=(idx == self._marker_idx), title_width=title_width)
+                    )
+            return
+        if self._current_album is None:
+            return
+        for child in tracklist.children:
+            if not isinstance(child, ListItem):
+                continue
+            idx = getattr(child, "track_index", None)
+            if not isinstance(idx, int):
+                continue
+            if not (0 <= idx < len(self._current_album.tracks)):
+                continue
+            track = self._current_album.tracks[idx]
+            rows = child.query(Static)
+            if rows:
+                rows.first().update(
+                    format_track_row(
+                        idx,
+                        track,
+                        self._current_album,
+                        marker=(idx == self._current_track_idx),
+                        title_width=title_width,
+                    )
+                )
+
     def on_track_list_focus_lost(self, event: TrackList.FocusLost) -> None:
         """When focus leaves TrackList, snap its cursor to the playing track.
 
@@ -558,6 +613,8 @@ class MusickitApp(App[None]):
         self._current_track_idx = track_idx
 
     def _repopulate_playlist(self) -> None:
+        from musickit.tui.formatters import compute_title_width
+
         tracklist = self.query_one(TrackList)
         # Same defer-cursor pattern as the browser to avoid the
         # second-album-no-highlight bug.
@@ -568,13 +625,14 @@ class MusickitApp(App[None]):
             return
         album = self._current_album
         needle = self._tracklist_filter.casefold()
+        title_width = compute_title_width(tracklist.size.width, header_padding=2)
         matched = 0
         for i, track in enumerate(album.tracks):
             if needle:
                 hay = f"{track.title or ''} {track.artist or ''}".casefold()
                 if needle not in hay:
                     continue
-            label = format_track_row(i, track, album, marker=(i == self._current_track_idx))
+            label = format_track_row(i, track, album, marker=(i == self._current_track_idx), title_width=title_width)
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             tracklist.append(item)
@@ -617,6 +675,8 @@ class MusickitApp(App[None]):
             tracklist.index = target
 
     def _repopulate_radio_playlist(self) -> None:
+        from musickit.tui.formatters import compute_title_width
+
         tracklist = self.query_one(TrackList)
         tracklist.index = None
         tracklist.clear()
@@ -624,11 +684,12 @@ class MusickitApp(App[None]):
             tracklist.append(ListItem(Static("[dim]No stations configured. Edit `~/.config/musickit/radio.toml`.[/]")))
             return
         needle = self._tracklist_filter.casefold()
+        title_width = compute_title_width(tracklist.size.width, header_padding=2)
         matched = 0
         for i, station in enumerate(self._radio_stations):
             if needle and needle not in station.name.casefold():
                 continue
-            label = format_station_row(i, station, marker=False)
+            label = format_station_row(i, station, marker=False, title_width=title_width)
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             item.station = station  # type: ignore[attr-defined]
@@ -639,21 +700,26 @@ class MusickitApp(App[None]):
         self.call_after_refresh(self._set_tracklist_cursor, 0)
 
     def _play_station(self, station: RadioStation) -> None:
+        from musickit.tui.formatters import compute_title_width
+
         idx = self._radio_stations.index(station) if station in self._radio_stations else None
         prev = self._marker_idx
         self._current_track_idx = idx
         self._marker_idx = idx
         self._player.play(station.url)
+        title_width = compute_title_width(self.query_one(TrackList).size.width, header_padding=2)
         if prev is not None and prev != idx:
             try:
                 self.query_one(f"#track-row-{prev}", Static).update(
-                    format_station_row(prev, self._radio_stations[prev], marker=False)
+                    format_station_row(prev, self._radio_stations[prev], marker=False, title_width=title_width)
                 )
             except Exception:  # pragma: no cover
                 pass
         if idx is not None:
             try:
-                self.query_one(f"#track-row-{idx}", Static).update(format_station_row(idx, station, marker=True))
+                self.query_one(f"#track-row-{idx}", Static).update(
+                    format_station_row(idx, station, marker=True, title_width=title_width)
+                )
             except Exception:  # pragma: no cover
                 pass
 
@@ -671,6 +737,8 @@ class MusickitApp(App[None]):
         self._marker_idx = new
 
     def _update_track_row_label(self, idx: int, *, marker: bool) -> None:
+        from musickit.tui.formatters import compute_title_width
+
         if self._current_album is None:
             return
         try:
@@ -678,7 +746,8 @@ class MusickitApp(App[None]):
         except Exception:
             return
         track = self._current_album.tracks[idx]
-        label_widget.update(format_track_row(idx, track, self._current_album, marker=marker))
+        title_width = compute_title_width(self.query_one(TrackList).size.width, header_padding=2)
+        label_widget.update(format_track_row(idx, track, self._current_album, marker=marker, title_width=title_width))
 
     # ------------------------------------------------------------------
     # Status refresh (UI ticks)
@@ -1039,8 +1108,13 @@ class MusickitApp(App[None]):
             if isinstance(item, ListItem):
                 rows = item.query(Static)
                 if rows:
+                    from musickit.tui.formatters import compute_title_width
+
                     is_playing = idx == self._current_track_idx
-                    rows.first().update(format_track_row(idx, track, self._current_album, marker=is_playing))
+                    title_width = compute_title_width(tracklist.size.width, header_padding=2)
+                    rows.first().update(
+                        format_track_row(idx, track, self._current_album, marker=is_playing, title_width=title_width)
+                    )
         if idx == self._current_track_idx:
             self._refresh_status()
         self.notify(f"✓ Tags saved: {track.path.name}", severity="information")
