@@ -221,6 +221,68 @@ def test_audit_flags_track_gap(silent_flac_template: Path, tmp_path: Path) -> No
     assert any("track gaps" in w and "[3]" in w for w in _audit_codes(index.albums[0]))
 
 
+def test_audit_does_not_flag_continuous_numbering_across_discs() -> None:
+    """Mega-comp convention: disc 2's track 1 is numbered 10, etc. — not a gap."""
+    from musickit.library.audit import _audit_track_gaps
+    from musickit.library.models import LibraryAlbum, LibraryTrack
+
+    album = LibraryAlbum(
+        path=Path("/tmp/x"),
+        artist_dir="VA",
+        album_dir="Mega Comp",
+        tracks=[
+            *[LibraryTrack(path=Path(f"/tmp/x/{i}.m4a"), track_no=i, disc_no=1) for i in range(1, 10)],
+            *[LibraryTrack(path=Path(f"/tmp/x/{i}.m4a"), track_no=i, disc_no=2) for i in range(10, 19)],
+            *[LibraryTrack(path=Path(f"/tmp/x/{i}.m4a"), track_no=i, disc_no=3) for i in range(19, 28)],
+        ],
+    )
+    _audit_track_gaps(album)
+    assert album.warnings == []
+
+
+def test_audit_still_flags_real_gaps_within_continuous_disc() -> None:
+    """Continuous numbering doesn't suppress real holes WITHIN a disc's range."""
+    from musickit.library.audit import _audit_track_gaps
+    from musickit.library.models import LibraryAlbum, LibraryTrack
+
+    album = LibraryAlbum(
+        path=Path("/tmp/x"),
+        artist_dir="VA",
+        album_dir="Mega Comp",
+        tracks=[
+            *[LibraryTrack(path=Path(f"/tmp/x/{i}.m4a"), track_no=i, disc_no=1) for i in (1, 2, 3, 5, 6, 7, 8, 9)],
+            # disc 1 is missing track 4 → still flagged.
+            *[LibraryTrack(path=Path(f"/tmp/x/{i}.m4a"), track_no=i, disc_no=2) for i in range(10, 19)],
+        ],
+    )
+    _audit_track_gaps(album)
+    assert any("missing [4]" in w for w in album.warnings)
+
+
+def test_audit_per_disc_starting_at_1_still_flags_gaps_from_1() -> None:
+    """Albums where each disc restarts at 1 still get the original behaviour."""
+    from musickit.library.audit import _audit_track_gaps
+    from musickit.library.models import LibraryAlbum, LibraryTrack
+
+    album = LibraryAlbum(
+        path=Path("/tmp/x"),
+        artist_dir="A",
+        album_dir="Album",
+        tracks=[
+            # Disc 1: tracks 2, 3 — missing 1
+            LibraryTrack(path=Path("/tmp/x/1.m4a"), track_no=2, disc_no=1),
+            LibraryTrack(path=Path("/tmp/x/2.m4a"), track_no=3, disc_no=1),
+            # Disc 2: tracks 1, 2 — restarts at 1, no gap
+            LibraryTrack(path=Path("/tmp/x/3.m4a"), track_no=1, disc_no=2),
+            LibraryTrack(path=Path("/tmp/x/4.m4a"), track_no=2, disc_no=2),
+        ],
+    )
+    _audit_track_gaps(album)
+    # Disc 1 should be flagged for missing 1; disc 2 is fine.
+    assert any("disc 1" in w and "missing [1]" in w for w in album.warnings)
+    assert not any("disc 2" in w for w in album.warnings)
+
+
 def test_audit_flags_tag_path_mismatch(silent_flac_template: Path, tmp_path: Path) -> None:
     root = tmp_path / "lib"
     album = root / "Artist" / "2020 - Wrong Title"

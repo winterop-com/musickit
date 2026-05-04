@@ -86,11 +86,24 @@ def _audit_track_gaps(album: LibraryAlbum) -> None:
             continue
         disc = track.disc_no or 1
         by_disc.setdefault(disc, []).append(track.track_no)
+
+    # Some VA / mega-comp rips number tracks continuously across discs (disc
+    # 2's track 1 is "track 10" because disc 1 had 9 tracks). Per-disc audit
+    # starting at 1 would falsely flag the missing 1-9 on disc 2. Detect the
+    # pattern: every disc D > min starts at the previous disc's max + 1.
+    sorted_discs = sorted(by_disc)
+    is_continuous = len(sorted_discs) > 1 and all(
+        d - 1 in by_disc and min(by_disc[d]) == max(by_disc[d - 1]) + 1 for d in sorted_discs[1:]
+    )
+
     for disc, numbers in by_disc.items():
         numbers.sort()
         if not numbers:
             continue
-        expected = set(range(1, max(numbers) + 1))
+        # Continuous numbering → gaps within (min..max) on this disc.
+        # Per-disc-restart numbering → gaps from 1..max as before.
+        start = min(numbers) if is_continuous else 1
+        expected = set(range(start, max(numbers) + 1))
         missing = sorted(expected - set(numbers))
         if missing:
             disc_label = f"disc {disc} " if len(by_disc) > 1 else ""

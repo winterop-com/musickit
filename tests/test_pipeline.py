@@ -558,6 +558,65 @@ def test_cover_collects_every_distinct_embedded_picture(silent_flac_template: Pa
     assert best.width == 1200 and best.height == 1200
 
 
+def test_filename_disc_track_resets_continuous_numbering(tmp_path: Path) -> None:
+    """Mega-comp filenames like 02-10 (disc 2, global track 10) → reset to per-disc 1..N."""
+    from musickit.discover import AlbumDir
+    from musickit.metadata import SourceTrack
+    from musickit.pipeline.disc import _maybe_apply_filename_disc_track
+
+    paths = [
+        tmp_path / "01-01 - Track A.flac",
+        tmp_path / "01-02 - Track B.flac",
+        tmp_path / "01-03 - Track C.flac",
+        tmp_path / "02-04 - Track D.flac",
+        tmp_path / "02-05 - Track E.flac",
+        tmp_path / "02-06 - Track F.flac",
+        tmp_path / "03-07 - Track G.flac",
+        tmp_path / "03-08 - Track H.flac",
+    ]
+    for p in paths:
+        p.touch()
+    tracks = [SourceTrack(path=p) for p in paths]
+    album_dir = AlbumDir(path=tmp_path, tracks=paths)
+
+    _maybe_apply_filename_disc_track(album_dir, tracks)
+
+    # Per-disc reset: each disc starts at track 1.
+    assert [(t.disc_no, t.track_no) for t in tracks] == [
+        (1, 1),
+        (1, 2),
+        (1, 3),
+        (2, 1),
+        (2, 2),
+        (2, 3),
+        (3, 1),
+        (3, 2),
+    ]
+    assert all(t.disc_total == 3 for t in tracks)
+
+
+def test_filename_disc_track_keeps_per_disc_numbering_unchanged(tmp_path: Path) -> None:
+    """When filenames already restart per disc (01-01, 01-02, 02-01, 02-02), trust them."""
+    from musickit.discover import AlbumDir
+    from musickit.metadata import SourceTrack
+    from musickit.pipeline.disc import _maybe_apply_filename_disc_track
+
+    paths = [
+        tmp_path / "01-01 - Track A.flac",
+        tmp_path / "01-02 - Track B.flac",
+        tmp_path / "02-01 - Track C.flac",
+        tmp_path / "02-02 - Track D.flac",
+    ]
+    for p in paths:
+        p.touch()
+    tracks = [SourceTrack(path=p) for p in paths]
+    album_dir = AlbumDir(path=tmp_path, tracks=paths)
+
+    _maybe_apply_filename_disc_track(album_dir, tracks)
+
+    assert [(t.disc_no, t.track_no) for t in tracks] == [(1, 1), (1, 2), (2, 1), (2, 2)]
+
+
 def test_dedupe_drops_duplicate_tracks_with_same_disc_track_title_artist(tmp_path: Path) -> None:
     """Same tags AND ~same audio duration → same content shipped twice → drop the second."""
     from musickit.metadata import SourceTrack

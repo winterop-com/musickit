@@ -19,6 +19,11 @@ def _maybe_apply_filename_disc_track(album_dir: AlbumDir, tracks: list[SourceTra
     `01-Title.flac` from a single-disc album as a multi-disc layout). Used
     by rips that put the disc + track in the filename rather than a CD
     subfolder (e.g. Zara Larsson 2-CD layout).
+
+    When the NN portion runs continuously across discs (disc 1: 1..9,
+    disc 2: 10..18, …) we reset per-disc to 1..N — that's how Subsonic /
+    Music.app / iTunes expect track_no to work, and it stops the audit
+    flagging "missing 1-9 on disc 2" for these mega-comps.
     """
     if album_dir.disc_total is not None:
         return  # discover already merged disc subfolders — trust that signal.
@@ -32,10 +37,24 @@ def _maybe_apply_filename_disc_track(album_dir: AlbumDir, tracks: list[SourceTra
     if len(discs) < 2:
         return
     disc_total = max(discs)
+
+    by_disc: dict[int, list[int]] = {}
+    for disc_n, track_n, _, _ in parsed:
+        by_disc.setdefault(disc_n, []).append(track_n)
+    sorted_discs = sorted(by_disc)
+    is_continuous = all(d - 1 in by_disc and min(by_disc[d]) == max(by_disc[d - 1]) + 1 for d in sorted_discs[1:])
+    # Per-disc offset: subtract `min(disc_n) - 1` from each track_n to map
+    # global numbers back to per-disc-starting-at-1.
+    offsets = {d: min(by_disc[d]) - 1 for d in sorted_discs} if is_continuous else {}
+
     for disc_n, track_n, title, track in parsed:
         track.disc_no = disc_n
         track.disc_total = disc_total
-        if not track.track_no:
+        if is_continuous:
+            # Override even when track.track_no is already set — the source
+            # tag carries the global number, which is what we're correcting.
+            track.track_no = track_n - offsets[disc_n]
+        elif not track.track_no:
             track.track_no = track_n
         if not track.title:
             track.title = title
