@@ -97,13 +97,9 @@ def tui(
                 # Explicit --server: hard fail. The user asked for this server.
                 typer.echo(f"error: subsonic ping failed: {exc}", err=True)
                 raise typer.Exit(code=1) from exc
-            # Auto-resumed from state.json — server's offline. Warn and fall
-            # through to local/radio mode rather than blocking the user.
-            typer.echo(
-                f"warning: saved Subsonic server {final_url} unreachable: {exc}",
-                err=True,
-            )
-            typer.echo("  falling back to radio mode (use --server to specify a different one)\n")
+            # Auto-resumed from state.json — server's offline. Radio is a
+            # first-class mode, not a fallback to apologise for; just close
+            # the client and fall through silently.
             client.close()
         else:
             # Persist creds on successful login so the next launch can drop flags.
