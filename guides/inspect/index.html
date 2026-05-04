@@ -748,29 +748,40 @@
 
 <h1 id="musickit-inspect"><code>musickit inspect</code><a class="headerlink" href="#musickit-inspect" title="Permanent link">&para;</a></h1>
 <p>Quick tag + cover summary for a single audio file.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>musickit<span class="w"> </span>inspect<span class="w"> </span>PATH
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>inspect<span class="w"> </span>PATH
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>inspect<span class="w"> </span>PATH<span class="w"> </span>--json<span class="w">   </span><span class="c1"># raw model dump for scripting / jq</span>
 </code></pre></div>
-<p>Prints title, artist, album_artist, album, year, genre, track/disc tuples, BPM, label, catalog, lyrics presence, replaygain values, MusicBrainz IDs (if present), and embedded picture dimensions.</p>
+<p>Prints title, artist, album_artist, album, year, genre, track/disc tuples, BPM, label, catalog, lyrics, replaygain values, MusicBrainz IDs (if present), and embedded picture dimensions, all as labelled rich panels — File, Tags, ReplayGain (when present), Lyrics (when present), Embedded picture (when present). Empty fields are suppressed so the output reflects only what's actually tagged.</p>
 <p>Useful when:</p>
 <ul>
 <li>Debugging "why didn't convert pick up X?" — read the source tags directly.</li>
 <li>Verifying an output file got the tags you expected after a <code>convert</code> run.</li>
-<li>Spot-checking a single file from a problematic rip before running <code>library --audit</code> over the whole library.</li>
+<li>Spot-checking a single file from a problematic rip before running <code>library audit</code> over the whole library.</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>uvx<span class="w"> </span>musickit<span class="w"> </span>inspect<span class="w"> </span>./output/ABBA/1976<span class="se">\ </span>-<span class="se">\ </span>Arrival/01<span class="se">\ </span>-<span class="se">\ </span>When<span class="se">\ </span>I<span class="se">\ </span>Kissed<span class="se">\ </span>The<span class="se">\ </span>Teacher.m4a
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>Title:<span class="w">         </span>When<span class="w"> </span>I<span class="w"> </span>Kissed<span class="w"> </span>The<span class="w"> </span>Teacher
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>Artist:<span class="w">        </span>ABBA
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>Album<span class="w"> </span>artist:<span class="w">  </span>ABBA
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>Album:<span class="w">         </span>Arrival
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>Date:<span class="w">          </span><span class="m">1976</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>Genre:<span class="w">         </span>Pop
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>Track:<span class="w">         </span><span class="m">1</span>/10
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>Disc:<span class="w">          </span><span class="m">1</span>/1
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>BPM:<span class="w">           </span><span class="m">113</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>Cover:<span class="w">         </span><span class="m">1000</span>×1000<span class="w">  </span><span class="o">(</span>image/jpeg<span class="o">)</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>MB<span class="w"> </span>album<span class="w"> </span>ID:<span class="w">   </span>54bf8f5f-bc55-3dde-9d75-29e26795f29d
+<p>Sample output:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>─── File ───────────────────────────────────────
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  path      ./output/ABBA/1976 - Arrival/01 - When I Kissed The Teacher.m4a
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  size      6.2 MiB
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  format    M4A
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  duration  3:00
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>─── Tags ───────────────────────────────────────
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  title         When I Kissed The Teacher
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  artist        ABBA
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  album artist  ABBA
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  album         Arrival
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  date          1976
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>  track         1/10
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  disc          1/1
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>  genres        Pop
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>  bpm           113
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>─── Embedded picture ───────────────────────────
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>  mime    image/jpeg
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>  size    245.0 KiB
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>  pixels  ~1,000,000 px
 </code></pre></div>
+<p>Pass <code>--json</code> to skip the Rich rendering and get the raw <code>SourceTrack</code> model serialised for downstream pipes (<code>uvx musickit inspect track.m4a --json | jq .title</code>).</p>
 <p>Backed by <code>metadata.read_source(path)</code> — the same tag reader the convert pipeline uses. So what you see here is what convert sees.</p>
 
 

@@ -1290,7 +1290,7 @@
 
 
 <h1 id="tutorial-0-to-streaming-on-your-iphone">Tutorial: 0 to streaming on your iPhone<a class="headerlink" href="#tutorial-0-to-streaming-on-your-iphone" title="Permanent link">&para;</a></h1>
-<p>End-to-end walkthrough — from <code>git clone</code> to playing a track on Amperfy from
+<p>End-to-end walkthrough — from <code>uvx musickit</code> to playing a track on Amperfy from
 across the room. Roughly 30 minutes of wall-clock time on a 200-album library;
 most of it is the convert pipeline and the cover-pick loop.</p>
 <p>The route this tutorial takes:</p>
@@ -1309,23 +1309,26 @@ anywhere with internet. We use it so the iPhone can reach the Mac whether
 you're on the same Wi-Fi or somewhere else.</p>
 <h2 id="1-mac-setup">1. Mac setup<a class="headerlink" href="#1-mac-setup" title="Permanent link">&para;</a></h2>
 <h3 id="install-musickit">Install musickit<a class="headerlink" href="#install-musickit" title="Permanent link">&para;</a></h3>
-<p>The published package on <a href="https://pypi.org/project/musickit/">PyPI</a> is the recommended install:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">       </span><span class="c1"># recommended (uv-managed, isolated venv on PATH)</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pipx<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">          </span><span class="c1"># equivalent for pipx users</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">           </span><span class="c1"># plain pip into current env</span>
+<p>The lowest-friction way is <a href="https://docs.astral.sh/uv/"><code>uvx</code></a> — it downloads the latest published <code>musickit</code> from <a href="https://pypi.org/project/musickit/">PyPI</a>, caches it, and runs it in one step. No install step required:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>--help
 </code></pre></div>
-<p>This pulls every Python dep, including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The canonical entry point is the <code>musickit</code> command.</p>
+<p>For daily / persistent use (PATH-installed, no per-run network check):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">       </span><span class="c1"># recommended (uv-managed, isolated venv on PATH)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pipx<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">          </span><span class="c1"># equivalent for pipx users</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pip<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">           </span><span class="c1"># plain pip into current env</span>
+</code></pre></div>
+<p>Either route pulls every Python dep, including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The rest of this tutorial uses <code>uvx musickit ...</code> for examples — substitute <code>musickit ...</code> if you went the persistent-install route.</p>
 <p>If you want to hack on musickit itself, see <a href="../development/">Development</a> for the <code>git clone</code> + <code>uv sync</code> flow.</p>
 <h3 id="install-system-ffmpeg">Install system ffmpeg<a class="headerlink" href="#install-system-ffmpeg" title="Permanent link">&para;</a></h3>
 <p>The bundled FFmpeg wheels handle audio decoding for the TUI and the on-the-fly
 transcoding inside <code>serve</code>. The <code>convert</code> pipeline itself shells out to a
 system <code>ffmpeg</code> / <code>ffprobe</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>brew<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">          </span><span class="c1"># macOS</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">      </span><span class="c1"># Debian / Ubuntu</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>brew<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">          </span><span class="c1"># macOS</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">      </span><span class="c1"># Debian / Ubuntu</span>
 </code></pre></div>
 <p>Verify:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ffmpeg<span class="w"> </span>-version<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ffprobe<span class="w"> </span>-version<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ffmpeg<span class="w"> </span>-version<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>ffprobe<span class="w"> </span>-version<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1
 </code></pre></div>
 <h3 id="install-tailscale-on-the-mac">Install Tailscale on the Mac<a class="headerlink" href="#install-tailscale-on-the-mac" title="Permanent link">&para;</a></h3>
 <p>Download the Mac client from <a href="https://tailscale.com/download/mac">https://tailscale.com/download/mac</a>. Open the
@@ -1333,19 +1336,19 @@ installer, sign in with whichever identity you like (Google / GitHub / email
 + password). After login, the menu-bar Tailscale icon shows your tailnet
 hostname — looks like <code>mlaptop.tail4a4b9a.ts.net</code>. Note that hostname; the
 iPhone will use it later.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tailscale<span class="w"> </span>status<span class="w">                          </span><span class="c1"># confirm the daemon is up</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>tailscale<span class="w"> </span>ip<span class="w"> </span>-4<span class="w">                           </span><span class="c1"># your Tailscale IPv4</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>hostname<span class="w"> </span>-f<span class="w">                               </span><span class="c1"># local hostname</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tailscale<span class="w"> </span>status<span class="w">                          </span><span class="c1"># confirm the daemon is up</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tailscale<span class="w"> </span>ip<span class="w"> </span>-4<span class="w">                           </span><span class="c1"># your Tailscale IPv4</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>hostname<span class="w"> </span>-f<span class="w">                               </span><span class="c1"># local hostname</span>
 </code></pre></div>
 <h3 id="sanity-check-musickit">Sanity-check musickit<a class="headerlink" href="#sanity-check-musickit" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>--help
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>--help
 </code></pre></div>
 <p>You should see <code>convert / library / inspect / tui / serve</code> listed.</p>
 <h2 id="2-convert-a-library">2. Convert a library<a class="headerlink" href="#2-convert-a-library" title="Permanent link">&para;</a></h2>
 <p>Drop a few albums into <code>./input/</code>. Any layout works — the convert pipeline
 handles <code>Artist/Album/</code>, <code>Artist/Album/CD1/CD2/</code>, scene-tagged dirs, and
 flat dumps. For a tutorial run a sample of 5–20 albums is enough.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output
 </code></pre></div>
 <p>Default output is <code>output/&lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.m4a</code> at
 256 kbps AAC. A 200-album library on an SSD takes 5–10 minutes; an
@@ -1354,21 +1357,21 @@ if you want a per-track log line; <code>--dry-run</code> plans without writing.<
 <p>When it finishes you have a clean library at <code>./output/</code>. The rest of the
 tutorial points at that directory.</p>
 <h2 id="3-audit-fix">3. Audit + fix<a class="headerlink" href="#3-audit-fix" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>audit<span class="w"> </span>./output<span class="w"> </span>--issues-only
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>audit<span class="w"> </span>./output<span class="w"> </span>--issues-only
 </code></pre></div>
 <p>Shows a table of every album with at least one warning: missing cover,
 missing year, mixed years, scene-residue dirnames, tag/path mismatch,
 track gaps. You can ignore most of these for a first run; the deterministic
 ones get fixed by:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>fix<span class="w"> </span>./output<span class="w"> </span>--dry-run<span class="w">        </span><span class="c1"># preview</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>fix<span class="w"> </span>./output<span class="w">                  </span><span class="c1"># apply</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>fix<span class="w"> </span>./output<span class="w"> </span>--dry-run<span class="w">        </span><span class="c1"># preview</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>fix<span class="w"> </span>./output<span class="w">                  </span><span class="c1"># apply</span>
 </code></pre></div>
 <p>The fixer makes one MusicBrainz HTTP call per flagged album to backfill
 missing years, then renames directories to match the canonical
 <code>YYYY - Album</code> form. A progress bar shows what it's doing — a quiet pass
 for clean albums means there's nothing to fix.</p>
 <p>For the cover-art warnings, the semi-automated path is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>cover-pick<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>cover-pick<span class="w"> </span>./output
 </code></pre></div>
 <p>Per album, this:</p>
 <ol>
@@ -1386,7 +1389,7 @@ for clean albums means there's nothing to fix.</p>
 <p>Run <code>library audit --issues-only</code> again to confirm the warning count
 dropped.</p>
 <h2 id="4-start-the-server">4. Start the server<a class="headerlink" href="#4-start-the-server" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>./output
 </code></pre></div>
 <p>By default this:</p>
 <ul>
@@ -1397,25 +1400,25 @@ dropped.</p>
 <li>uses default credentials <code>admin / admin</code> with a yellow warning</li>
 </ul>
 <p>You'll see a startup banner like:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>musickit serve — Subsonic API for /Volumes/T9/Music
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  bind: 0.0.0.0:4533
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  LAN:  http://192.168.1.42:4533
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>  Tailscale: http://mlaptop.tail4a4b9a.ts.net:4533
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>scanning library…
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>   142 artists, 318 albums, 4521 tracks
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>  mDNS: advertising as musickit-mlaptop._subsonic._tcp.local
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>  watching /Volumes/T9/Music for changes (auto-rescan on add/remove/rename)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>musickit serve — Subsonic API for /Volumes/T9/Music
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  bind: 0.0.0.0:4533
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  LAN:  http://192.168.1.42:4533
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>  Tailscale: http://mlaptop.tail4a4b9a.ts.net:4533
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>scanning library…
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>   142 artists, 318 albums, 4521 tracks
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>  mDNS: advertising as musickit-mlaptop._subsonic._tcp.local
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>  watching /Volumes/T9/Music for changes (auto-rescan on add/remove/rename)
 </code></pre></div>
 <p>Note the <strong>Tailscale</strong> URL — that's what the iPhone will use.</p>
 <p>For anything beyond a private LAN, set proper credentials. The simplest path:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/musickit
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/musickit/serve.toml<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="s">[auth]</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="s">user = &quot;your-username&quot;</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="s">password = &quot;your-strong-password&quot;</span>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="s">EOF</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/musickit
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/musickit/serve.toml<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="s">[auth]</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="s">user = &quot;your-username&quot;</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="s">password = &quot;your-strong-password&quot;</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="s">EOF</span>
 </code></pre></div>
 <p>Restart <code>musickit serve</code> — the yellow warning is gone.</p>
 <p>Leave the server running. You can also run it as a background process via
@@ -1429,16 +1432,16 @@ under Devices.</p>
 <p>In Tailscale settings, enable <strong>Use Tailscale DNS</strong> so the
 <code>*.tail-...ts.net</code> hostnames resolve from any Wi-Fi.</p>
 <p>Quick check from a browser on the iPhone:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>http://mlaptop.tail4a4b9a.ts.net:4533/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>http://mlaptop.tail4a4b9a.ts.net:4533/
 </code></pre></div>
 <p>You should see a JSON probe response like:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.1.0&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;subsonic-compatible&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span><span class="nt">&quot;api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/rest/&quot;</span><span class="p">,</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">  </span><span class="nt">&quot;spec&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://opensubsonic.netlify.app/docs/api-reference/&quot;</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.1.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;subsonic-compatible&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span><span class="nt">&quot;api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/rest/&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="nt">&quot;spec&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://opensubsonic.netlify.app/docs/api-reference/&quot;</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="p">}</span>
 </code></pre></div>
 <p>If that loads, the iPhone can reach the server.</p>
 <h3 id="install-amperfy">Install Amperfy<a class="headerlink" href="#install-amperfy" title="Permanent link">&para;</a></h3>
@@ -1483,7 +1486,7 @@ local file (HTTP buffer fill), then steady-state is real-time.</p>
 </ul>
 <h2 id="6-optional-browse-play-locally-on-the-mac">6. Optional: browse + play locally on the Mac<a class="headerlink" href="#6-optional-browse-play-locally-on-the-mac" title="Permanent link">&para;</a></h2>
 <p>If you also want to browse the same library on the Mac itself:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output
 </code></pre></div>
 <p>This is the TUI — three-pane Textual app, library browser on the left, now-playing card + 48-band visualizer + tracklist on the right.</p>
 <p><img alt="musickit TUI — drilled into an album" src="../../screenshots/album-tracks.svg" /></p>
@@ -1534,7 +1537,7 @@ that exercise all of them, so they get the most polished UX.</p>
 filesystem walk + tag read. After that, the SQLite index at
 <code>&lt;output&gt;/.musickit/index.db</code> is hydrated and only filesystem deltas
 are re-scanned. If a launch ever feels mysteriously slow, run:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>status<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>status<span class="w"> </span>./output
 </code></pre></div>
 <p>to inspect the DB and confirm it exists. <code>--full-rescan</code> (on <code>tree</code> or
 any other library subcommand) wipes + rebuilds the cache.</p>

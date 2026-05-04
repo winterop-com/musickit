@@ -936,18 +936,18 @@
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">      </span><span class="c1"># Debian / Ubuntu</span>
 </code></pre></div>
 <p>That's it for setup. Confirm:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>musickit<span class="w"> </span>--help
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>--help
 </code></pre></div>
 <p>For working on musickit itself (not just using it), see <a href="../development/">Development</a> — the <code>git clone</code> + <code>uv sync</code> flow.</p>
 <h2 id="convert-your-first-library">Convert your first library<a class="headerlink" href="#convert-your-first-library" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output
 </code></pre></div>
 <p>Default is <code>--format auto</code> — every track ends up <code>.m4a</code> with AAC inside, at 256 kbps. Apple Music quality, ~24% the size of lossless. See <a href="../convert/">Convert</a> for the full codec / bitrate matrix.</p>
 <p>Useful flags worth knowing on the first run:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--dry-run<span class="w">           </span><span class="c1"># plan only, no writes</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--verbose<span class="w">           </span><span class="c1"># per-track log lines</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--format<span class="w"> </span>alac<span class="w">       </span><span class="c1"># archival lossless</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--remove-source<span class="w">     </span><span class="c1"># delete source after success</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--dry-run<span class="w">           </span><span class="c1"># plan only, no writes</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--verbose<span class="w">           </span><span class="c1"># per-track log lines</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--format<span class="w"> </span>alac<span class="w">       </span><span class="c1"># archival lossless</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--remove-source<span class="w">     </span><span class="c1"># delete source after success</span>
 </code></pre></div>
 <p>After it finishes you'll have <code>output/&lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.m4a</code> for every album.</p>
 <h2 id="audit-fix-the-result">Audit + fix the result<a class="headerlink" href="#audit-fix-the-result" title="Permanent link">&para;</a></h2>
@@ -961,8 +961,8 @@
 <h2 id="browse-play-locally">Browse + play locally<a class="headerlink" href="#browse-play-locally" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output
 </code></pre></div>
-<p>Three-pane TUI: sidebar with the artist→album browser, main area with the now-playing meta + 24-band visualizer + progress + tracklist, bottom keybar. Decoder + sounddevice output run in a separate process (their own GIL) so UI work can't stall playback into a buffer underrun. Both libraries ship pip wheels — no system audio install needed.</p>
-<p>Press <code>?</code> for the full keybindings panel. The most useful: <code>Enter</code> to play, <code>Space</code> to pause, <code>n</code>/<code>p</code> for next/prev, <code>&lt;/&gt;</code> for ±5s seek, <code>Ctrl+P</code> for the command palette, <code>q</code> to quit.</p>
+<p>Three-pane TUI: sidebar with the artist→album browser, main area with the now-playing meta + 48-band visualizer + click-to-seek progress + tracklist, bottom keybar. Decoder + sounddevice output run in a separate process (their own GIL) so UI work can't stall playback into a buffer underrun. Both libraries ship pip wheels — no system audio install needed.</p>
+<p>Press <code>?</code> for the full keybindings panel. The most useful: <code>Enter</code> to play, <code>Space</code> to pause, <code>n</code>/<code>p</code> for next/prev, <code>&lt;/&gt;</code> for ±5s seek, <code>9</code>/<code>0</code> for volume, <code>Ctrl+P</code> for the command palette, <code>q</code> to quit.</p>
 <p>If you have an AirPlay device on the LAN, press <code>a</code> to route playback to it. See <a href="../tui/">TUI</a> for the full feature set.</p>
 <h2 id="stream-over-your-lan-tailscale">Stream over your LAN / Tailscale<a class="headerlink" href="#stream-over-your-lan-tailscale" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>./output
