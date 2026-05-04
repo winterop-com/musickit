@@ -110,6 +110,7 @@ class NowPlayingMeta(Static):
 
     DEFAULT_CSS = """
     NowPlayingMeta {
+        width: 1fr;
         height: auto;
         padding: 1 2;
     }
@@ -123,9 +124,12 @@ class NowPlayingMeta(Static):
     fmt = reactive("—")
 
     def render(self) -> str:
+        # `padding: 1 2` → 2 cells on each side reserved.
+        rule_width = max(20, self.size.width - 4)
+        rule = "─" * rule_width
         rows = [
             f"[{C_HEADER}]Now Playing[/]",
-            "[dim]──────────────────────────────────────────────[/]",
+            f"[dim]{rule}[/]",
             f"[{C_LABEL}]Artist:[/]  {self.artist}",
             f"[{C_LABEL}]Title:[/]   [bold]{self.title_text}[/]",
             f"[{C_LABEL}]Album:[/]   {self.album}",
@@ -202,6 +206,7 @@ class ProgressLine(Static):
 
     DEFAULT_CSS = """
     ProgressLine {
+        width: 1fr;
         height: 1;
         padding: 0 2;
     }
@@ -213,12 +218,14 @@ class ProgressLine(Static):
 
     def render(self) -> str:
         width = max(20, self.size.width - 30)
+        # `C_MUTED` (slate) for the unfilled track instead of `C_DIM`
+        # (#3a3a3a, nearly invisible against the dark background).
         if self.duration <= 0:
-            bar = f"[{C_DIM}]{'─' * width}[/]"
+            bar = f"[{C_MUTED}]{'─' * width}[/]"
         else:
             ratio = max(0.0, min(1.0, self.position / self.duration))
             filled = int(round(ratio * width))
-            bar = f"[{C_TIME}]{'━' * filled}[/][{C_DIM}]{'─' * (width - filled)}[/]"
+            bar = f"[{C_TIME}]{'━' * filled}[/][{C_MUTED}]{'─' * (width - filled)}[/]"
         if self.state == "playing":
             badge = f"[{C_PLAYING}][playing][/]"
         elif self.state == "paused":
@@ -235,13 +242,17 @@ class TrackTableHeader(Static):
 
     DEFAULT_CSS = """
     TrackTableHeader {
+        width: 1fr;
         height: 2;
         padding: 0 2;
     }
     """
 
     def render(self) -> str:
-        return f"[{C_HEADER}]{'#':>3}  {'Title':<46}{'Artist':<28}{'Time':>6}[/]\n[dim]{'─' * 90}[/]"
+        # `padding: 0 2` → 2 cells reserved on each side.
+        rule_width = max(20, self.size.width - 4)
+        rule = "─" * rule_width
+        return f"[{C_HEADER}]{'#':>3}  {'Title':<46}{'Artist':<28}{'Time':>6}[/]\n[dim]{rule}[/]"
 
 
 class TrackList(ListView):
