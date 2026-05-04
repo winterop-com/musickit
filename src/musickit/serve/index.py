@@ -45,20 +45,39 @@ class IndexCache:
                 return
             self.scan_in_progress = True
         try:
-            new_index = library_mod.scan(self.root, on_album=on_album)
-            library_mod.audit(new_index)
-            self._reindex(new_index)
+            self._rebuild_inner(on_album=on_album)
         finally:
             with self._scan_lock:
                 self.scan_in_progress = False
 
     def start_background_rescan(self) -> bool:
-        """Kick a daemon thread that calls `rebuild()`. Returns False if a scan is already running."""
+        """Kick a daemon thread that runs the rebuild. Returns False if already running.
+
+        Sets `scan_in_progress=True` under the lock BEFORE spawning the thread,
+        so a `getScanStatus` poll fired right after `startScan` reflects the
+        intended active state. Without this the daemon thread could lose the
+        race and the client would see `scanning=false` and stop polling.
+        """
         with self._scan_lock:
             if self.scan_in_progress:
                 return False
-        threading.Thread(target=self.rebuild, name="musickit-rescan", daemon=True).start()
+            self.scan_in_progress = True
+
+        def runner() -> None:
+            try:
+                self._rebuild_inner()
+            finally:
+                with self._scan_lock:
+                    self.scan_in_progress = False
+
+        threading.Thread(target=runner, name="musickit-rescan", daemon=True).start()
         return True
+
+    def _rebuild_inner(self, *, on_album: Callable[[Path, int, int], None] | None = None) -> None:
+        """Do the actual scan + audit + reindex work. Caller owns `scan_in_progress`."""
+        new_index = library_mod.scan(self.root, on_album=on_album)
+        library_mod.audit(new_index)
+        self._reindex(new_index)
 
     def _reindex(self, idx: LibraryIndex) -> None:
         """Replace all lookup maps from a fresh `LibraryIndex`."""

@@ -172,6 +172,40 @@ def test_player_stop_is_safe_when_never_played(fake_stream: type[_FakeOutputStre
     player.stop()  # must not raise
 
 
+def test_stale_decoder_does_not_corrupt_next_playback(silent_m4a: Path, fake_stream: type[_FakeOutputStream]) -> None:
+    """A slow-to-exit decoder must write to its own queue, not the next track's.
+
+    Regression: previously the decoder thread read self._queue + self._stopped
+    by reference. After teardown reset those to point at a new playback's
+    state, the stale decoder could push old PCM (or its end-of-stream
+    sentinel) into the new playback's queue, corrupting the next track.
+    """
+    from musickit.tui.player import AudioPlayer
+
+    player = AudioPlayer()
+    player.play(silent_m4a)
+    # Let the decoder spin up.
+    deadline = time.time() + 2.0
+    while time.time() < deadline and player._queue is None:  # noqa: SLF001
+        time.sleep(0.01)
+    first_queue = player._queue  # noqa: SLF001
+    first_stop = player._decoder_stop  # noqa: SLF001
+    assert first_queue is not None
+    assert first_stop is not None
+
+    # Tear down + start a new playback. The new one must get fresh
+    # queue + stop event objects; the OLD ones must have been signalled.
+    player.play(silent_m4a)
+    deadline = time.time() + 2.0
+    while time.time() < deadline and (player._queue is first_queue or player._queue is None):  # noqa: SLF001
+        time.sleep(0.01)
+    assert player._queue is not first_queue, "queue must be re-created per playback"  # noqa: SLF001
+    assert player._decoder_stop is not first_stop, "stop event must be re-created per playback"  # noqa: SLF001
+    assert first_stop.is_set(), "old decoder's stop event must be set so it bails on its next iteration"
+
+    player.stop()
+
+
 def test_stop_cancels_pending_async_open(monkeypatch: pytest.MonkeyPatch, fake_stream: type[_FakeOutputStream]) -> None:
     """`play(slow_url); stop()` must NOT start playback after the slow open returns.
 

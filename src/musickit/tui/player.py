@@ -93,6 +93,14 @@ class AudioPlayer:
         # Filled per-`play()`:
         self._queue: queue.Queue[np.ndarray | None] | None = None
         self._decoder_thread: threading.Thread | None = None
+        # Per-decoder stop event. Each decoder thread captures its own
+        # event by closure when started; teardown sets the OLD event so a
+        # stale decoder that didn't join in time still bails on its next
+        # iteration. Without this isolation, a slow decoder could wake up
+        # after the next play() began and write to the new playback's
+        # queue (queue corruption) or push an end-sentinel that the audio
+        # callback would interpret as the new track having ended.
+        self._decoder_stop: threading.Event | None = None
         self._stream: sd.OutputStream | None = None
         self._end_fired: bool = False
         self._seek_target: float | None = None  # set by seek(), consumed by decoder
@@ -165,7 +173,14 @@ class AudioPlayer:
         self._paused = False
         self._stopped = False
         self._current_source = source
-        self._queue = queue.Queue(maxsize=_QUEUE_MAX_CHUNKS)
+        # Per-decoder queue + stop event. The decoder thread captures these
+        # references; even if the previous decoder didn't join in time, it
+        # writes to its OWN orphaned queue and observes its OWN set stop
+        # event, never touching this new playback's state.
+        local_queue: queue.Queue[np.ndarray | None] = queue.Queue(maxsize=_QUEUE_MAX_CHUNKS)
+        local_stop = threading.Event()
+        self._queue = local_queue
+        self._decoder_stop = local_stop
         self._current_chunk = None
         self._chunk_offset = 0
 
@@ -182,7 +197,7 @@ class AudioPlayer:
         thread_name = f"musickit-decoder-{Path(str(source)).name}"
         self._decoder_thread = threading.Thread(
             target=self._decoder_loop,
-            args=(container, stream),
+            args=(container, stream, local_queue, local_stop, source),
             name=thread_name,
             daemon=True,
         )
@@ -223,6 +238,12 @@ class AudioPlayer:
         with self._lock:
             self._stopped = True
             self._band_levels = [0.0] * _VIS_BANDS
+        # Signal the OLD decoder via its captured stop event. Even if it
+        # doesn't exit before the next _setup_playback installs new state,
+        # it still observes its own set event and bails — never writes to
+        # the new playback's queue.
+        if self._decoder_stop is not None:
+            self._decoder_stop.set()
         if self._stream is not None:
             try:
                 self._stream.stop()
@@ -241,6 +262,7 @@ class AudioPlayer:
             self._decoder_thread.join(timeout=2.0)
         self._decoder_thread = None
         self._queue = None
+        self._decoder_stop = None
         self._current_chunk = None
         self._chunk_offset = 0
 
@@ -320,34 +342,54 @@ class AudioPlayer:
     # Decoder thread
     # ------------------------------------------------------------------
 
-    def _decoder_loop(self, container: InputContainer, stream: Any) -> None:
+    def _decoder_loop(
+        self,
+        container: InputContainer,
+        stream: Any,
+        local_queue: queue.Queue[np.ndarray | None],
+        local_stop: threading.Event,
+        source: Path | str,
+    ) -> None:
+        """Decode `container` into `local_queue` until `local_stop` fires.
+
+        All shared state is captured by parameter — no `self._queue` /
+        `self._stopped` reads in the body. Stale decoders write to their
+        own queue, see their own set stop event, and exit cleanly.
+        """
         try:
             resampler = av.AudioResampler(format="flt", layout="stereo", rate=self._sample_rate)
-            self._decode_into_queue(container, stream, resampler)
+            self._decode_into_queue(container, stream, resampler, local_queue, local_stop)
         except Exception as exc:  # pragma: no cover — surface decode errors softly
-            log.warning("decoder failed for %s: %s", self._current_source, exc)
-            if self.on_track_failed is not None and self._current_source is not None:
-                self.on_track_failed(self._current_source, str(exc))
+            log.warning("decoder failed for %s: %s", source, exc)
+            if not local_stop.is_set() and self.on_track_failed is not None:
+                self.on_track_failed(source, str(exc))
         finally:
             try:
                 container.close()
             except Exception:  # pragma: no cover
                 pass
             # Sentinel: tells the audio callback no more chunks are coming.
-            if self._queue is not None:
-                try:
-                    self._queue.put(None, timeout=1.0)
-                except queue.Full:  # pragma: no cover
-                    pass
+            # Always pushed to the LOCAL queue — never the new playback's.
+            try:
+                local_queue.put(None, timeout=1.0)
+            except queue.Full:  # pragma: no cover
+                pass
 
-    def _decode_into_queue(self, container: InputContainer, stream: Any, resampler: AudioResampler) -> None:
+    def _decode_into_queue(
+        self,
+        container: InputContainer,
+        stream: Any,
+        resampler: AudioResampler,
+        local_queue: queue.Queue[np.ndarray | None],
+        local_stop: threading.Event,
+    ) -> None:
         for packet in container.demux(stream):
-            if self._stopped:
+            if local_stop.is_set():
                 return
             # Honour seeks issued from the caller thread.
             target = self._consume_seek_target()
             if target is not None:
-                self._apply_seek(container, stream, target)
+                self._apply_seek(container, stream, target, local_queue)
                 continue
             # ICY metadata refresh: when streaming, `container.metadata` is
             # updated in-place by libavformat as `StreamTitle` lines arrive
@@ -355,11 +397,11 @@ class AudioPlayer:
             if self._is_live:
                 self._poll_stream_metadata(container)
             for frame in packet.decode():
-                if self._stopped:
+                if local_stop.is_set():
                     return
                 for resampled in resampler.resample(frame):
-                    self._push_frame(resampled)
-                    if self._stopped:
+                    self._push_frame(resampled, local_queue, local_stop)
+                    if local_stop.is_set():
                         return
 
     def _poll_stream_metadata(self, container: InputContainer) -> None:
@@ -378,14 +420,20 @@ class AudioPlayer:
             self._seek_target = None
         return target
 
-    def _apply_seek(self, container: InputContainer, stream: Any, seconds: float) -> None:
-        # Drop queued PCM so the next callback hears the new position immediately.
-        if self._queue is not None:
-            while True:
-                try:
-                    self._queue.get_nowait()
-                except queue.Empty:
-                    break
+    def _apply_seek(
+        self,
+        container: InputContainer,
+        stream: Any,
+        seconds: float,
+        local_queue: queue.Queue[np.ndarray | None],
+    ) -> None:
+        # Drop queued PCM on the LOCAL queue so the next callback hears the
+        # new position immediately. Never touches a different decoder's queue.
+        while True:
+            try:
+                local_queue.get_nowait()
+            except queue.Empty:
+                break
         target_pts = int(seconds / float(stream.time_base))
         try:
             container.seek(target_pts, stream=stream)
@@ -393,9 +441,12 @@ class AudioPlayer:
             return
         self._frames_played = int(seconds * self._sample_rate)
 
-    def _push_frame(self, frame: AudioFrame) -> None:
-        if self._queue is None:
-            return
+    def _push_frame(
+        self,
+        frame: AudioFrame,
+        local_queue: queue.Queue[np.ndarray | None],
+        local_stop: threading.Event,
+    ) -> None:
         # PyAV gives us (channels, samples) when planar, (1, samples*channels) when packed.
         # Resampler with format='flt' (float interleaved) → packed.
         array = frame.to_ndarray()
@@ -408,13 +459,13 @@ class AudioPlayer:
         # Push in fixed-size chunks so the audio callback always gets _CHUNK_FRAMES.
         offset = 0
         total = interleaved.shape[0]
-        while offset < total and not self._stopped:
+        while offset < total and not local_stop.is_set():
             chunk = interleaved[offset : offset + _CHUNK_FRAMES]
             offset += chunk.shape[0]
             try:
-                self._queue.put(np.ascontiguousarray(chunk, dtype=np.float32), timeout=1.0)
+                local_queue.put(np.ascontiguousarray(chunk, dtype=np.float32), timeout=1.0)
             except queue.Full:  # pragma: no cover
-                if self._stopped:
+                if local_stop.is_set():
                     return
 
     # ------------------------------------------------------------------

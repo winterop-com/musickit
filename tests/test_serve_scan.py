@@ -32,6 +32,17 @@ def test_start_scan_returns_status_envelope(tmp_path: Path) -> None:
     assert "scanning" in body["scanStatus"]
 
 
+def test_start_scan_immediately_reports_scanning_true(tmp_path: Path) -> None:
+    """Race regression: scan_in_progress must be set BEFORE the bg thread runs.
+
+    Otherwise a fast client polling getScanStatus right after startScan
+    could see scanning=false and stop polling before the rescan even
+    started.
+    """
+    body = _client(tmp_path).post("/rest/startScan", params=_params()).json()["subsonic-response"]
+    assert body["scanStatus"]["scanning"] is True
+
+
 def test_start_scan_walks_real_directory(tmp_path: Path) -> None:
     """End-to-end: dump a fake album on disk, hit startScan, poll until done."""
     # Build a tiny "album" — empty m4a is fine, library.scan reads tags

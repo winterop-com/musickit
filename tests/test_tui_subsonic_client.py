@@ -163,3 +163,55 @@ def test_close_is_idempotent_and_safe(tmp_path: Path) -> None:
     sc = _subsonic(_serve_test_client(tmp_path))
     sc.close()
     sc.close()  # second call after the http client is already closed
+
+
+def test_malformed_json_top_level_list_raises_subsonic_error() -> None:
+    """A server returning `[]` at top level → SubsonicError, not TypeError."""
+    import httpx as _httpx
+
+    def handler(_req: _httpx.Request) -> _httpx.Response:
+        return _httpx.Response(200, json=[])
+
+    transport = _httpx.MockTransport(handler)
+    sc = SubsonicClient("http://x", "u", "p", http=_httpx.Client(transport=transport))
+    with pytest.raises(SubsonicError, match="malformed"):
+        sc.ping()
+
+
+def test_malformed_json_envelope_is_list_raises_subsonic_error() -> None:
+    """`{"subsonic-response": []}` — envelope must be a dict — yields SubsonicError."""
+    import httpx as _httpx
+
+    def handler(_req: _httpx.Request) -> _httpx.Response:
+        return _httpx.Response(200, json={"subsonic-response": []})
+
+    transport = _httpx.MockTransport(handler)
+    sc = SubsonicClient("http://x", "u", "p", http=_httpx.Client(transport=transport))
+    with pytest.raises(SubsonicError, match="malformed"):
+        sc.ping()
+
+
+def test_malformed_envelope_missing_key_raises_subsonic_error() -> None:
+    """Plain JSON without the wrapper → SubsonicError."""
+    import httpx as _httpx
+
+    def handler(_req: _httpx.Request) -> _httpx.Response:
+        return _httpx.Response(200, json={"some_other_key": 1})
+
+    transport = _httpx.MockTransport(handler)
+    sc = SubsonicClient("http://x", "u", "p", http=_httpx.Client(transport=transport))
+    with pytest.raises(SubsonicError, match="malformed"):
+        sc.ping()
+
+
+def test_non_json_response_raises_subsonic_error() -> None:
+    """Server returning HTML (e.g. proxy error page) → SubsonicError, not ValueError."""
+    import httpx as _httpx
+
+    def handler(_req: _httpx.Request) -> _httpx.Response:
+        return _httpx.Response(200, text="<html>Service Unavailable</html>")
+
+    transport = _httpx.MockTransport(handler)
+    sc = SubsonicClient("http://x", "u", "p", http=_httpx.Client(transport=transport))
+    with pytest.raises(SubsonicError, match="malformed"):
+        sc.ping()

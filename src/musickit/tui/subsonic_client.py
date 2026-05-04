@@ -62,14 +62,26 @@ class SubsonicClient:
             resp.raise_for_status()
         except httpx.HTTPError as exc:
             raise SubsonicError(f"HTTP error: {exc}") from exc
+        # Defensive parse — beyond the obvious JSON-decode error, a malformed
+        # server might return `[]` (TypeError on dict-indexing), or
+        # `{"subsonic-response": []}` (AttributeError on `.get`), or a string
+        # status that doesn't compare normally. Funnel everything into
+        # SubsonicError so callers don't have to handle bare exceptions.
         try:
-            envelope = resp.json()["subsonic-response"]
-        except (KeyError, ValueError) as exc:
+            parsed = resp.json()
+            if not isinstance(parsed, dict):
+                raise TypeError("top-level response is not a JSON object")
+            envelope = parsed["subsonic-response"]
+            if not isinstance(envelope, dict):
+                raise TypeError("subsonic-response is not a JSON object")
+        except (KeyError, ValueError, TypeError, AttributeError) as exc:
             raise SubsonicError(f"malformed response: {resp.text[:120]}") from exc
         if envelope.get("status") != "ok":
-            err = envelope.get("error", {})
+            err = envelope.get("error") or {}
+            if not isinstance(err, dict):
+                err = {}
             raise SubsonicError(f"code {err.get('code')}: {err.get('message', 'unknown error')}")
-        return envelope  # type: ignore[no-any-return]
+        return envelope
 
     def ping(self) -> None:
         """Auth check + connectivity. Raises SubsonicError on any failure."""
