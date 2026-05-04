@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight runs for the same PR / branch when a new commit lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: check + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install ffmpeg + libportaudio
+        # ffmpeg is needed by the convert pipeline + transcoding tests.
+        # libportaudio2 is the runtime sounddevice loads (the wheel ships
+        # bindings, not PortAudio itself).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libportaudio2
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: make check
+        run: make check
+
+      - name: make test
+        run: make test

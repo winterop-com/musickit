@@ -1,4 +1,4 @@
-.PHONY: help install lint test coverage docs docs-serve docs-build clean
+.PHONY: help install lint check test coverage docs docs-serve docs-build clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -7,7 +7,8 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  install      Install dependencies"
-	@echo "  lint         Run ruff + mypy + pyright"
+	@echo "  lint         Run ruff (with --fix) + mypy + pyright — local dev, mutates code"
+	@echo "  check        Run ruff (no --fix) + mypy + pyright — CI-safe, never mutates"
 	@echo "  test         Run pytest"
 	@echo "  coverage     Run pytest with coverage"
 	@echo "  docs-serve   Serve documentation locally with live reload"
@@ -23,6 +24,15 @@ lint:
 	@echo ">>> Running linter"
 	@$(UV) run ruff format .
 	@$(UV) run ruff check . --fix
+	@echo ">>> Running type checkers"
+	@$(UV) run mypy --explicit-package-bases src tests
+	@$(UV) run pyright
+
+check:
+	@echo ">>> Running format check (no mutations)"
+	@$(UV) run ruff format --check .
+	@echo ">>> Running lint check (no mutations)"
+	@$(UV) run ruff check .
 	@echo ">>> Running type checkers"
 	@$(UV) run mypy --explicit-package-bases src tests
 	@$(UV) run pyright
