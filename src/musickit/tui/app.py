@@ -20,6 +20,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
+from textual.timer import Timer
 from textual.widgets import Input, ListItem, ListView, Static
 
 from musickit import library as library_mod
@@ -175,20 +176,37 @@ class MusickitApp(App[None]):
         # substring match. Empty = inactive.
         self._browser_filter: str = ""
         self._tracklist_filter: str = ""
+        # Debounce timer for `on_resize` — reflowing track rows on every
+        # resize-burst event holds the GIL long enough to scratch audio.
+        self._resize_reflow_timer: Timer | None = None
 
     def on_resize(self, event: events.Resize) -> None:
-        """Reflow track rows when the terminal resizes.
+        """Schedule a debounced row reflow after the user stops resizing.
 
-        The TrackTableHeader and the visualizer recompute their layout
-        from `self.size.width` every render, so they adapt automatically.
-        Each track row, on the other hand, is a `ListItem(Static(...))`
-        with a label baked in at populate time — without this hook, long
-        titles stay clipped at the OLD title width even after a resize.
-        Updates the label string in place, preserving the cursor index.
+        The TrackTableHeader and visualizer recompute their layout from
+        `self.size.width` every render, so they adapt automatically. Each
+        track row, on the other hand, is a `ListItem(Static(...))` with a
+        label baked in at populate time — without re-rendering, long
+        titles stay clipped at the OLD title width.
+
+        Resize events fire continuously during a drag (potentially per
+        cell) — running the per-row reflow on each fire holds the GIL
+        long enough to starve the audio callback and produce mid-track
+        scratches. Debouncing collapses the burst into one update once
+        the user stops resizing.
         """
         del event
+        # Cancel any pending reflow; schedule a new one.
+        if self._resize_reflow_timer is not None:
+            self._resize_reflow_timer.stop()
+        self._resize_reflow_timer = self.set_timer(0.15, self._reflow_track_rows)
+
+    def _reflow_track_rows(self) -> None:
+        """Re-render every track row's label with the current title_width."""
         from musickit.tui.formatters import compute_title_width
 
+        # Clear the debounce flag so `_refresh_visualizer` resumes ticking.
+        self._resize_reflow_timer = None
         try:
             tracklist = self.query_one(TrackList)
         except NoMatches:
@@ -754,7 +772,15 @@ class MusickitApp(App[None]):
     # ------------------------------------------------------------------
 
     def _refresh_visualizer(self) -> None:
-        """High-FPS visualizer tick — runs the FFT off the audio thread."""
+        """High-FPS visualizer tick — runs the FFT off the audio thread.
+
+        Skipped while a resize burst is in flight: the visualizer fires
+        30×/sec and adds GIL pressure on top of Textual's layout reflow.
+        Letting the bars freeze for a few hundred milliseconds during a
+        drag is invisible; preventing audio scratches is not.
+        """
+        if self._resize_reflow_timer is not None:
+            return
         self._player.update_band_levels()
         try:
             visualizer = self.query_one(Visualizer)
@@ -1011,7 +1037,11 @@ class MusickitApp(App[None]):
     def action_toggle_fullscreen(self) -> None:
         if self.screen.has_class("fullscreen"):
             self.screen.remove_class("fullscreen")
-            self.query_one(Visualizer).styles.height = 6
+            # Restore default panel height (matches the CSS height in
+            # `widgets.Visualizer.DEFAULT_CSS`). Bumping this had been
+            # missed previously — it stayed at the old 6 after the
+            # visualizer panel grew to 12, leaving a weird gap.
+            self.query_one(Visualizer).styles.height = 12
         else:
             self.screen.add_class("fullscreen")
             self.query_one(Visualizer).styles.height = "1fr"
