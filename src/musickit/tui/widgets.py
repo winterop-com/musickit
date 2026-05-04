@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from textual.binding import Binding
 from textual.reactive import reactive
-from textual.widgets import Input, ListView, Static
+from textual.widgets import Input, ListItem, ListView, Static
 
 # ---------------------------------------------------------------------------
 # Palette (ncmpcpp-leaning: cyan headers, green meters, dim grey rules,
@@ -276,6 +276,11 @@ class TrackList(ListView):
     track gets the warm `C_ACTIVE` color in its label (set by
     `format_track_row`) — the visual difference between "where I am"
     (cursor) and "what's playing" (orange marker) is intentional.
+
+    Click semantics: single click moves the cursor only (no playback).
+    Double click within ~400ms plays the track. Mirrors Spotify /
+    iTunes / etc. — and lets the user click a row to edit its tags
+    via `e` without restarting whatever's currently playing.
     """
 
     DEFAULT_CSS = """
@@ -289,11 +294,54 @@ class TrackList(ListView):
     TrackList > ListItem:even {
         background: $boost 40%;
     }
-    TrackList > ListItem.--highlight {
+    TrackList > ListItem.-highlight {
         background: $primary 50%;
         text-style: bold;
     }
     """
+
+    _DOUBLE_CLICK_WINDOW_S = 0.4
+
+    def _on_list_item__child_clicked(self, event: ListItem._ChildClicked) -> None:  # noqa: PLW3201
+        """Override Textual's default click → Selected behaviour.
+
+        Default: any click on a row posts `Selected` (== Enter), which the
+        App treats as "play this track." We want single click to just move
+        the cursor; only a second click within the double-click window
+        actually plays.
+
+        IMPORTANT: Textual dispatches a message to a handler in EVERY class
+        in the MRO that defines one, not just the most-derived. Without
+        `event.prevent_default()` here, our override runs AND the parent
+        ListView's handler also runs (which posts Selected unconditionally
+        → plays the track). `prevent_default()` sets `_no_default_action`
+        and breaks the dispatch loop in `MessagePump._get_dispatch_methods`.
+        """
+        import time
+        from typing import cast
+
+        event.prevent_default()
+        event.stop()
+        item = event.item
+        idx = -1
+        for i, child in enumerate(self.children):
+            if child is item:
+                idx = i
+                break
+        if idx < 0:
+            return
+        last_idx: int = getattr(self, "_last_click_idx", -1)
+        last_time: float = getattr(self, "_last_click_time", 0.0)
+        now = time.monotonic()
+        is_double = last_idx == idx and (now - last_time) < self._DOUBLE_CLICK_WINDOW_S
+        self._last_click_idx = idx
+        self._last_click_time = now
+        # Cast: pyright narrows `ListView.index` to `int` after this
+        # assignment, breaking external `tracklist.index = None` calls.
+        self.index = cast("int | None", idx)
+        self.focus()
+        if is_double:
+            self.post_message(self.Selected(self, item, idx))
 
 
 class BrowserList(ListView):
@@ -316,7 +364,7 @@ class BrowserList(ListView):
     BrowserList > ListItem {
         height: 1;
     }
-    BrowserList > ListItem.--highlight {
+    BrowserList > ListItem.-highlight {
         background: $primary 30%;
     }
     """

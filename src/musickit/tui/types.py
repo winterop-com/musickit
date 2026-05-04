@@ -8,8 +8,14 @@ _TREE_DEFAULT_WIDTH = 32
 _TREE_MIN_WIDTH = 20
 _TREE_MAX_WIDTH = 80
 _TREE_RESIZE_STEP = 4
-# Decoration overhead per browser row: ` ▸ ` prefix + ` (NN)` suffix + padding ≈ 8 cells.
-_BROWSER_DECORATION_PAD = 8
+# Total non-name cells in a browser row, accounting for:
+#   - sidebar `padding: 0 1`             → 2 cells
+#   - BrowserList `border: round`        → 2 cells
+#   - BrowserList `padding: 0 1`         → 2 cells
+#   - row decoration ` ▸ ` + `  (NN)`    → ~8 cells (allowing 3-digit counts)
+# = 14 cells of chrome before/after the name. Used in `_fit_sidebar_width`
+# to size the sidebar so the longest name fits without overflow-clipping.
+_BROWSER_DECORATION_PAD = 14
 
 
 class RepeatMode(str, Enum):
