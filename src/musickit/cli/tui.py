@@ -72,8 +72,12 @@ def tui(
     final_user = user or _str_or_none(saved_subsonic.get("user"))
     final_password = password or _str_or_none(saved_subsonic.get("password"))
 
-    use_subsonic = (server is not None) or (target_dir is None and final_url and final_user and final_password)
+    explicit_server = server is not None
+    use_subsonic = explicit_server or (target_dir is None and final_url and final_user and final_password)
 
+    from musickit.tui.app import MusickitApp
+
+    connected_client = None
     if use_subsonic:
         if not (final_url and final_user and final_password):
             typer.echo(
@@ -83,32 +87,41 @@ def tui(
             )
             raise typer.Exit(code=1)
 
-        from musickit.tui.app import MusickitApp
         from musickit.tui.subsonic_client import SubsonicClient, SubsonicError
 
         client = SubsonicClient(final_url, final_user, final_password)
         try:
             client.ping()
         except SubsonicError as exc:
-            typer.echo(f"error: subsonic ping failed: {exc}", err=True)
-            raise typer.Exit(code=1) from exc
+            if explicit_server:
+                # Explicit --server: hard fail. The user asked for this server.
+                typer.echo(f"error: subsonic ping failed: {exc}", err=True)
+                raise typer.Exit(code=1) from exc
+            # Auto-resumed from state.json — server's offline. Warn and fall
+            # through to local/radio mode rather than blocking the user.
+            typer.echo(
+                f"warning: saved Subsonic server {final_url} unreachable: {exc}",
+                err=True,
+            )
+            typer.echo("  falling back to radio mode (use --server to specify a different one)\n")
+            client.close()
+        else:
+            # Persist creds on successful login so the next launch can drop flags.
+            new_state = dict(saved)
+            new_state["subsonic"] = {"url": final_url, "user": final_user, "password": final_password}
+            save_state(new_state)
+            typer.echo(f"connected to {final_url} as {final_user}")
+            connected_client = client
 
-        # Persist creds on successful login so the next launch can drop flags.
-        new_state = dict(saved)
-        new_state["subsonic"] = {"url": final_url, "user": final_user, "password": final_password}
-        save_state(new_state)
-
-        typer.echo(f"connected to {final_url} as {final_user}")
-        MusickitApp(root=None, subsonic_client=client).run()
+    if connected_client is not None:
+        MusickitApp(root=None, subsonic_client=connected_client).run()
         return
 
-    # Last fallback: if there's no DIR and no Subsonic creds, briefly browse
-    # mDNS for any musickit servers on the LAN and surface them as a hint
-    # before dropping into radio-only mode.
+    # Last fallback: if there's no DIR and no live Subsonic connection, briefly
+    # browse mDNS for any musickit servers on the LAN and surface them as a
+    # hint before dropping into radio-only mode.
     if target_dir is None:
         _print_lan_hint_if_any()
-
-    from musickit.tui.app import MusickitApp
 
     MusickitApp(target_dir.resolve() if target_dir is not None else None).run()
 
