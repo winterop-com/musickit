@@ -92,7 +92,9 @@
     
       
 
-<header class="md-header" data-md-component="header">
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="musickit" class="md-header__button md-logo" aria-label="musickit" data-md-component="logo">
       
@@ -219,132 +221,6 @@
       
         
           
-            
-<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
-  <div class="md-grid">
-    <ul class="md-tabs__list">
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
-        
-  
-  
-    
-  
-  Home
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../architecture/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Architecture
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-    
-  
-  
-    
-    
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
-          
-  
-  
-  Guides
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../edge-cases/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Edge cases
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../roadmap/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Roadmap
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../api-reference/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  API Reference
-
-      </a>
-    </li>
-  
-
-      
-    </ul>
-  </div>
-</nav>
-          
         
       
       <main class="md-main" data-md-component="main">
@@ -358,10 +234,8 @@
                     
 
 
-  
 
-
-<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="musickit" class="md-nav__button md-logo" aria-label="musickit" data-md-component="logo">
       
@@ -450,13 +324,28 @@
   
     
     
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
     
     
       
         
-        
-      
-      
         
       
     
@@ -1037,42 +926,46 @@
 <h1 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">&para;</a></h1>
 <p>This page gets you from zero to "music playing in a Subsonic client over Tailscale" in about 15 minutes.</p>
 <h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/winterop-com/musickit
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>musickit
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uv<span class="w"> </span>sync
+<p>The published package on <a href="https://pypi.org/project/musickit/">PyPI</a> is the recommended install:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">       </span><span class="c1"># recommended (uv-managed, isolated venv on PATH)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pipx<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">          </span><span class="c1"># equivalent for pipx users</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">           </span><span class="c1"># plain pip into current env</span>
 </code></pre></div>
-<p><code>uv</code> will pull every Python dep including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The convert pipeline itself needs <code>ffmpeg</code> and <code>ffprobe</code> on your <code>$PATH</code>:</p>
+<p>Pulls every Python dep, including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The convert pipeline itself needs <code>ffmpeg</code> and <code>ffprobe</code> on your <code>$PATH</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>brew<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">          </span><span class="c1"># macOS</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">      </span><span class="c1"># Debian / Ubuntu</span>
 </code></pre></div>
-<p>That's it for setup.</p>
+<p>That's it for setup. Confirm:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>musickit<span class="w"> </span>--help
+</code></pre></div>
+<p>For working on musickit itself (not just using it), see <a href="../development/">Development</a> — the <code>git clone</code> + <code>uv sync</code> flow.</p>
 <h2 id="convert-your-first-library">Convert your first library<a class="headerlink" href="#convert-your-first-library" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output
 </code></pre></div>
 <p>Default is <code>--format auto</code> — every track ends up <code>.m4a</code> with AAC inside, at 256 kbps. Apple Music quality, ~24% the size of lossless. See <a href="../convert/">Convert</a> for the full codec / bitrate matrix.</p>
 <p>Useful flags worth knowing on the first run:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--dry-run<span class="w">           </span><span class="c1"># plan only, no writes</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--verbose<span class="w">           </span><span class="c1"># per-track log lines</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--format<span class="w"> </span>alac<span class="w">       </span><span class="c1"># archival lossless</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--remove-source<span class="w">     </span><span class="c1"># delete source after success</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--dry-run<span class="w">           </span><span class="c1"># plan only, no writes</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--verbose<span class="w">           </span><span class="c1"># per-track log lines</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--format<span class="w"> </span>alac<span class="w">       </span><span class="c1"># archival lossless</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w"> </span>--remove-source<span class="w">     </span><span class="c1"># delete source after success</span>
 </code></pre></div>
 <p>After it finishes you'll have <code>output/&lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.m4a</code> for every album.</p>
 <h2 id="audit-fix-the-result">Audit + fix the result<a class="headerlink" href="#audit-fix-the-result" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>audit<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>audit<span class="w"> </span>./output
 </code></pre></div>
 <p>Flags every album with a problem (missing cover, mixed years, tag/path mismatch, track gaps, scene-residue artist names, etc.). Use <code>musickit library fix ./output</code> to apply the deterministic fixes (MusicBrainz year backfill, dir-rename to match tags). See <a href="../library/">Library</a>.</p>
 <p>For low-res or missing cover art, the semi-automated fix is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>cover-pick<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>cover-pick<span class="w"> </span>./output
 </code></pre></div>
 <p>Walks the flagged albums one at a time, opens <a href="https://covers.musichoarders.xyz/">musichoarders.xyz</a> pre-filled, you paste the chosen image URL back into the terminal, it downloads + saves + embeds.</p>
 <h2 id="browse-play-locally">Browse + play locally<a class="headerlink" href="#browse-play-locally" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output
 </code></pre></div>
 <p>Three-pane TUI: sidebar with the artist→album browser, main area with the now-playing meta + 24-band visualizer + progress + tracklist, bottom keybar. Decoder + sounddevice output run in a separate process (their own GIL) so UI work can't stall playback into a buffer underrun. Both libraries ship pip wheels — no system audio install needed.</p>
 <p>Press <code>?</code> for the full keybindings panel. The most useful: <code>Enter</code> to play, <code>Space</code> to pause, <code>n</code>/<code>p</code> for next/prev, <code>&lt;/&gt;</code> for ±5s seek, <code>Ctrl+P</code> for the command palette, <code>q</code> to quit.</p>
 <p>If you have an AirPlay device on the LAN, press <code>a</code> to route playback to it. See <a href="../tui/">TUI</a> for the full feature set.</p>
 <h2 id="stream-over-your-lan-tailscale">Stream over your LAN / Tailscale<a class="headerlink" href="#stream-over-your-lan-tailscale" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uv<span class="w"> </span>run<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>./output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>./output
 </code></pre></div>
 <p>This starts a Subsonic-compatible HTTP server, binds <code>0.0.0.0:4533</code> by default (so Tailscale and your LAN both reach it), advertises itself via mDNS/Bonjour, and watches the library directory for changes. Default credentials are <code>admin</code> / <code>admin</code> with a yellow warning — pass <code>--user</code> and <code>--password</code> (or write <code>~/.config/musickit/serve.toml</code>) for anything beyond a private LAN.</p>
 <p>Then on your phone, install <strong>Symfonium</strong> (Android), <strong>Amperfy</strong> (iOS), or <strong>Feishin</strong> (desktop), point it at the URL, and you're done. See <a href="../serve/">Serve</a> for the full endpoint list, Tailscale walkthrough, and client recommendations.</p>
@@ -1140,7 +1033,7 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "navigation.tracking", "toc.follow", "search.highlight", "search.share", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
