@@ -1,62 +1,46 @@
-"""In-process audio playback via PyAV (decoding) + sounddevice (output).
+"""Public AudioPlayer — RPC client over the audio subprocess.
 
-Runs the decoder in a worker thread that pushes resampled float32 stereo
-chunks into a bounded queue. The sounddevice output stream callback drains
-one chunk per call and applies a software volume gain. Pause writes silence;
-seek flushes the queue and asks PyAV to seek the underlying container.
+The actual decoding + audio output lives in `audio_engine` running in a
+separate process. This module owns the public interface the UI calls
+(`play`, `stop`, `toggle_pause`, `seek`, `set_volume`, `set_airplay`,
+properties for position / duration / band levels / etc.) and forwards
+everything to the engine via two `multiprocessing.Queue`s plus a
+shared-memory block for high-frequency state.
 
-Track-end is event-driven: when the decoder thread finishes AND the queue
-is empty, we fire `on_track_end` once.
+Why a subprocess: the sounddevice audio callback is implemented in
+Python and acquires the GIL on every fire. With the engine in its own
+interpreter, UI work in the main process (Textual reflows, focus
+changes, GC) can no longer stall the callback into a buffer underrun.
+
+AirPlay is kept in this process for v1 — pyatv just sends URLs to the
+device, no decoder/callback contention to worry about.
 """
 
 from __future__ import annotations
 
 import logging
-import queue
+import multiprocessing as mp
 import threading
-import time
-from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from queue import Empty
+from typing import TYPE_CHECKING, Any, Callable
 
-import av
-import av.error
-import numpy as np
-import sounddevice as sd  # type: ignore[import-untyped]
-
-from musickit.tui.audio_io import get_metadata_value, open_container
+from musickit.tui.audio_engine import SharedState, engine_main
+from musickit.tui.audio_proto import (
+    SAMPLE_RATE,
+    VIS_BANDS,
+    Command,
+    Event,
+    EventOp,
+    Op,
+    PlayPayload,
+    StartedPayload,
+)
 
 if TYPE_CHECKING:
-    from av.audio.frame import AudioFrame
-    from av.audio.resampler import AudioResampler
-    from av.container.input import InputContainer
-
     from musickit.tui.airplay import AirPlayController
 
 log = logging.getLogger(__name__)
-
-_SAMPLE_RATE = 44100
-_CHANNELS = 2
-_DTYPE = "float32"
-# Buffer depth: 512 chunks × 1024 frames @ 44.1 kHz ≈ 12 seconds of stereo
-# float32 audio (~4 MB resident). Tight 3-second buffers caused audible
-# clicks on radio streams when WAN jitter spiked past the buffer drain
-# rate — most often around 30s+ once the decoder's initial backlog cleared
-# and steady-state network conditions started to bite. 12s is plenty of
-# slack for transatlantic Icecast streams without feeling sluggish on
-# local files (they fill the buffer in ~50ms regardless).
-_QUEUE_MAX_CHUNKS = 512
-_CHUNK_FRAMES = 1024  # frames per output callback iteration
-# Wait for this many chunks to land in the queue before starting the audio
-# stream. Without prebuffer the callback fires before the decoder has
-# produced anything → first ~50ms of every track is silence-and-then-pop.
-# 8 × 1024 frames @ 44.1 kHz ≈ 186ms — imperceptible startup latency for
-# a clean attack. Capped to a small wait window so a slow stream open
-# doesn't hold up forever.
-_PREBUFFER_CHUNKS = 8
-_PREBUFFER_TIMEOUT_S = 1.5
-_VIS_BANDS = 24
-_VIS_DECAY = 0.85  # per-callback decay of the band level (smooths the bars)
 
 ReplayGainMode = str  # "auto" | "track" | "album" | "off"
 
@@ -115,14 +99,20 @@ def _parse_db(value: str) -> float | None:
 
 
 class AudioPlayer:
-    """Play audio files via PyAV → sounddevice with pause/seek/volume.
+    """RPC client for the audio engine subprocess.
 
-    Threading model:
-      - Caller thread: `play()`, `stop()`, `toggle_pause()`, `seek()`, `set_volume()`.
-      - Decoder thread (one per `play()`): reads packets, decodes, resamples, queues PCM.
-      - Audio callback thread (sounddevice-managed): drains the queue.
+    The public interface matches the previous in-process implementation
+    so callers in `tui/app.py` need no changes. Internally every method
+    pushes a `Command` onto the engine's queue (or writes shared
+    memory) and the engine handles the rest in its own interpreter.
 
-    All shared state is guarded by `self._lock`.
+    Threading model from the UI's perspective:
+      - Caller thread (Textual UI): public methods.
+      - Event reader thread: drains the engine's event queue, fires
+        the on_track_end / on_track_failed / on_metadata_change
+        callbacks. Callbacks are invoked from THIS thread, same as
+        before — UI code that needs main-thread updates uses
+        `App.call_from_thread` (already does).
     """
 
     on_track_end: Callable[[], None] | None = None
@@ -131,67 +121,58 @@ class AudioPlayer:
 
     def __init__(
         self,
-        sample_rate: int = _SAMPLE_RATE,
+        sample_rate: int = SAMPLE_RATE,
         *,
         airplay: AirPlayController | None = None,
     ) -> None:
         self._sample_rate = sample_rate
-        # When set, `play(source)` hands the URL straight to the AirPlay
-        # device instead of decoding locally. Only URL sources work — local
-        # `Path` sources fall back to local playback (no inline HTTP server
-        # in v1; the Subsonic-client mode covers the common remote case).
+        # AirPlay routing stays in this process — pyatv just sends URLs to
+        # the device, no decoder/callback work to worry about.
         self._airplay = airplay
-        self._lock = threading.Lock()
-        self._volume: float = 1.0
-        # ReplayGain — mode set by the TUI (or via state.toml), multiplier
-        # computed per track in `play()` from the LibraryTrack's tags.
-        self._replaygain_mode: ReplayGainMode = "auto"
-        self._replaygain_multiplier: float = 1.0
-        self._paused: bool = False
-        self._stopped: bool = True
-        self._frames_played: int = 0
-        self._duration: float = 0.0
-        self._current_source: Path | str | None = None
-        # Live-stream metadata. `is_live` flips True when we're playing a
-        # URL whose `stream.duration` is None (Icecast/Shoutcast/HLS).
-        # `stream_title` is the most recent ICY `StreamTitle` (current song)
-        # — updated by the decoder thread polling `container.metadata`.
-        self._is_live: bool = False
-        # True iff the current playback was routed to AirPlay rather than
-        # decoded in-process. Pause / volume need to know which target to
-        # talk to (the local callback or pyatv).
         self._airplay_active: bool = False
+
+        # Local cache of state the UI reads via properties — populated by
+        # STARTED / METADATA_CHANGED events from the engine.
+        self._current_source: Path | str | None = None
+        self._is_live: bool = False
         self._stream_title: str | None = None
         self._stream_station_name: str | None = None
-        # 8-band amplitude levels (0.0–1.0), driven by the UI tick (NOT the
-        # audio callback). The callback only stores the last-played chunk;
-        # `update_band_levels()` reads it and runs FFT off the audio thread.
-        self._band_levels: list[float] = [0.0] * _VIS_BANDS
-        self._latest_chunk: np.ndarray | None = None
-        # Carry state for the audio callback: sounddevice's `frames` per
-        # call is a hint, not a guarantee, and may differ from our
-        # decoder's chunk size. We keep the partially-consumed current
-        # chunk between callbacks so no PCM is dropped or zero-padded.
-        self._current_chunk: np.ndarray | None = None
-        self._chunk_offset: int = 0
-        # Filled per-`play()`:
-        self._queue: queue.Queue[np.ndarray | None] | None = None
-        self._decoder_thread: threading.Thread | None = None
-        # Per-decoder stop event. Each decoder thread captures its own
-        # event by closure when started; teardown sets the OLD event so a
-        # stale decoder that didn't join in time still bails on its next
-        # iteration. Without this isolation, a slow decoder could wake up
-        # after the next play() began and write to the new playback's
-        # queue (queue corruption) or push an end-sentinel that the audio
-        # callback would interpret as the new track having ended.
-        self._decoder_stop: threading.Event | None = None
-        self._stream: sd.OutputStream | None = None
-        self._end_fired: bool = False
-        self._seek_target: float | None = None  # set by seek(), consumed by decoder
-        # Monotonic counter — every `play()` bumps it. The opener thread
-        # checks against the latest value to drop stale opens when the user
-        # mashes through stations faster than HTTP connects complete.
-        self._opener_gen: int = 0
+        self._replaygain_mode: ReplayGainMode = "auto"
+        self._opener_gen = 0
+
+        # Shared-memory state. mp.Value/Array provide an atomic-per-slot
+        # interface and a built-in lock; no Python-level lock needed.
+        ctx = mp.get_context("spawn")
+        self._state = SharedState(
+            position_frames=ctx.Value("q", 0),
+            duration_s=ctx.Value("d", 0.0),
+            paused=ctx.Value("b", 0),
+            stopped=ctx.Value("b", 1),
+            is_live=ctx.Value("b", 0),
+            volume=ctx.Value("d", 1.0),
+            replaygain_multiplier=ctx.Value("d", 1.0),
+            band_levels=ctx.Array("d", [0.0] * VIS_BANDS),
+        )
+        self._cmd_queue: Any = ctx.Queue()
+        self._event_queue: Any = ctx.Queue()
+
+        # Spawn the engine. `daemon=True` so the parent's exit kills it.
+        self._proc: Any = ctx.Process(
+            target=engine_main,
+            args=(self._cmd_queue, self._event_queue, self._state),
+            name="musickit-audio-engine",
+            daemon=True,
+        )
+        self._proc.start()
+
+        # Reader thread: forwards engine events to UI callbacks.
+        self._reader_stop = threading.Event()
+        self._reader = threading.Thread(
+            target=self._read_events,
+            name="musickit-audio-reader",
+            daemon=True,
+        )
+        self._reader.start()
 
     # ------------------------------------------------------------------
     # Public API
@@ -214,38 +195,25 @@ class AudioPlayer:
     def play(self, source: Path | str, *, replaygain: dict[str, str] | None = None) -> None:
         """Schedule playback of `source`. Returns immediately.
 
-        The slow part of starting playback for live streams is the HTTP
-        connect inside `av.open` — easily 1+ seconds. We do that on a
-        background thread so:
-          1. The UI doesn't freeze during the connect.
-          2. The PREVIOUS source keeps playing right up until the new one
-             is ready (no audible silence-then-pop on station switches).
+        AirPlay routing: if an AirPlay device is connected AND `source` is
+        a URL, hand the URL straight to pyatv. Local Path sources fall
+        back to engine-side decoding.
 
-        `source` can be a local `Path` or a URL string. Multiple rapid
-        `play()` calls are handled via a generation counter — only the
-        latest one's opener is allowed to swap.
-
-        AirPlay routing: when an AirPlay device is connected AND `source`
-        is a URL (radio stream or `/rest/stream` from a Subsonic server),
-        hand the URL to the device instead of decoding locally. Local
-        Path sources fall through to the normal in-process player —
-        AirPlay-from-local would need a tiny inline HTTP server, which
-        is deferred.
-
-        `replaygain` is the per-track tag dict (typically
-        `LibraryTrack.replaygain`). Resolved via the current mode into a
-        scalar multiplier applied in the audio callback. AirPlay paths
-        ignore this — the device handles its own gain.
+        `replaygain` is the per-track tag dict; resolved into a multiplier
+        on this side and pushed via shared memory before the engine starts
+        the new track, so the audio callback can read it without IPC.
         """
-        # Compute up front so the audio callback can read it post-setup
-        # without touching tag data on a worker thread.
-        self._replaygain_multiplier = compute_replaygain_multiplier(
-            replaygain or {},
-            self._replaygain_mode,
-        )
+        # Compute the RG multiplier here and push it into shared memory —
+        # the engine's audio callback reads from `_state.replaygain_multiplier`.
+        multiplier = compute_replaygain_multiplier(replaygain or {}, self._replaygain_mode)
+        with self._state.replaygain_multiplier.get_lock():
+            self._state.replaygain_multiplier.value = multiplier
+
         if self._airplay is not None and self._airplay.device is not None and isinstance(source, str):
+            # Tear down any engine-side playback first; AirPlay is the new
+            # output target.
             self._opener_gen += 1
-            self._teardown_playback()
+            self._send(Op.STOP)
             self._current_source = source
             self._is_live = source.startswith(("http://", "https://"))
             try:
@@ -255,248 +223,93 @@ class AudioPlayer:
                 if self.on_track_failed is not None:
                     self.on_track_failed(source, f"airplay: {exc}")
                 return
-            # `_teardown_playback` left `_stopped = True`; flip it back so
-            # `is_playing` reports correctly while AirPlay is the output.
-            with self._lock:
-                self._stopped = False
-                self._paused = False
-                self._airplay_active = True
+            with self._state.stopped.get_lock():
+                self._state.stopped.value = 0
+            with self._state.paused.get_lock():
+                self._state.paused.value = 0
+            self._airplay_active = True
             return
 
+        # Local playback — hand off to the engine.
         self._opener_gen += 1
-        gen = self._opener_gen
-        threading.Thread(
-            target=self._open_and_swap,
-            args=(source, gen),
-            name=f"musickit-opener-{Path(str(source)).name}",
-            daemon=True,
-        ).start()
-
-    def _open_and_swap(self, source: Path | str, gen: int) -> None:
-        """Worker thread: connect to `source`, then atomically take over playback."""
-        try:
-            container, stream = open_container(source)
-        except Exception as exc:
-            log.warning("failed to open %s: %s", source, exc)
-            if gen == self._opener_gen and self.on_track_failed is not None:
-                self.on_track_failed(source, str(exc))
-            return
-        if gen != self._opener_gen:
-            # Either a newer play() OR a stop() superseded us while we were
-            # connecting — discard this open without touching playback.
-            try:
-                container.close()
-            except Exception:  # pragma: no cover
-                pass
-            return
-        # Tear the OLD playback down only now that the NEW container is
-        # ready. Keeps the previous track audible during the HTTP connect
-        # for stream-to-stream switches. Use the internal teardown so we
-        # don't bump _opener_gen and invalidate ourselves.
-        self._teardown_playback()
-        if gen != self._opener_gen:
-            try:
-                container.close()
-            except Exception:  # pragma: no cover
-                pass
-            return
-        self._setup_playback(source, container, stream)
-
-    def _setup_playback(self, source: Path | str, container: InputContainer, stream: Any) -> None:
-        """Wire up state + threads for an already-opened container."""
-        self._frames_played = 0
-        self._end_fired = False
-        self._paused = False
-        self._stopped = False
-        # Local in-process playback — clear the AirPlay routing flag so
-        # subsequent pause/volume calls hit the local audio callback.
         self._airplay_active = False
-        self._current_source = source
-        # Per-decoder queue + stop event. The decoder thread captures these
-        # references; even if the previous decoder didn't join in time, it
-        # writes to its OWN orphaned queue and observes its OWN set stop
-        # event, never touching this new playback's state.
-        local_queue: queue.Queue[np.ndarray | None] = queue.Queue(maxsize=_QUEUE_MAX_CHUNKS)
-        local_stop = threading.Event()
-        self._queue = local_queue
-        self._decoder_stop = local_stop
-        self._current_chunk = None
-        self._chunk_offset = 0
-
-        self._duration = float(stream.duration * stream.time_base) if stream.duration else 0.0
-        self._is_live = self._duration <= 0
-        self._stream_station_name = get_metadata_value(container, "icy-name")
-        self._stream_title = get_metadata_value(container, "StreamTitle")
-        if self.on_metadata_change is not None:
-            try:
-                self.on_metadata_change()
-            except Exception:  # pragma: no cover
-                pass
-
-        thread_name = f"musickit-decoder-{Path(str(source)).name}"
-        self._decoder_thread = threading.Thread(
-            target=self._decoder_loop,
-            args=(container, stream, local_queue, local_stop, source),
-            name=thread_name,
-            daemon=True,
+        self._send(
+            Op.PLAY,
+            payload=PlayPayload(
+                source=str(source),
+                is_path=isinstance(source, Path),
+                replaygain=dict(replaygain or {}),
+            ),
+            gen=self._opener_gen,
         )
-        self._decoder_thread.start()
-
-        # Prebuffer: don't start the output stream until the decoder has
-        # produced at least a few chunks. Without this the first ~2 audio
-        # callbacks fire while the queue is still empty, write silence, and
-        # the user hears a "silence-then-pop" attack on every track. We
-        # cap the wait so a stuck open / slow stream doesn't hang the UI.
-        prebuffer_deadline = time.time() + _PREBUFFER_TIMEOUT_S
-        while time.time() < prebuffer_deadline and local_queue.qsize() < _PREBUFFER_CHUNKS and not local_stop.is_set():
-            time.sleep(0.01)
-
-        try:
-            # The Python audio callback acquires the GIL on every fire,
-            # so any heavy GIL work elsewhere (Textual layout reflow on
-            # resize, focus changes between panes, fullscreen toggle, GC
-            # pause) can stall the callback past the device-buffer
-            # deadline → audible click (PortAudio underrun / xrun).
-            #
-            # PortAudio's `latency='high'` on macOS only buys ~80ms of
-            # headroom, which a burst of focus changes or resize events
-            # can blow through (Textual repainting all widgets each time).
-            # An explicit 1.0s is generous: Core Audio internally buffers
-            # ~1s of audio so the callback can be very late and still
-            # recover. Trade-off is ~1s extra startup latency, plus
-            # seek/skip taking ~1s to take effect — imperceptible for
-            # normal music playback, the right call for jitter resistance
-            # until audio moves to a subprocess (see roadmap Tier 2).
-            self._stream = sd.OutputStream(
-                samplerate=self._sample_rate,
-                channels=_CHANNELS,
-                dtype=_DTYPE,
-                callback=self._audio_callback,
-                blocksize=_CHUNK_FRAMES,
-                latency=1.0,
-            )
-            self._stream.start()
-        except Exception as exc:
-            log.warning("failed to open audio device: %s", exc)
-            self._stopped = True
-            if self.on_track_failed is not None:
-                self.on_track_failed(source, f"audio device unavailable: {exc}")
 
     def stop(self) -> None:
-        """Stop playback, join the decoder thread, AND invalidate any pending opener.
-
-        Bumping `_opener_gen` here ensures that `play(slow_url); stop()` doesn't
-        let the slow opener finish and start playback after the user asked us
-        to stop. `_open_and_swap` calls `_teardown_playback()` directly during
-        track transitions so it doesn't invalidate itself.
-        """
+        """Stop playback (engine-side and AirPlay-side)."""
         self._opener_gen += 1
-        self._teardown_playback()
+        self._send(Op.STOP)
         if self._airplay is not None and self._airplay.device is not None:
             try:
                 self._airplay.stop()
-            except Exception:  # pragma: no cover — best-effort
+            except Exception:  # pragma: no cover
                 pass
-
-    def _teardown_playback(self) -> None:
-        """Tear down the audio output stream + decoder thread + queue.
-
-        Internal helper — does NOT bump `_opener_gen`. Used by both public
-        `stop()` and `_open_and_swap` to swap in a new container.
-        """
-        with self._lock:
-            self._stopped = True
-            self._airplay_active = False
-            self._band_levels = [0.0] * _VIS_BANDS
-        # Signal the OLD decoder via its captured stop event. Even if it
-        # doesn't exit before the next _setup_playback installs new state,
-        # it still observes its own set event and bails — never writes to
-        # the new playback's queue.
-        if self._decoder_stop is not None:
-            self._decoder_stop.set()
-        if self._stream is not None:
-            try:
-                self._stream.stop()
-                self._stream.close()
-            except Exception:  # pragma: no cover — best-effort cleanup
-                pass
-            self._stream = None
-        # Drain the queue so the decoder unblocks on its `put`.
-        if self._queue is not None:
-            while not self._queue.empty():
-                try:
-                    self._queue.get_nowait()
-                except queue.Empty:
-                    break
-        if self._decoder_thread is not None and self._decoder_thread.is_alive():
-            self._decoder_thread.join(timeout=2.0)
-        self._decoder_thread = None
-        self._queue = None
-        self._decoder_stop = None
-        self._current_chunk = None
-        self._chunk_offset = 0
+        self._airplay_active = False
 
     def toggle_pause(self) -> None:
-        with self._lock:
-            self._paused = not self._paused
-            now_paused = self._paused
-        # When routed to AirPlay the audio is decoded on the remote
-        # device; pausing the local callback (which is just writing
-        # silence at this point) doesn't stop the speaker. Forward
-        # the pause/resume command to pyatv so the device matches the
-        # UI state.
+        """Toggle pause state on the active output (engine OR AirPlay)."""
         if self._airplay_active and self._airplay is not None:
+            new_paused = not self._is_paused_local()
+            with self._state.paused.get_lock():
+                self._state.paused.value = 1 if new_paused else 0
             try:
-                if now_paused:
+                if new_paused:
                     self._airplay.pause()
                 else:
                     self._airplay.resume()
-            except Exception:  # pragma: no cover — best-effort
+            except Exception:  # pragma: no cover
                 log.warning("airplay pause/resume failed", exc_info=True)
+            return
+        self._send(Op.TOGGLE_PAUSE)
 
     def seek(self, seconds: float) -> None:
         """Seek to absolute position `seconds` from start."""
-        if self._duration <= 0:
-            return
-        with self._lock:
-            self._seek_target = max(0.0, min(seconds, self._duration))
+        self._send(Op.SEEK, payload=float(seconds))
 
     def set_volume(self, percent: int) -> None:
         clamped = max(0, min(100, percent))
-        with self._lock:
-            self._volume = clamped / 100.0
-        # When the AirPlay device is the actual output, the local
-        # software gain in the audio callback isn't applied to
-        # anything — forward the volume to the device too.
+        with self._state.volume.get_lock():
+            self._state.volume.value = clamped / 100.0
         if self._airplay_active and self._airplay is not None:
             try:
                 self._airplay.set_volume(clamped)
-            except Exception:  # pragma: no cover — best-effort
+            except Exception:  # pragma: no cover
                 log.warning("airplay set_volume failed", exc_info=True)
 
     @property
     def position(self) -> float:
         """Current playback position in seconds."""
-        return self._frames_played / self._sample_rate
+        with self._state.position_frames.get_lock():
+            frames = self._state.position_frames.value
+        return frames / self._sample_rate
 
     @property
     def duration(self) -> float:
-        return self._duration
+        with self._state.duration_s.get_lock():
+            return self._state.duration_s.value
 
     @property
     def is_playing(self) -> bool:
-        with self._lock:
-            return not self._stopped and not self._paused
+        with self._state.stopped.get_lock():
+            stopped = bool(self._state.stopped.value)
+        return not stopped and not self._is_paused_local()
 
     @property
     def is_paused(self) -> bool:
-        with self._lock:
-            return self._paused
+        return self._is_paused_local()
 
     @property
     def volume(self) -> int:
-        with self._lock:
-            return int(round(self._volume * 100))
+        with self._state.volume.get_lock():
+            return int(round(self._state.volume.value * 100))
 
     @property
     def current_path(self) -> Path | None:
@@ -513,247 +326,99 @@ class AudioPlayer:
 
     @property
     def stream_title(self) -> str | None:
-        """ICY `StreamTitle` (current track) — only meaningful while `is_live`."""
+        """ICY `StreamTitle` — only meaningful while `is_live`."""
         return self._stream_title
 
     @property
     def stream_station_name(self) -> str | None:
-        """ICY `icy-name` (station name) — set on stream open."""
+        """ICY `icy-name` — set on stream open."""
         return self._stream_station_name
 
     @property
     def band_levels(self) -> list[float]:
-        """8 amplitude bins (0.0–1.0) for the spectrum visualizer.
-
-        Updated by the audio callback (cheap FFT per chunk). Read by the UI
-        thread on its render tick. No lock needed — list reads are atomic for
-        small fixed-size lists in CPython, and we're rendering for visuals.
-        """
-        return list(self._band_levels)
-
-    # ------------------------------------------------------------------
-    # Decoder thread
-    # ------------------------------------------------------------------
-
-    def _decoder_loop(
-        self,
-        container: InputContainer,
-        stream: Any,
-        local_queue: queue.Queue[np.ndarray | None],
-        local_stop: threading.Event,
-        source: Path | str,
-    ) -> None:
-        """Decode `container` into `local_queue` until `local_stop` fires.
-
-        All shared state is captured by parameter — no `self._queue` /
-        `self._stopped` reads in the body. Stale decoders write to their
-        own queue, see their own set stop event, and exit cleanly.
-        """
-        try:
-            resampler = av.AudioResampler(format="flt", layout="stereo", rate=self._sample_rate)
-            self._decode_into_queue(container, stream, resampler, local_queue, local_stop)
-        except Exception as exc:  # pragma: no cover — surface decode errors softly
-            log.warning("decoder failed for %s: %s", source, exc)
-            if not local_stop.is_set() and self.on_track_failed is not None:
-                self.on_track_failed(source, str(exc))
-        finally:
-            try:
-                container.close()
-            except Exception:  # pragma: no cover
-                pass
-            # Sentinel: tells the audio callback no more chunks are coming.
-            # Always pushed to the LOCAL queue — never the new playback's.
-            try:
-                local_queue.put(None, timeout=1.0)
-            except queue.Full:  # pragma: no cover
-                pass
-
-    def _decode_into_queue(
-        self,
-        container: InputContainer,
-        stream: Any,
-        resampler: AudioResampler,
-        local_queue: queue.Queue[np.ndarray | None],
-        local_stop: threading.Event,
-    ) -> None:
-        for packet in container.demux(stream):
-            if local_stop.is_set():
-                return
-            # Honour seeks issued from the caller thread.
-            target = self._consume_seek_target()
-            if target is not None:
-                self._apply_seek(container, stream, target, local_queue)
-                continue
-            # ICY metadata refresh: when streaming, `container.metadata` is
-            # updated in-place by libavformat as `StreamTitle` lines arrive
-            # in the stream. Polling per-packet is cheap.
-            if self._is_live:
-                self._poll_stream_metadata(container)
-            for frame in packet.decode():
-                if local_stop.is_set():
-                    return
-                for resampled in resampler.resample(frame):
-                    self._push_frame(resampled, local_queue, local_stop)
-                    if local_stop.is_set():
-                        return
-
-    def _poll_stream_metadata(self, container: InputContainer) -> None:
-        new_title = get_metadata_value(container, "StreamTitle")
-        if new_title and new_title != self._stream_title:
-            self._stream_title = new_title
-            if self.on_metadata_change is not None:
-                try:
-                    self.on_metadata_change()
-                except Exception:  # pragma: no cover
-                    pass
-
-    def _consume_seek_target(self) -> float | None:
-        with self._lock:
-            target = self._seek_target
-            self._seek_target = None
-        return target
-
-    def _apply_seek(
-        self,
-        container: InputContainer,
-        stream: Any,
-        seconds: float,
-        local_queue: queue.Queue[np.ndarray | None],
-    ) -> None:
-        # Drop queued PCM on the LOCAL queue so the next callback hears the
-        # new position immediately. Never touches a different decoder's queue.
-        while True:
-            try:
-                local_queue.get_nowait()
-            except queue.Empty:
-                break
-        target_pts = int(seconds / float(stream.time_base))
-        try:
-            container.seek(target_pts, stream=stream)
-        except av.error.FFmpegError:  # pragma: no cover
-            return
-        self._frames_played = int(seconds * self._sample_rate)
-
-    def _push_frame(
-        self,
-        frame: AudioFrame,
-        local_queue: queue.Queue[np.ndarray | None],
-        local_stop: threading.Event,
-    ) -> None:
-        # PyAV gives us (channels, samples) when planar, (1, samples*channels) when packed.
-        # Resampler with format='flt' (float interleaved) → packed.
-        array = frame.to_ndarray()
-        if array.ndim == 2 and array.shape[0] == 1:
-            # Packed float: (1, samples * channels). Reshape to (samples, channels).
-            interleaved = array[0].reshape(-1, _CHANNELS)
-        else:
-            # Defensive: planar fallback — transpose to (samples, channels).
-            interleaved = array.T.copy()
-        # Push in fixed-size chunks so the audio callback always gets _CHUNK_FRAMES.
-        offset = 0
-        total = interleaved.shape[0]
-        while offset < total and not local_stop.is_set():
-            chunk = interleaved[offset : offset + _CHUNK_FRAMES]
-            offset += chunk.shape[0]
-            try:
-                local_queue.put(np.ascontiguousarray(chunk, dtype=np.float32), timeout=1.0)
-            except queue.Full:  # pragma: no cover
-                if local_stop.is_set():
-                    return
-
-    # ------------------------------------------------------------------
-    # Audio callback (runs on the sounddevice thread)
-    # ------------------------------------------------------------------
-
-    def _audio_callback(
-        self,
-        outdata: np.ndarray,
-        frames: int,
-        time_info: Any,
-        status: sd.CallbackFlags,
-    ) -> None:
-        del time_info, status
-        if self._stopped or self._queue is None:
-            outdata.fill(0)
-            return
-        with self._lock:
-            paused = self._paused
-            volume = self._volume
-        # ReplayGain is applied as an additional multiplier alongside the
-        # user volume slider. Computed in `play()` from the track's tags;
-        # 1.0 when RG is off, untagged, or AirPlay-routed.
-        gain = volume * self._replaygain_multiplier
-        if paused:
-            outdata.fill(0)
-            return
-        # Drain across however many decoder chunks are needed to fill `frames`.
-        # `frames` is sounddevice's request size and is NOT guaranteed to
-        # equal the decoder's chunk size (`_CHUNK_FRAMES`) — `blocksize` is a
-        # hint. Pulling exactly one chunk per callback caused dropped samples
-        # (chunk too big) or silence padding (chunk too small), perceptually
-        # producing slow/stuttery playback. Carry partially-consumed chunks
-        # between callbacks via `self._current_chunk` + `self._chunk_offset`.
-        written = 0
-        while written < frames:
-            if self._current_chunk is None or self._chunk_offset >= self._current_chunk.shape[0]:
-                try:
-                    next_chunk = self._queue.get_nowait()
-                except queue.Empty:
-                    outdata[written:].fill(0)
-                    self._frames_played += written
-                    return
-                if next_chunk is None:
-                    # End-of-stream sentinel — fill remainder with silence.
-                    outdata[written:].fill(0)
-                    self._frames_played += written
-                    if not self._end_fired:
-                        self._end_fired = True
-                        if self.on_track_end is not None:
-                            # Fire on a separate thread so the callback returns promptly.
-                            threading.Thread(target=self.on_track_end, daemon=True).start()
-                    return
-                self._current_chunk = next_chunk
-                self._chunk_offset = 0
-            chunk = self._current_chunk
-            available = chunk.shape[0] - self._chunk_offset
-            take = min(available, frames - written)
-            outdata[written : written + take] = chunk[self._chunk_offset : self._chunk_offset + take] * gain
-            self._chunk_offset += take
-            written += take
-        self._frames_played += written
-        # Stash the most recently delivered window for the UI thread's FFT.
-        if self._current_chunk is not None and self._chunk_offset > 0:
-            self._latest_chunk = self._current_chunk[max(0, self._chunk_offset - frames) : self._chunk_offset]
+        """24 amplitude bins (0.0–1.0) for the spectrum visualizer."""
+        with self._state.band_levels.get_lock():
+            return [float(self._state.band_levels[i]) for i in range(VIS_BANDS)]
 
     def update_band_levels(self) -> None:
-        """Compute FFT band levels from the most recently played chunk.
+        """No-op — band levels are now updated by the engine and read via shared memory."""
 
-        Called from the UI thread (~30Hz) — explicitly NOT from the audio
-        callback. If no fresh chunk is available (paused / between tracks),
-        bars decay toward silence.
-        """
-        chunk = self._latest_chunk
-        if chunk is None or chunk.size == 0:
-            for i in range(_VIS_BANDS):
-                self._band_levels[i] *= _VIS_DECAY
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    def _is_paused_local(self) -> bool:
+        with self._state.paused.get_lock():
+            return bool(self._state.paused.value)
+
+    def _send(self, op: Op, *, payload: Any = None, gen: int = 0) -> None:
+        try:
+            self._cmd_queue.put(Command(op=op, payload=payload, gen=gen))
+        except Exception:  # pragma: no cover — engine subprocess is gone
+            log.warning("failed to send %s to audio engine", op)
+
+    def _read_events(self) -> None:
+        """Forward engine events to the UI's registered callbacks."""
+        while not self._reader_stop.is_set():
+            try:
+                event: Event = self._event_queue.get(timeout=0.1)
+            except Empty:
+                continue
+            except Exception:  # pragma: no cover — queue closed during shutdown
+                return
+            try:
+                self._dispatch_event(event)
+            except Exception:  # pragma: no cover — UI handler threw
+                log.exception("audio event dispatch failed for %s", event.op)
+
+    def _dispatch_event(self, event: Event) -> None:
+        if event.op is EventOp.STARTED:
+            payload = event.payload
+            assert isinstance(payload, StartedPayload)
+            self._current_source = Path(payload.source) if payload.is_path else payload.source
+            self._is_live = payload.is_live
+            self._stream_title = payload.stream_title
+            self._stream_station_name = payload.stream_station_name
+            if self.on_metadata_change is not None:
+                self.on_metadata_change()
+        elif event.op is EventOp.TRACK_END:
+            if self.on_track_end is not None:
+                self.on_track_end()
+        elif event.op is EventOp.TRACK_FAILED:
+            payload = event.payload
+            source = payload["source"]
+            message = payload["message"]
+            if self.on_track_failed is not None:
+                self.on_track_failed(source, message)
+        elif event.op is EventOp.METADATA_CHANGED:
+            payload = event.payload
+            self._stream_title = payload.get("stream_title")
+            station = payload.get("stream_station_name")
+            if station is not None:
+                self._stream_station_name = station
+            if self.on_metadata_change is not None:
+                self.on_metadata_change()
+
+    def shutdown(self) -> None:
+        """Cleanly terminate the audio engine subprocess. Idempotent."""
+        if self._reader_stop.is_set():
             return
-        mono = chunk.mean(axis=1) if chunk.ndim == 2 else chunk
-        spectrum = np.abs(np.fft.rfft(mono))
-        n_bins = spectrum.shape[0]
-        edges = self._band_edges_for(n_bins)
-        for i in range(_VIS_BANDS):
-            lo, hi = edges[i], max(edges[i] + 1, edges[i + 1])
-            peak = float(spectrum[lo:hi].max()) if hi > lo else 0.0
-            level = min(1.0, peak / 32.0)
-            prev = self._band_levels[i]
-            self._band_levels[i] = max(level, prev * _VIS_DECAY)
+        self._reader_stop.set()
+        try:
+            self._send(Op.SHUTDOWN)
+        except Exception:  # pragma: no cover
+            pass
+        if self._proc is not None and self._proc.is_alive():
+            self._proc.join(timeout=2.0)
+            if self._proc.is_alive():  # pragma: no cover — engine hung
+                self._proc.terminate()
+                self._proc.join(timeout=1.0)
 
-    _cached_edges: np.ndarray | None = None
-    _cached_edges_n: int = 0
-
-    def _band_edges_for(self, n_bins: int) -> np.ndarray:
-        if self._cached_edges is None or self._cached_edges_n != n_bins:
-            edges = np.geomspace(1, n_bins, _VIS_BANDS + 1).astype(int)
-            self._cached_edges = np.clip(edges, 1, n_bins)
-            self._cached_edges_n = n_bins
-        return self._cached_edges
+    def __del__(self) -> None:
+        # Best-effort cleanup if the user forgot to call shutdown(). The
+        # daemon=True flag on the process means it'll die with the parent
+        # anyway, but explicit shutdown is cleaner.
+        try:
+            self.shutdown()
+        except Exception:  # pragma: no cover
+            pass

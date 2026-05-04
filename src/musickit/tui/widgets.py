@@ -505,19 +505,20 @@ class KeyBar(Static):
     """
 
     def render(self) -> str:
+        # Curated quick-reference. The full binding list lives in
+        # Textual's HelpPanel (toggled via `?`); KeyBar covers the verbs
+        # used most often during playback.
         items = [
             ("space", "Play"),
-            ("enter", "Open"),
             ("←/→", "Nav"),
             ("</>", "Seek"),
+            ("9/0", "Vol"),
             ("n", "Next"),
-            ("p", "Prev"),
-            ("s", "Shuffle"),
-            ("r", "Repeat"),
-            ("f", "Fullscreen"),
-            ("^r", "Rescan"),
-            ("tab", "Focus"),
-            ("^←/→", "Resize"),
+            ("/", "Filter"),
+            ("e", "Edit"),
+            ("a", "AirPlay"),
+            ("f", "Full"),
+            ("?", "Help"),
             ("q", "Quit"),
         ]
         # All-dim. The keys themselves are slightly less dim than labels

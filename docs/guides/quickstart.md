@@ -60,7 +60,7 @@ Walks the flagged albums one at a time, opens [musichoarders.xyz](https://covers
 uv run musickit tui ./output
 ```
 
-Three-pane TUI: sidebar with the artist→album browser, main area with the now-playing meta + 24-band visualizer + progress + tracklist, bottom keybar. Decoder runs in-process via PyAV; output via sounddevice/PortAudio (both ship pip wheels — no system audio install needed).
+Three-pane TUI: sidebar with the artist→album browser, main area with the now-playing meta + 24-band visualizer + progress + tracklist, bottom keybar. Decoder + sounddevice output run in a separate process (their own GIL) so UI work can't stall playback into a buffer underrun. Both libraries ship pip wheels — no system audio install needed.
 
 Press `?` for the full keybindings panel. The most useful: `Enter` to play, `Space` to pause, `n`/`p` for next/prev, `</>` for ±5s seek, `Ctrl+P` for the command palette, `q` to quit.
 

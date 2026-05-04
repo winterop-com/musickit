@@ -114,34 +114,41 @@ class MusickitApp(App[None]):
     }
     """
 
+    # `show=True` here surfaces the binding in Textual's HelpPanel (the
+    # `?` overlay). The bottom KeyBar widget still owns the always-on
+    # quick-reference; HelpPanel is the comprehensive on-demand list.
     BINDINGS = [
-        Binding("q,ctrl+c", "quit", "Quit", show=False),
-        Binding("space", "toggle_pause", "Play/Pause", show=False),
-        Binding("enter", "play_selected", "Play", show=False),
-        Binding("n", "next_track", "Next", show=False),
-        Binding("p", "prev_track", "Prev", show=False),
-        Binding("plus,equals_sign", "vol_up", "Vol+", show=False),
-        Binding("minus", "vol_down", "Vol-", show=False),
+        Binding("space", "toggle_pause", "Play / pause", show=True),
+        Binding("enter", "play_selected", "Play selection", show=True),
+        Binding("n", "next_track", "Next track", show=True),
+        Binding("p", "prev_track", "Previous track", show=True),
+        # mpv convention: `9` quieter, `0` louder. Both are digits so
+        # they're unshifted on every layout (the `+/-` and `[/]` choices
+        # we tried first all need shift / AltGr on Nordic Mac). The
+        # original `+/-` keys still work for muscle-memory.
+        Binding("0,plus,equals_sign", "vol_up", "Volume +", show=True),
+        Binding("9,minus", "vol_down", "Volume -", show=True),
         # `←` / `→` are context-aware (see `action_left` / `action_right`):
         # they navigate between panes when one is focused, and only fall back
         # to seek when nothing's focused. Use `<` / `>` for always-on seek
         # (Shift+`,`/`.` — the "arrow" shifted variants of those keys).
-        Binding("left", "left", "Left", show=False),
-        Binding("right", "right", "Right", show=False),
-        Binding("less_than_sign", "seek_back", "Seek -", show=False),
-        Binding("greater_than_sign", "seek_fwd", "Seek +", show=False),
-        Binding("s", "toggle_shuffle", "Shuffle", show=False),
-        Binding("r", "cycle_repeat", "Repeat", show=False),
-        Binding("f", "toggle_fullscreen", "Fullscreen", show=False),
-        Binding("tab", "focus_next", "Focus", show=False),
-        Binding("ctrl+left", "tree_narrower", "Tree-", show=False),
-        Binding("ctrl+right", "tree_wider", "Tree+", show=False),
-        Binding("backspace", "browser_up", "Up", show=False),
-        Binding("ctrl+r,f5", "rescan_library", "Rescan", show=False),
-        Binding("question_mark", "toggle_help", "Help", show=False),
-        Binding("a", "airplay_picker", "AirPlay", show=False),
-        Binding("slash", "start_filter", "Filter", show=False),
-        Binding("e", "edit_tags", "Edit tags", show=False),
+        Binding("left", "left", "Navigate left", show=True),
+        Binding("right", "right", "Navigate right", show=True),
+        Binding("less_than_sign", "seek_back", "Seek backward", show=True),
+        Binding("greater_than_sign", "seek_fwd", "Seek forward", show=True),
+        Binding("s", "toggle_shuffle", "Shuffle", show=True),
+        Binding("r", "cycle_repeat", "Repeat mode", show=True),
+        Binding("f", "toggle_fullscreen", "Fullscreen viz", show=True),
+        Binding("tab", "focus_next", "Focus next pane", show=True),
+        Binding("ctrl+left", "tree_narrower", "Sidebar narrower", show=True),
+        Binding("ctrl+right", "tree_wider", "Sidebar wider", show=True),
+        Binding("backspace", "browser_up", "Browse up", show=True),
+        Binding("ctrl+r,f5", "rescan_library", "Rescan library", show=True),
+        Binding("a", "airplay_picker", "AirPlay picker", show=True),
+        Binding("slash", "start_filter", "Filter pane", show=True),
+        Binding("e", "edit_tags", "Edit tags", show=True),
+        Binding("question_mark", "toggle_help", "Toggle help", show=True),
+        Binding("q,ctrl+c", "quit", "Quit", show=True),
     ]
 
     def __init__(
@@ -283,17 +290,22 @@ class MusickitApp(App[None]):
         save_state(state)
 
     async def on_unmount(self) -> None:
-        """Close the audio stream + Subsonic httpx pool + AirPlay loop on app exit.
+        """Tear down the audio subprocess + Subsonic httpx pool + AirPlay loop on app exit.
 
-        Without this the process hangs after `q`: PortAudio's C thread holds
-        the interpreter alive (Ctrl-C can't reach Python at that point) and
-        httpx leaves connection-pool sockets open. Stopping the player closes
-        the OutputStream cleanly; closing the client drops the pool;
-        disconnecting AirPlay shuts down the background asyncio loop thread.
+        Without this the process hangs after `q`: the audio subprocess is
+        a daemon, but a clean shutdown via `_player.shutdown()` joins the
+        engine, drains its queues, and avoids the BrokenPipeError that
+        would otherwise show up at interpreter shutdown. httpx leaves
+        connection-pool sockets open without close(); pyatv's asyncio
+        thread keeps the interpreter alive without disconnect().
         """
         try:
             self._player.stop()
         except Exception:  # pragma: no cover — best effort on shutdown
+            pass
+        try:
+            self._player.shutdown()
+        except Exception:  # pragma: no cover
             pass
         if self._subsonic_client is not None:
             self._subsonic_client.close()

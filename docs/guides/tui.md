@@ -71,14 +71,25 @@ Click semantics on the track list mirror Spotify / iTunes: single click moves th
 
 ## Local library mode
 
-`musickit tui ./output` walks the directory via `library.scan` + `library.audit`, builds an in-memory `LibraryIndex`, and renders. Initial scan shows a centred progress overlay with album-by-album feedback; subsequent rescans (`Ctrl+R`) do the same.
+`musickit tui ./output` hydrates the persistent SQLite index at `<DIR>/.musickit/index.db` if present (a delta-validate pass picks up filesystem changes since the last run); otherwise it walks the directory via `library.scan` + `library.audit`. Initial scan shows a centred progress overlay with album-by-album feedback; subsequent rescans (`Ctrl+R`) re-validate against the filesystem.
 
-Decoder is in-process via PyAV (bundled FFmpeg, no `brew install` needed). Output via sounddevice/PortAudio (also bundled). Threading model:
+### Audio engine architecture
 
-- **Opener thread** per `play()` — does the slow part of starting playback (`av.open` for HTTP streams = HTTP connect = 1+ second). The PREVIOUS track keeps playing during the connect, so station switches don't have an audible silence-and-pop.
+PyAV decoder + sounddevice output run in a **separate process**, spawned at startup. The UI process (Textual) and the audio engine each have their own Python interpreter, their own GIL. This means heavy UI work — Textual reflows on resize, focus changes between panes, GC pauses — can't stall the audio callback into a buffer underrun (the cause of the audible clicks the project chased through several earlier mitigations: 500ms then 1s PortAudio buffer, resize-debounce, focus-change short-circuit).
+
+Communication:
+
+- **`multiprocessing.Queue` × 2** — UI → engine commands (play / pause / seek / stop / shutdown), engine → UI events (track_end, track_failed, metadata_changed, started). Pickled dataclasses; one reader thread on the UI side dispatches events to registered callbacks.
+- **`multiprocessing.Value` / `Array`** — high-frequency shared state (position frames, paused/stopped flags, volume, replaygain multiplier, 24 band levels). Atomic per-slot reads/writes; the visualizer reads bands directly without round-tripping through the queue.
+
+Inside the audio engine:
+
+- **Opener thread** per `play()` — does the slow part of starting playback (`av.open` for HTTP streams = HTTP connect = 1+ second). The previous track keeps playing during the connect, so station switches don't have an audible silence-and-pop.
 - **Decoder thread** per playback — reads packets, decodes, resamples, pushes float32 stereo chunks into a bounded queue (~12s buffer).
-- **Audio callback** (sounddevice-managed) — drains chunks across `frames` boundaries with carry state, so `frames != _CHUNK_FRAMES` doesn't drop or pad samples.
+- **Audio callback** (sounddevice-managed) — drains chunks across `frames` boundaries with carry state, so `frames != _CHUNK_FRAMES` doesn't drop or pad samples. Also runs the FFT for the visualizer and publishes the 24 band levels into shared memory.
 - **Pre-buffer** — wait for ~186ms of audio before starting the output stream. Without this the first 1-2 callbacks see an empty queue and the user hears "silence-then-pop" attacks.
+
+PortAudio buffer latency is 200ms — small enough that the visualizer (which FFTs the chunk being sent to PortAudio) doesn't run noticeably ahead of what the user hears, and large enough to absorb decoder hiccups inside the engine process.
 
 ## Internet radio
 

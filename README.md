@@ -7,7 +7,7 @@ Python 3.13 CLI for converting audio rips into a clean tagged library, browsing 
 ```bash
 uv sync
 uv run musickit convert ./input ./output       # convert
-uv run musickit library ./output --audit       # audit
+uv run musickit library audit ./output         # audit
 uv run musickit tui ./output                   # TUI
 uv run musickit serve ./output                 # Subsonic server
 ```
@@ -33,7 +33,7 @@ Or jump straight to:
 
 ## Status
 
-v0.3.0 · 297 tests, ruff + mypy + pyright clean. All eight user-facing commands shipped: `convert`, `inspect`, `library`, `retag`, `cover`, `cover-pick`, `tui`, `serve`. The TUI ships local-library playback, internet radio, Subsonic-client mode, AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, an incremental `/`-filter, in-place tag editing (`e` for track / album-wide), and a 24-band FFT visualiser. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions) and tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop.
+v0.3.0 · ruff + mypy + pyright clean, full pytest suite green. Five top-level commands — `convert`, `library`, `inspect`, `tui`, `serve` — with `library` carrying the read / mutate / manage subcommands (`tree`, `audit`, `fix`, `cover`, `cover-pick`, `retag`, `index`). The TUI ships local-library playback, internet radio, Subsonic-client mode, AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, an incremental `/`-filter, in-place tag editing (`e` for track / album-wide), and a 24-band FFT visualiser. Audio decoder + sounddevice callback run in a separate process so UI work in the main interpreter can't stall playback. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions) and tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop. A persistent SQLite library index at `<root>/.musickit/index.db` makes cold starts skip the filesystem walk + tag read; the filesystem watcher does per-album incremental rescans.
 
 ## License
 
