@@ -331,13 +331,17 @@ class BrowserInfo(Static):
     DEFAULT_CSS = """
     BrowserInfo {
         height: auto;
-        max-height: 8;
+        max-height: 12;
         padding: 0 1;
         border: round $primary 30%;
     }
     """
 
-    body = reactive("")
+    # `layout=True` so the panel re-measures its auto height when `body`
+    # grows from the placeholder (1 line) to a multi-line warning list.
+    # Without this, only the first line is visible — the per-warning
+    # bullets get clipped.
+    body = reactive("", layout=True)
 
     def on_mount(self) -> None:  # noqa: D102
         self.border_title = "Info"

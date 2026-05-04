@@ -138,6 +138,7 @@ class MusickitApp(App[None]):
         Binding("question_mark", "toggle_help", "Help", show=False),
         Binding("a", "airplay_picker", "AirPlay", show=False),
         Binding("slash", "start_filter", "Filter", show=False),
+        Binding("e", "edit_tags", "Edit tags", show=False),
     ]
 
     def __init__(
@@ -927,6 +928,66 @@ class MusickitApp(App[None]):
         from musickit.tui.airplay_picker import AirPlayPickerScreen
 
         self.push_screen(AirPlayPickerScreen(self))
+
+    def action_edit_tags(self) -> None:
+        """`e` opens the tag editor for the currently-highlighted tracklist row.
+
+        Refused in Subsonic-client mode — the synthetic `/subsonic/...` path
+        isn't a real on-disk file. (Tags would have to be written via the
+        server's API, which Subsonic doesn't fully support; out of scope.)
+        Refused on the radio-stations view too — stations are config, not files.
+        """
+        if self._subsonic_client is not None:
+            self.notify("Tag editing isn't available in Subsonic-client mode.", severity="warning")
+            return
+        if self._in_radio_view:
+            self.notify("Tag editing only applies to library tracks.", severity="warning")
+            return
+        if self._current_album is None or self._current_track_idx is None:
+            return
+        try:
+            tracklist = self.query_one(TrackList)
+        except NoMatches:
+            return
+        highlighted = tracklist.highlighted_child
+        if highlighted is None:
+            return
+        track_idx = getattr(highlighted, "track_index", None)
+        if track_idx is None or not (0 <= track_idx < len(self._current_album.tracks)):
+            return
+        track = self._current_album.tracks[track_idx]
+        from musickit.tui.tag_editor import TrackTagEditorScreen
+
+        self.push_screen(TrackTagEditorScreen(self, track))
+
+    def notify_track_tags_updated(self, track: LibraryTrack) -> None:
+        """Called by the tag editor after a successful save.
+
+        Re-renders the tracklist row so the new title / artist appear without
+        a full library rescan. Also refreshes NowPlayingMeta if the edited
+        track is the one playing.
+        """
+        if self._current_album is None:
+            return
+        try:
+            idx = self._current_album.tracks.index(track)
+        except ValueError:
+            return
+        # Re-render just this row.
+        try:
+            tracklist = self.query_one(TrackList)
+        except NoMatches:
+            return
+        if 0 <= idx < len(tracklist.children):
+            item = tracklist.children[idx]
+            if isinstance(item, ListItem):
+                rows = item.query(Static)
+                if rows:
+                    is_playing = idx == self._current_track_idx
+                    rows.first().update(format_track_row(idx, track, self._current_album, marker=is_playing))
+        if idx == self._current_track_idx:
+            self._refresh_status()
+        self.notify(f"✓ Tags saved: {track.path.name}", severity="information")
 
     def action_start_filter(self) -> None:
         """`/`: open a filter input above the focused pane (browser or tracklist)."""
