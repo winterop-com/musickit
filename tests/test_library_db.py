@@ -363,7 +363,7 @@ def test_cli_drop_index(silent_flac_template: Path, tmp_path: Path) -> None:
     assert library.db_path(root).exists()
 
     runner = CliRunner()
-    result = runner.invoke(app, ["library", str(root), "--drop-index"])
+    result = runner.invoke(app, ["library", "index", "drop", str(root)])
     assert result.exit_code == 0, result.output
     assert "removed" in result.output
     assert not library.db_path(root).exists()
@@ -375,19 +375,30 @@ def test_cli_index_status(silent_flac_template: Path, tmp_path: Path) -> None:
     library.load_or_scan(root)
 
     runner = CliRunner()
-    result = runner.invoke(app, ["library", str(root), "--index-status"])
+    result = runner.invoke(app, ["library", "index", "status", str(root)])
     assert result.exit_code == 0, result.output
     assert "schema_version" in result.output
     assert "albums" in result.output
     assert "tracks" in result.output
 
 
-def test_cli_full_rescan(silent_flac_template: Path, tmp_path: Path) -> None:
+def test_cli_index_rebuild(silent_flac_template: Path, tmp_path: Path) -> None:
     root = tmp_path / "lib"
     _make_track(root / "A" / "2020 - One", silent_flac_template, filename="01 - T.m4a")
 
     runner = CliRunner()
-    result = runner.invoke(app, ["library", str(root), "--full-rescan"])
+    result = runner.invoke(app, ["library", "index", "rebuild", str(root)])
+    assert result.exit_code == 0, result.output
+    assert library.db_path(root).exists()
+    assert "rebuilt" in result.output
+
+
+def test_cli_tree_full_rescan(silent_flac_template: Path, tmp_path: Path) -> None:
+    root = tmp_path / "lib"
+    _make_track(root / "A" / "2020 - One", silent_flac_template, filename="01 - T.m4a")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["library", "tree", str(root), "--full-rescan"])
     assert result.exit_code == 0, result.output
     assert library.db_path(root).exists()
 

@@ -41,15 +41,15 @@ After it finishes you'll have `output/<Artist>/<YYYY> - <Album>/NN - <Title>.m4a
 ## Audit + fix the result
 
 ```bash
-uv run musickit library ./output --audit
+uv run musickit library audit ./output
 ```
 
-Flags every album with a problem (missing cover, mixed years, tag/path mismatch, track gaps, scene-residue artist names, etc.). Pair with `--fix` to apply the deterministic fixes (MusicBrainz year backfill, dir-rename to match tags). See [Library](library.md).
+Flags every album with a problem (missing cover, mixed years, tag/path mismatch, track gaps, scene-residue artist names, etc.). Use `musickit library fix ./output` to apply the deterministic fixes (MusicBrainz year backfill, dir-rename to match tags). See [Library](library.md).
 
 For low-res or missing cover art, the semi-automated fix is:
 
 ```bash
-uv run musickit cover-pick ./output
+uv run musickit library cover-pick ./output
 ```
 
 Walks the flagged albums one at a time, opens [musichoarders.xyz](https://covers.musichoarders.xyz/) pre-filled, you paste the chosen image URL back into the terminal, it downloads + saves + embeds.
@@ -80,7 +80,7 @@ Then on your phone, install **Symfonium** (Android), **Amperfy** (iOS), or **Fei
 
 - **More codec / format detail**: [Convert](convert.md)
 - **Audit rules + fix loop**: [Library](library.md)
-- **In-place tag edits**: [Retag / Cover](retag-cover.md)
+- **In-place tag edits**: [`library retag` / `library cover`](library.md#cover-embed-an-image)
 - **TUI features incl. AirPlay + Subsonic-client mode**: [TUI](tui.md)
 - **Subsonic API endpoints + client compat**: [Serve](serve.md)
 - **Architecture + contributing**: [Development](development.md)

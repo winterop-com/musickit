@@ -35,7 +35,6 @@ nav:
       - Quickstart: guides/quickstart.md
       - musickit convert: guides/convert.md
       - musickit library: guides/library.md
-      - musickit retag / cover: guides/retag-cover.md
       - musickit inspect: guides/inspect.md
       - musickit tui: guides/tui.md
       - musickit serve: guides/serve.md

@@ -329,7 +329,7 @@ def test_library_command_renders_tree(silent_flac_template: Path, tmp_path: Path
     _make_track(album, silent_flac_template, filename="01 - Radioactive.m4a", title="Radioactive")
 
     runner = CliRunner()
-    result = runner.invoke(app, ["library", str(root)])
+    result = runner.invoke(app, ["library", "tree", str(root)])
     assert result.exit_code == 0, result.output
     assert "Imagine Dragons" in result.output
     assert "2012 - Night Visions" in result.output
@@ -345,7 +345,7 @@ def test_library_command_audit_table_lists_warnings(silent_flac_template: Path, 
     _make_track(album, silent_flac_template, filename="01 - T.m4a", cover_size=None, year=None)
 
     runner = CliRunner()
-    result = runner.invoke(app, ["library", str(root), "--audit"])
+    result = runner.invoke(app, ["library", "audit", str(root)])
     assert result.exit_code == 0, result.output
     # Both warnings should show in the table.
     assert "no cover" in result.output
@@ -364,7 +364,7 @@ def test_library_command_json_output(silent_flac_template: Path, tmp_path: Path)
     _make_track(album, silent_flac_template, filename="01 - T.m4a")
 
     runner = CliRunner()
-    result = runner.invoke(app, ["library", str(root), "--json"])
+    result = runner.invoke(app, ["library", "tree", str(root), "--json"])
     assert result.exit_code == 0, result.output
     payload: dict[str, Any] = json.loads(result.output)
     assert len(payload["albums"]) == 1
