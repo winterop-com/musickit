@@ -3,7 +3,7 @@
 A Subsonic-compatible HTTP server. Any modern Subsonic client (Symfonium, Amperfy, play:Sub, Feishin, Supersonic, DSub) connects, browses, searches, streams, and seeks. Works equally well over LAN and over Tailscale.
 
 ```bash
-musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [--no-mdns] [--no-watch] [--no-cache] [--full-rescan]
+uvx musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [--no-mdns] [--no-watch] [--no-cache] [--full-rescan]
 ```
 
 `TARGET_DIR` is required. `--host 0.0.0.0`, `--port 4533`, credentials default to `admin`/`admin` with a yellow warning. `--no-cache` skips the persistent SQLite index at `<TARGET_DIR>/.musickit/index.db`; `--full-rescan` rebuilds it from scratch on startup. See [`musickit library index`](library.md#index-manage-the-persistent-sqlite-cache) for index management.
@@ -33,7 +33,7 @@ Unlike most "self-hosted" services, the default is to bind all interfaces, NOT l
 Auth is mandatory (`admin`/`admin` if you don't override), so the binding is safe even on a public Wi-Fi network. If you really want LAN-blind for some reason:
 
 ```bash
-musickit serve --host 127.0.0.1
+uvx musickit serve --host 127.0.0.1
 ```
 
 ## Tailscale walkthrough
@@ -180,8 +180,8 @@ Default-on: `serve` advertises `_subsonic._tcp.local` so Symfonium / Amperfy / F
 The `musickit tui` itself can also discover servers:
 
 ```bash
-musickit tui --discover                  # list and exit
-musickit tui                             # quick browse + show hint
+uvx musickit tui --discover                  # list and exit
+uvx musickit tui                             # quick browse + show hint
 ```
 
 `--no-mdns` opts out.

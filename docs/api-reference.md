@@ -25,18 +25,36 @@ Read source audio tags (FLAC / MP3 / generic) and write MP4 ALAC / AAC / MP3 tag
 
 ## `musickit.library`
 
-Walk a converted-output directory, build an Artist→Album→Track index, audit it, fix the deterministic warnings.
+Walk a converted-output directory, build an Artist→Album→Track index, audit it, fix the deterministic warnings, and persist it as a SQLite cache at `<root>/.musickit/index.db`.
 
 ::: musickit.library
     options:
       members:
+        # Pydantic models — same shape used by tui / serve / library CLI.
         - LibraryTrack
         - LibraryAlbum
         - LibraryIndex
+        # Filesystem-driven scanning + auditing (no DB).
         - scan
         - audit
+        - audit_album
+        # Auto-fix flagged albums (MB year backfill, dir/tag rename).
         - fix_index
         - fix_album
+        # SQLite-backed index lifecycle.
+        - SCHEMA_VERSION
+        - INDEX_DIR_NAME
+        - INDEX_DB_NAME
+        - db_path
+        - open_db
+        - is_empty
+        - load
+        - load_or_scan
+        - scan_full
+        - validate
+        - rescan_albums
+        - ValidationResult
+        - ScanProgressCallback
 
 ## `musickit.serve`
 

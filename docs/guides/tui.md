@@ -5,13 +5,13 @@ A Textual TUI for browsing + playing the converted library, plus a curated radio
 ## Modes
 
 ```bash
-musickit tui ./output                                # local library + radio
-musickit tui                                         # radio-only
-musickit tui --subsonic URL --user U --password P    # Subsonic client mode
-musickit tui --discover                              # list LAN Subsonic servers + AirPlay devices, exit
-musickit tui --airplay 'HomePod'                     # route playback to an AirPlay device
-musickit tui ./output --no-cache                     # skip the index DB (in-memory scan only)
-musickit tui ./output --full-rescan                  # rebuild the index DB from scratch on launch
+uvx musickit tui ./output                                # local library + radio
+uvx musickit tui                                         # radio-only
+uvx musickit tui --subsonic URL --user U --password P    # Subsonic client mode
+uvx musickit tui --discover                              # list LAN Subsonic servers + AirPlay devices, exit
+uvx musickit tui --airplay 'HomePod'                     # route playback to an AirPlay device
+uvx musickit tui ./output --no-cache                     # skip the index DB (in-memory scan only)
+uvx musickit tui ./output --full-rescan                  # rebuild the index DB from scratch on launch
 ```
 
 Subsonic credentials are NEVER persisted — pass `--subsonic` / `--user` / `--password` explicitly each session. With no arguments the TUI drops directly into radio-only mode.
@@ -82,13 +82,13 @@ PyAV decoder + sounddevice output run in a **separate process**, spawned at star
 Communication:
 
 - **`multiprocessing.Queue` × 2** — UI → engine commands (play / pause / seek / stop / shutdown), engine → UI events (track_end, track_failed, metadata_changed, started). Pickled dataclasses; one reader thread on the UI side dispatches events to registered callbacks.
-- **`multiprocessing.Value` / `Array`** — high-frequency shared state (position frames, paused/stopped flags, volume, replaygain multiplier, 24 band levels). Atomic per-slot reads/writes; the visualizer reads bands directly without round-tripping through the queue.
+- **`multiprocessing.Value` / `Array`** — high-frequency shared state (position frames, paused/stopped flags, volume, replaygain multiplier, 48 band levels). Atomic per-slot reads/writes; the visualizer reads bands directly without round-tripping through the queue.
 
 Inside the audio engine:
 
 - **Opener thread** per `play()` — does the slow part of starting playback (`av.open` for HTTP streams = HTTP connect = 1+ second). The previous track keeps playing during the connect, so station switches don't have an audible silence-and-pop.
 - **Decoder thread** per playback — reads packets, decodes, resamples, pushes float32 stereo chunks into a bounded queue (~12s buffer).
-- **Audio callback** (sounddevice-managed) — drains chunks across `frames` boundaries with carry state, so `frames != _CHUNK_FRAMES` doesn't drop or pad samples. Also runs the FFT for the visualizer and publishes the 24 band levels into shared memory.
+- **Audio callback** (sounddevice-managed) — drains chunks across `frames` boundaries with carry state, so `frames != _CHUNK_FRAMES` doesn't drop or pad samples. Also runs the FFT for the visualizer and publishes the 48 band levels into shared memory.
 - **Pre-buffer** — wait for ~186ms of audio before starting the output stream. Without this the first 1-2 callbacks see an empty queue and the user hears "silence-then-pop" attacks.
 
 PortAudio buffer latency is 200ms — small enough that the visualizer (which FFTs the chunk being sent to PortAudio) doesn't run noticeably ahead of what the user hears, and large enough to absorb decoder hiccups inside the engine process.
@@ -116,7 +116,7 @@ Radio launches as a first-class mode — `musickit tui` with no DIR drops direct
 `musickit tui --subsonic URL` makes the TUI talk to any Subsonic-compatible server — your own `musickit serve` over Tailscale, Navidrome, the original Subsonic, etc.
 
 ```bash
-musickit tui --subsonic http://mlaptop.tail4a4b9a.ts.net:4533 \
+uvx musickit tui --subsonic http://mlaptop.tail4a4b9a.ts.net:4533 \
              --user mort --password secret
 ```
 
@@ -145,9 +145,9 @@ The selected device persists to `state.toml` and auto-resumes on next launch (wi
 CLI flag for headless / scripted use:
 
 ```bash
-musickit tui --airplay 'HomePod'                            # exact / substring match by name
-musickit tui --airplay '192.168.1.50'                       # match by address
-musickit tui --discover                                     # list AirPlay devices (and Subsonic servers) and exit
+uvx musickit tui --airplay 'HomePod'                            # exact / substring match by name
+uvx musickit tui --airplay '192.168.1.50'                       # match by address
+uvx musickit tui --discover                                     # list AirPlay devices (and Subsonic servers) and exit
 ```
 
 `--airplay` hard-fails if no device matches (you asked for a specific one). The auto-resume path (no `--airplay` flag, `state.toml` has a saved device) skips silently if not found.

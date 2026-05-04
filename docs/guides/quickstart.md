@@ -22,7 +22,7 @@ sudo apt install ffmpeg      # Debian / Ubuntu
 That's it for setup. Confirm:
 
 ```bash
-musickit --help
+uvx musickit --help
 ```
 
 For working on musickit itself (not just using it), see [Development](development.md) — the `git clone` + `uv sync` flow.
@@ -30,7 +30,7 @@ For working on musickit itself (not just using it), see [Development](developmen
 ## Convert your first library
 
 ```bash
-musickit convert ./input ./output
+uvx musickit convert ./input ./output
 ```
 
 Default is `--format auto` — every track ends up `.m4a` with AAC inside, at 256 kbps. Apple Music quality, ~24% the size of lossless. See [Convert](convert.md) for the full codec / bitrate matrix.
@@ -38,10 +38,10 @@ Default is `--format auto` — every track ends up `.m4a` with AAC inside, at 25
 Useful flags worth knowing on the first run:
 
 ```bash
-musickit convert ./input ./output --dry-run           # plan only, no writes
-musickit convert ./input ./output --verbose           # per-track log lines
-musickit convert ./input ./output --format alac       # archival lossless
-musickit convert ./input ./output --remove-source     # delete source after success
+uvx musickit convert ./input ./output --dry-run           # plan only, no writes
+uvx musickit convert ./input ./output --verbose           # per-track log lines
+uvx musickit convert ./input ./output --format alac       # archival lossless
+uvx musickit convert ./input ./output --remove-source     # delete source after success
 ```
 
 After it finishes you'll have `output/<Artist>/<YYYY> - <Album>/NN - <Title>.m4a` for every album.
@@ -68,9 +68,9 @@ Walks the flagged albums one at a time, opens [musichoarders.xyz](https://covers
 uvx musickit tui ./output
 ```
 
-Three-pane TUI: sidebar with the artist→album browser, main area with the now-playing meta + 24-band visualizer + progress + tracklist, bottom keybar. Decoder + sounddevice output run in a separate process (their own GIL) so UI work can't stall playback into a buffer underrun. Both libraries ship pip wheels — no system audio install needed.
+Three-pane TUI: sidebar with the artist→album browser, main area with the now-playing meta + 48-band visualizer + click-to-seek progress + tracklist, bottom keybar. Decoder + sounddevice output run in a separate process (their own GIL) so UI work can't stall playback into a buffer underrun. Both libraries ship pip wheels — no system audio install needed.
 
-Press `?` for the full keybindings panel. The most useful: `Enter` to play, `Space` to pause, `n`/`p` for next/prev, `</>` for ±5s seek, `Ctrl+P` for the command palette, `q` to quit.
+Press `?` for the full keybindings panel. The most useful: `Enter` to play, `Space` to pause, `n`/`p` for next/prev, `</>` for ±5s seek, `9`/`0` for volume, `Ctrl+P` for the command palette, `q` to quit.
 
 If you have an AirPlay device on the LAN, press `a` to route playback to it. See [TUI](tui.md) for the full feature set.
 

@@ -1,6 +1,6 @@
 # Tutorial: 0 to streaming on your iPhone
 
-End-to-end walkthrough — from `git clone` to playing a track on Amperfy from
+End-to-end walkthrough — from `uvx musickit` to playing a track on Amperfy from
 across the room. Roughly 30 minutes of wall-clock time on a 200-album library;
 most of it is the convert pipeline and the cover-pick loop.
 
@@ -23,7 +23,13 @@ you're on the same Wi-Fi or somewhere else.
 
 ### Install musickit
 
-The published package on [PyPI](https://pypi.org/project/musickit/) is the recommended install:
+The lowest-friction way is [`uvx`](https://docs.astral.sh/uv/) — it downloads the latest published `musickit` from [PyPI](https://pypi.org/project/musickit/), caches it, and runs it in one step. No install step required:
+
+```bash
+uvx musickit --help
+```
+
+For daily / persistent use (PATH-installed, no per-run network check):
 
 ```bash
 uv tool install musickit       # recommended (uv-managed, isolated venv on PATH)
@@ -31,7 +37,7 @@ pipx install musickit          # equivalent for pipx users
 pip install musickit           # plain pip into current env
 ```
 
-This pulls every Python dep, including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The canonical entry point is the `musickit` command.
+Either route pulls every Python dep, including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The rest of this tutorial uses `uvx musickit ...` for examples — substitute `musickit ...` if you went the persistent-install route.
 
 If you want to hack on musickit itself, see [Development](development.md) for the `git clone` + `uv sync` flow.
 

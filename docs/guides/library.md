@@ -3,15 +3,15 @@
 Every operation that reads, mutates, or manages the converted library lives under `musickit library`.
 
 ```bash
-musickit library tree DIR              # rich.Tree of artists / albums / tracks
-musickit library audit DIR             # audit table with per-album warnings
-musickit library fix DIR               # apply deterministic fixes
-musickit library cover DIR IMAGE       # embed an image into every audio file
-musickit library cover-pick DIR        # semi-automated cover sourcing via musichoarders
-musickit library retag DIR             # in-place tag overrides
-musickit library index status DIR      # show index DB metadata + counts
-musickit library index drop DIR        # delete <DIR>/.musickit/
-musickit library index rebuild DIR     # rebuild the index DB from scratch
+uvx musickit library tree DIR              # rich.Tree of artists / albums / tracks
+uvx musickit library audit DIR             # audit table with per-album warnings
+uvx musickit library fix DIR               # apply deterministic fixes
+uvx musickit library cover DIR IMAGE       # embed an image into every audio file
+uvx musickit library cover-pick DIR        # semi-automated cover sourcing via musichoarders
+uvx musickit library retag DIR             # in-place tag overrides
+uvx musickit library index status DIR      # show index DB metadata + counts
+uvx musickit library index drop DIR        # delete <DIR>/.musickit/
+uvx musickit library index rebuild DIR     # rebuild the index DB from scratch
 ```
 
 `DIR` is required for every subcommand.
@@ -19,8 +19,8 @@ musickit library index rebuild DIR     # rebuild the index DB from scratch
 ## `tree` and `audit`
 
 ```bash
-musickit library tree   DIR [--json] [--no-cache] [--full-rescan]
-musickit library audit  DIR [--issues-only] [--json] [--no-cache] [--full-rescan]
+uvx musickit library tree   DIR [--json] [--no-cache] [--full-rescan]
+uvx musickit library audit  DIR [--issues-only] [--json] [--no-cache] [--full-rescan]
 ```
 
 `tree` prints the `rich.Tree` view; `audit` prints the warnings table.
@@ -60,7 +60,7 @@ Each rule appends to `album.warnings`. Multiple can fire on one album.
 ## `fix`
 
 ```bash
-musickit library fix DIR [--dry-run] [--prefer-dirname] [--no-cache] [--full-rescan]
+uvx musickit library fix DIR [--dry-run] [--prefer-dirname] [--no-cache] [--full-rescan]
 ```
 
 Applies the deterministic fixes:
@@ -79,19 +79,19 @@ Fixes that are NOT auto-applied:
 ## `cover` — embed an image
 
 ```bash
-musickit library cover DIR IMAGE [--cover-max-edge PX] [--recursive/--no-recursive]
+uvx musickit library cover DIR IMAGE [--cover-max-edge PX] [--recursive/--no-recursive]
 ```
 
 Embeds `IMAGE` (JPG/PNG) into every audio file under `DIR`. The image is normalised once (downscaled to fit the long-edge cap, JPEG-encoded for non-PNG sources) and then written to every supported audio file. Other tags are preserved — only the cover is replaced.
 
 ```bash
-musickit library cover ./output/Pink\ Floyd/1973\ -\ The\ Dark\ Side\ Of\ The\ Moon scan-of-the-LP.jpg
+uvx musickit library cover ./output/Pink\ Floyd/1973\ -\ The\ Dark\ Side\ Of\ The\ Moon scan-of-the-LP.jpg
 ```
 
 ## `cover-pick` — semi-automated cover sourcing
 
 ```bash
-musickit library cover-pick DIR [--all] [--no-embed] [--cover-max-edge PX] [--no-browser] [--no-cache] [--full-rescan]
+uvx musickit library cover-pick DIR [--all] [--no-embed] [--cover-max-edge PX] [--no-browser] [--no-cache] [--full-rescan]
 ```
 
 For each candidate album:
@@ -109,7 +109,7 @@ Honours [musichoarders' integration policy](https://covers.musichoarders.xyz/) �
 ## `retag` — in-place tag overrides
 
 ```bash
-musickit library retag DIR [--title T] [--artist A] [--album-artist AA] [--album AL] \
+uvx musickit library retag DIR [--title T] [--artist A] [--album-artist AA] [--album AL] \
                                    [--year YYYY] [--genre G] \
                                    [--track-total N] [--disc-total N] \
                                    [--recursive/--no-recursive] [--rename]
@@ -118,9 +118,9 @@ musickit library retag DIR [--title T] [--artist A] [--album-artist AA] [--album
 Only fields you explicitly pass are written; everything else is preserved (including covers, replaygain, MusicBrainz IDs). Useful when an album converted with the wrong name and you don't want to re-encode just to fix a tag.
 
 ```bash
-musickit library retag path/to/album/01.m4a --year 1976
-musickit library retag path/to/album --track-total 12
-musickit library retag path/to/album --genre ''
+uvx musickit library retag path/to/album/01.m4a --year 1976
+uvx musickit library retag path/to/album --track-total 12
+uvx musickit library retag path/to/album --genre ''
 ```
 
 `--rename` renames `DIR` to `YYYY - Album` based on the post-update tags after the retag completes.
@@ -134,9 +134,9 @@ The DB is fully derived from the filesystem, so it's always safe to delete.
 ### Commands
 
 ```bash
-musickit library index status  DIR     # schema version, library_root_abs, row counts, DB size
-musickit library index drop    DIR     # delete <DIR>/.musickit/
-musickit library index rebuild DIR     # wipe + rebuild from scratch
+uvx musickit library index status  DIR     # schema version, library_root_abs, row counts, DB size
+uvx musickit library index drop    DIR     # delete <DIR>/.musickit/
+uvx musickit library index rebuild DIR     # wipe + rebuild from scratch
 ```
 
 `--no-cache` (on `tree` / `audit` / `fix` / `cover-pick` / `tui` / `serve`) skips the DB entirely — useful for read-only mounts where `<DIR>/.musickit/` can't be created. `--full-rescan` (on the same set) rebuilds the index from scratch on this run.

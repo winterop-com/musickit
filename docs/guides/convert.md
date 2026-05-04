@@ -3,7 +3,7 @@
 The heart of the project. Walks an input tree, groups audio files into albums, re-encodes via `ffmpeg`, writes clean tags + a normalised cover, lays the result out as `output/<Artist>/<YYYY> - <Album>/NN - <Title>.<ext>`.
 
 ```
-musickit convert [INPUT_DIR] [OUTPUT_DIR] [...flags]
+uvx musickit convert [INPUT_DIR] [OUTPUT_DIR] [...flags]
 ```
 
 Defaults: `INPUT_DIR=./input`, `OUTPUT_DIR=./output`, `--format auto`.
