@@ -1,0 +1,1611 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Convert messy audio rips into a clean tagged library; play locally or stream over Tailscale via a Subsonic-compatible server.">
+      
+      
+      
+        <link rel="canonical" href="https://winterop-com.github.io/musickit/edge-cases/">
+      
+      
+        <link rel="prev" href="../guides/development/">
+      
+      
+        <link rel="next" href="../roadmap/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Edge cases - musickit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#edge-cases" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="musickit" class="md-header__button md-logo" aria-label="musickit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            musickit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Edge cases
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/winterop-com/musickit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    winterop-com/musickit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/quickstart/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Edge cases
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../roadmap/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmap
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="musickit" class="md-nav__button md-logo" aria-label="musickit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    musickit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/winterop-com/musickit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    winterop-com/musickit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial: 0 to iPhone streaming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/convert/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit convert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/inspect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit inspect
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit tui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/serve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit serve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Edge cases
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Edge cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#multi-disc-folder-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-disc folder layouts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filename-encoded-multi-disc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filename-encoded multi-disc
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Filename-encoded multi-disc">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuous-numbering-across-discs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuous numbering across discs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scene-encoded-dtt-track-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scene-encoded DTT track numbers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#various-artists-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Various-Artists detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Various-Artists detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tagless-va-filename-parsing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tagless VA filename parsing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tagless-100-track-va-mix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tagless 100-track VA mix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disc-suffix-in-album-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disc-suffix in album tags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disc-1-bias-in-album-name-vote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disc-1 bias in album-name vote
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#folder-name-junk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Folder name junk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filesystem-safe-sanitisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filesystem-safe sanitisation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filename-collisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filename collisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-dir-collisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output dir collisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-side-dedupe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source-side dedupe
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#atomic-per-album-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Atomic per-album writes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cover-corruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cover corruption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lossy-lossy-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lossy → lossy guard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mp3-in-mp4-deliberately-avoided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MP3-in-MP4 deliberately avoided
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cases-the-pipeline-does-not-handle-deliberate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases the pipeline does NOT handle (deliberate)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cases the pipeline does NOT handle (deliberate)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#radio-show-pseudo-artists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Radio Show -" pseudo-artists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#classical-style-compilations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classical-style compilations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#multi-disc-folder-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-disc folder layouts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filename-encoded-multi-disc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filename-encoded multi-disc
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Filename-encoded multi-disc">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuous-numbering-across-discs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuous numbering across discs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scene-encoded-dtt-track-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scene-encoded DTT track numbers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#various-artists-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Various-Artists detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Various-Artists detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tagless-va-filename-parsing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tagless VA filename parsing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tagless-100-track-va-mix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tagless 100-track VA mix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disc-suffix-in-album-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disc-suffix in album tags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disc-1-bias-in-album-name-vote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disc-1 bias in album-name vote
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#folder-name-junk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Folder name junk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filesystem-safe-sanitisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filesystem-safe sanitisation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filename-collisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filename collisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-dir-collisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output dir collisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-side-dedupe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source-side dedupe
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#atomic-per-album-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Atomic per-album writes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cover-corruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cover corruption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lossy-lossy-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lossy → lossy guard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mp3-in-mp4-deliberately-avoided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MP3-in-MP4 deliberately avoided
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cases-the-pipeline-does-not-handle-deliberate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases the pipeline does NOT handle (deliberate)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cases the pipeline does NOT handle (deliberate)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#radio-show-pseudo-artists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Radio Show -" pseudo-artists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#classical-style-compilations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classical-style compilations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="edge-cases">Edge cases<a class="headerlink" href="#edge-cases" title="Permanent link">&para;</a></h1>
+<p>Every weirdness here came from a real input that exposed it. Most are handled by the convert pipeline; a few are deliberate non-handlings explained at the bottom.</p>
+<h2 id="multi-disc-folder-layouts">Multi-disc folder layouts<a class="headerlink" href="#multi-disc-folder-layouts" title="Permanent link">&para;</a></h2>
+<p>The discover step merges siblings with shared prefixes:</p>
+<table>
+<thead>
+<tr>
+<th>Layout</th>
+<th>Detected as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Album/CD1</code>, <code>Album/CD2</code></td>
+<td>one album, 2 discs</td>
+</tr>
+<tr>
+<td><code>Album/CD-1</code>, <code>Album/CD-2</code></td>
+<td>one album</td>
+</tr>
+<tr>
+<td><code>Album/CD 1</code>, <code>Album/CD 2</code></td>
+<td>one album</td>
+</tr>
+<tr>
+<td><code>Album/Disc 1</code>, <code>Album/Disc 2</code></td>
+<td>one album</td>
+</tr>
+<tr>
+<td><code>Album/Disk3</code></td>
+<td>(treated as disc 3 if siblings exist)</td>
+</tr>
+<tr>
+<td><code>Album (CD1)/</code>, <code>Album (CD2)/</code></td>
+<td>one album, shared-prefix style</td>
+</tr>
+<tr>
+<td><code>Album/CD2 (Bonus Live CD)</code></td>
+<td>merges with <code>CD1</code> even with trailing text</td>
+</tr>
+</tbody>
+</table>
+<p>Single <code>Album/CD1/</code> (no CD2 sibling) is <strong>not</strong> promoted to multi-disc — treated as a regular single-disc album.</p>
+<p>Mixed-content parents (Ultimate Queen layout: a folder with both <code>CD1/</code>/<code>CD2/</code> AND bare albums as siblings) only merge the matching-prefix disc pairs; bare albums stay as-is.</p>
+<p>Parent-with-audio + disc subfolders (System Of A Down self-titled with duplicate <code>Disc 1/</code>/<code>Disc 2/</code> subfolders inside the album folder containing the same tracks): drops the disc subfolders, uses the parent's top-level tracks as one album.</p>
+<h2 id="filename-encoded-multi-disc">Filename-encoded multi-disc<a class="headerlink" href="#filename-encoded-multi-disc" title="Permanent link">&para;</a></h2>
+<p>Some rips put the disc + track in the filename rather than a CD subfolder:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Zara Larsson — So Good (Deluxe)/
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  1-01. Ain&#39;t My Fault.flac
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  1-02. I Would Like.flac
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  ...
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  2-01. So Good.flac
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  2-02. Lush Life.flac
+</code></pre></div>
+<p><code>_maybe_apply_filename_disc_track</code> detects + applies disc/track from the filename pattern when no folder-disc structure exists. Triggers only when ≥2 distinct disc numbers appear (so single-disc <code>01-NN</code> doesn't accidentally trip).</p>
+<h3 id="continuous-numbering-across-discs">Continuous numbering across discs<a class="headerlink" href="#continuous-numbering-across-discs" title="Permanent link">&para;</a></h3>
+<p>Mega-comp convention: disc 1 has tracks 1-9, disc 2 has 10-18, etc. — track numbers continue rather than restart per disc.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>A State Of Trance Classics Vol. 7/
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  01-01 - Chicane - Offshore.m4a
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  01-02 - Above &amp; Beyond - ...
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  ...
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  01-09 - G&amp;M Project - ...
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  02-10 - BT - Flaming June.m4a       # disc 2 starts at track 10
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  02-11 - Marcel Woods - ...
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  ...
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  02-18 - Peter Martijn Wijnia - ...
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  03-19 - Marco V - GODD.m4a          # disc 3 starts at 19
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  ...
+</code></pre></div>
+<p>The convert pipeline detects this (each disc's min track == previous disc's max + 1) and resets to per-disc 1..N in the output tags. Otherwise Subsonic / Music.app would show "track 10" of "1 track" on disc 2, which displays weirdly.</p>
+<h2 id="scene-encoded-dtt-track-numbers">Scene-encoded <code>DTT</code> track numbers<a class="headerlink" href="#scene-encoded-dtt-track-numbers" title="Permanent link">&para;</a></h2>
+<p>Now! / Absolute Music / Billboard compilations encode multi-disc structure into a 3-digit track number prefix on the filename (<code>101_artist_-_title.mp3</code> = disc 1 track 1, <code>218_artist_-_title.mp3</code> = disc 2 track 18). The MP3 <code>track</code> tag often carries the in-disc number; the filename carries the encoded form. We read the filename because the tag is unreliable.</p>
+<p>Trigger conditions (all required, conservative):</p>
+<ul>
+<li><code>discover</code> did NOT already merge this album from disc subfolders.</li>
+<li>Every track's filename starts with a 3-digit number (100-999).</li>
+<li>The set of <code>tn // 100</code> has ≥2 unique values.</li>
+<li>Each disc cluster has ≥3 tracks.</li>
+</ul>
+<p>A 100-track regular album with one track numbered 100 won't accidentally trigger this.</p>
+<h2 id="various-artists-detection">Various-Artists detection<a class="headerlink" href="#various-artists-detection" title="Permanent link">&para;</a></h2>
+<p>Detected as compilation when:</p>
+<ul>
+<li><code>album_artist</code> is a VA alias (<code>VA</code>, <code>Various</code>, <code>Various Artists</code>, <code>V.A.</code>, <code>V/A</code>, <code>Various Artist</code>, <code>Verschillende Artiesten</code>, etc.)</li>
+<li>The per-track artist majority is itself a VA alias (rips that leave album_artist empty but stamp every track artist as <code>VA</code>)</li>
+<li>No <code>album_artist</code> and tracks span multiple different artists</li>
+</ul>
+<p>Compilations route to <code>Various Artists/</code> and set <code>cpil</code> (MP4) / <code>TCMP</code> (ID3) compilation flag.</p>
+<h3 id="tagless-va-filename-parsing">Tagless VA filename parsing<a class="headerlink" href="#tagless-va-filename-parsing" title="Permanent link">&para;</a></h3>
+<p>Filename <code>01 - VA - Artist - Title.flac</code> has a leading <code>VA -</code> segment. The filename parser splits out the real per-track artist; summary detects compilation by VA-marker artist_fallback even if <code>album_artist</code> is empty.</p>
+<h3 id="tagless-100-track-va-mix">Tagless 100-track VA mix<a class="headerlink" href="#tagless-100-track-va-mix" title="Permanent link">&para;</a></h3>
+<p>Real example: a <code>7Os8Os9Os</code> compilation with 100 MP3s named <code>NN. Artist - Title.mp3</code> and <strong>no tags at all</strong>. Filename pre-fill in <code>_process_album</code> populates per-track artists before summarise → distinct artists triggers compilation flag → output lands under <code>Various Artists/</code>.</p>
+<h2 id="disc-suffix-in-album-tags">Disc-suffix in album tags<a class="headerlink" href="#disc-suffix-in-album-tags" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Roses (CD1) → Roses
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Are You Ready: Best Of AC/DC [CD1] → Are You Ready: Best Of AC/DC
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Roses (CD2) Live In Madrid → Roses (Cranberries layout — middle-of-string disc marker)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>Echoes (1) → Echoes (bare-paren disc index)
+</code></pre></div>
+<p><code>clean_album_title</code> strips them, including the bare-trailing <code>(1)</code>/<code>(2)</code> form.</p>
+<h2 id="disc-1-bias-in-album-name-vote">Disc-1 bias in album-name vote<a class="headerlink" href="#disc-1-bias-in-album-name-vote" title="Permanent link">&para;</a></h2>
+<p>Multi-disc albums where bonus discs have polluted tags (e.g. <code>Album (CD2) Live In Madrid</code>) would otherwise win majority count over disc 1's clean <code>Album</code> tag. The summary biases toward disc 1 — disc 1 tracks vote first; only fall back to all tracks if disc 1 had no consensus.</p>
+<h2 id="folder-name-junk">Folder name junk<a class="headerlink" href="#folder-name-junk" title="Permanent link">&para;</a></h2>
+<p>Stripped from the directory name when used as ALBUM fallback:</p>
+<ul>
+<li>Codec / quality bracketed tags: <code>[FLAC]</code>, <code>[16Bit-44.1kHz]</code>, <code>[lossless]</code></li>
+<li>Year: <code>(2012)</code> (extracted, not just dropped)</li>
+<li>VA prefix: <code>VA -</code>, <code>Various -</code></li>
+<li>Scene-domain tags: <code>[nextorrent.com]</code>, <code>[example.org]</code> — limited to known TLDs so we don't strip <code>[Live]</code> / <code>[PMEDIA]</code> / catalog numbers</li>
+</ul>
+<p>Edition annotations (added in a later commit):</p>
+<ul>
+<li><code>(Remastered)</code>, <code>(Remastered 2009)</code>, <code>(2009 Remaster)</code></li>
+<li><code>(Deluxe Edition)</code>, <code>(Super Deluxe Edition)</code>, <code>(Expanded Edition)</code></li>
+<li><code>(40th Anniversary Edition)</code>, <code>(10th Anniversary)</code></li>
+<li><code>(Bonus Tracks)</code>, <code>[Bonus Disc]</code></li>
+<li><code>(2018 Reissue)</code>, <code>(Reissue)</code></li>
+<li><code>(Special Edition)</code>, <code>(Limited Edition)</code>, <code>(Collector's Edition)</code></li>
+</ul>
+<p>Live annotations are <strong>kept</strong> — <code>(Live)</code>, <code>(Live in Madrid)</code>, <code>(Live at Budokan 1979)</code> — since live albums are distinct works from their studio counterparts.</p>
+<h2 id="filesystem-safe-sanitisation">Filesystem-safe sanitisation<a class="headerlink" href="#filesystem-safe-sanitisation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>/</code>, <code>:</code>, <code>*</code>, <code>?</code>, <code>"</code>, <code>&lt;</code>, <code>&gt;</code>, <code>|</code> all replaced with <code>_</code></li>
+<li><code>R.E.M.</code> trailing dots preserved (single-letter acronyms — distinct from disc-marker <code>(1).</code>)</li>
+<li>NFC unicode normalisation</li>
+<li>≤180-byte component cap (some filesystems cap at 255; we leave headroom)</li>
+</ul>
+<p>Smart quotes / em-dashes (Sting <code>1984–1994</code>): preserved verbatim.</p>
+<h2 id="filename-collisions">Filename collisions<a class="headerlink" href="#filename-collisions" title="Permanent link">&para;</a></h2>
+<p>Two tracks with same track-no + title in one album → auto-suffix <code>(2)</code>, <code>(3)</code>. Reserves the FINAL filename, not just the planned one, so a third track titled <code>Same (2)</code> chains to <code>(3)</code> rather than colliding with the auto-renamed second.</p>
+<h2 id="output-dir-collisions">Output dir collisions<a class="headerlink" href="#output-dir-collisions" title="Permanent link">&para;</a></h2>
+<p>Two source albums normalising to the same output path → skip second + warn in the summary. Surfaces in <code>--dry-run</code> too. Reservation happens BEFORE encode so dry-run and real-run agree on what would happen.</p>
+<h2 id="source-side-dedupe">Source-side dedupe<a class="headerlink" href="#source-side-dedupe" title="Permanent link">&para;</a></h2>
+<p>Some rip groups ship every track twice under different filename conventions:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>01. Artist - Title.flac
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>01 Title.flac           ← same content, different filename style
+</code></pre></div>
+<p>Match on <code>(disc_no, track_no, title.casefold(), artist.casefold())</code> + duration within 0.5s. Without the duration check, a remix and its original at the same <code>track_no</code> would falsely dedupe; with it, only true duplicates collapse.</p>
+<h2 id="atomic-per-album-writes">Atomic per-album writes<a class="headerlink" href="#atomic-per-album-writes" title="Permanent link">&para;</a></h2>
+<p>Hidden <code>.staging</code> sibling dir, swap on success, no half-replaced albums on mid-encode failure. Per-track failures caught at thread level, propagate to album-level <code>error</code> (album fails in summary, CLI exits non-zero, prior album content preserved by atomic swap).</p>
+<h2 id="cover-corruption">Cover corruption<a class="headerlink" href="#cover-corruption" title="Permanent link">&para;</a></h2>
+<p><code>_measure</code> returns <code>(0, 0)</code> on Pillow failure → candidate dropped from the picker. <code>cover.normalize()</code> exception → fall through to next-best candidate. CAA HTTP 5xx (Internet Archive CDN flaky) → caught + warning + fall back to local cover. Don't crash the album.</p>
+<h2 id="lossy-lossy-guard">Lossy → lossy guard<a class="headerlink" href="#lossy-lossy-guard" title="Permanent link">&para;</a></h2>
+<p><code>--format aac/mp3</code> against an MP3/OGG source falls back to ALAC for that track unless <code>--allow-lossy-recompress</code>. AUTO never triggers this since MP3 explicitly transcodes to AAC by design.</p>
+<h2 id="mp3-in-mp4-deliberately-avoided">MP3-in-MP4 deliberately avoided<a class="headerlink" href="#mp3-in-mp4-deliberately-avoided" title="Permanent link">&para;</a></h2>
+<p>When a source MP3 is processed under <code>--format auto</code>, the output is <strong>transcoded to AAC</strong> rather than stream-copied into an <code>.m4a</code> container. MP3-in-MP4 is a valid combination per the MP4 spec and <code>mutagen</code> reads its tags fine, but Finder / Music.app's metadata pipeline shortcuts based on the codec field and won't display tags reliably. Transcoding loses a tiny amount of audio fidelity (transparent on Bluetooth playback) in exchange for a tag schema every consumer can read.</p>
+<h2 id="cases-the-pipeline-does-not-handle-deliberate">Cases the pipeline does NOT handle (deliberate)<a class="headerlink" href="#cases-the-pipeline-does-not-handle-deliberate" title="Permanent link">&para;</a></h2>
+<h3 id="radio-show-pseudo-artists">"Radio Show -" pseudo-artists<a class="headerlink" href="#radio-show-pseudo-artists" title="Permanent link">&para;</a></h3>
+<p>Some rips deliberately tag the <code>album_artist</code> as a <em>programme</em> rather than a <em>person</em> — Armin van Buuren's <em>A State Of Trance</em> weekly show ships with <code>album_artist = "Radio Show - A State Of Trance"</code> on every episode. We trust the tag; episodes land under <code>output/Radio Show - A State Of Trance/2025 - A State Of Trance 1254 (...)/</code> rather than mixed into <code>Armin van Buuren/</code>.</p>
+<p>This is the right default — keeps weekly shows from polluting the main artist library — but means searching for the actual artist won't find them. Workarounds: re-tag source files, or future <code>--artist-override</code> flag.</p>
+<h3 id="classical-style-compilations">Classical-style compilations<a class="headerlink" href="#classical-style-compilations" title="Permanent link">&para;</a></h3>
+<p><code>Best Of/</code> wrapper folder with one sub-folder per composer — each containing tracks tagged only with the composer name, no <code>ALBUM</code> tag — produces <strong>one output album per composer-folder</strong>, not a single merged "Various Artists" comp. Tried merging once; concluded per-composer artist folders were the better default.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

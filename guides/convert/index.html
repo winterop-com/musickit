@@ -1,0 +1,1313 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Convert messy audio rips into a clean tagged library; play locally or stream over Tailscale via a Subsonic-compatible server.">
+      
+      
+      
+        <link rel="canonical" href="https://winterop-com.github.io/musickit/guides/convert/">
+      
+      
+        <link rel="prev" href="../tutorial/">
+      
+      
+        <link rel="next" href="../library/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>musickit convert - musickit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#musickit-convert" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="musickit" class="md-header__button md-logo" aria-label="musickit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            musickit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              musickit convert
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/winterop-com/musickit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    winterop-com/musickit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../quickstart/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../edge-cases/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Edge cases
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../roadmap/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmap
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../api-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="musickit" class="md-nav__button md-logo" aria-label="musickit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    musickit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/winterop-com/musickit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    winterop-com/musickit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial: 0 to iPhone streaming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit convert
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit convert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-runs-per-album" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What runs per album
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-format-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --format matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="--format matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-format-auto-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --format auto (default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#size-and-quality-in-practice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Size and quality, in practice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#container-nuance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Container nuance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#online-enrichment-enrich-no-enrich" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Online enrichment (--enrich / --no-enrich)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#all-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit inspect
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit tui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../serve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit serve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../edge-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Edge cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-runs-per-album" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What runs per album
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-format-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --format matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="--format matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-format-auto-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --format auto (default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#size-and-quality-in-practice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Size and quality, in practice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#container-nuance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Container nuance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#online-enrichment-enrich-no-enrich" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Online enrichment (--enrich / --no-enrich)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#all-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="musickit-convert"><code>musickit convert</code><a class="headerlink" href="#musickit-convert" title="Permanent link">&para;</a></h1>
+<p>The heart of the project. Walks an input tree, groups audio files into albums, re-encodes via <code>ffmpeg</code>, writes clean tags + a normalised cover, lays the result out as <code>output/&lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.&lt;ext&gt;</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>musickit convert [INPUT_DIR] [OUTPUT_DIR] [...flags]
+</code></pre></div>
+<p>Defaults: <code>INPUT_DIR=./input</code>, <code>OUTPUT_DIR=./output</code>, <code>--format auto</code>.</p>
+<h2 id="what-runs-per-album">What runs per album<a class="headerlink" href="#what-runs-per-album" title="Permanent link">&para;</a></h2>
+<p>Roughly in order:</p>
+<ol>
+<li><strong>Discover</strong> — walks the input root, groups audio files by leaf-with-tracks, merges multi-disc layouts (<code>CD1</code>/<code>CD2</code>, <code>Disc 1</code>/<code>Disc 2</code>, <code>Album (CD1)</code>/<code>Album (CD2)</code>, etc.).</li>
+<li><strong>Read source tags</strong> — mutagen via <code>metadata.read_source(path)</code> per track. Format-specific readers for FLAC / MP3 / MP4; generic fallback for OGG / Opus / WAV.</li>
+<li><strong>Pre-fill from filename</strong> — if a track is missing title or artist, <code>_parse_filename_for_va</code> extracts <code>Artist - Title</code> from <code>NN. Artist - Title.ext</code> style filenames. Critical for tagless rips.</li>
+<li><strong>AcoustID lookup</strong> (if <code>--acoustid-key</code> set) — Chromaprint fingerprint for tracks still missing title/artist, query <a href="https://acoustid.org">acoustid.org</a>. Off by default — requires a free user-supplied API key.</li>
+<li><strong>Summarise</strong> — majority-vote across tracks for album / album_artist / year / genre. Disc-1 biased so bonus-disc tags don't pollute the album-name pick on multi-disc releases.</li>
+<li><strong>Folder fallback</strong> — when no ALBUM tag exists, parse the directory name. Strips codec/quality scene tags (<code>[FLAC]</code>, <code>[16Bit-44.1kHz]</code>), edition annotations (<code>(Remastered)</code>, <code>(Deluxe Edition)</code>, <code>(2018 Reissue)</code>), keeps live-album annotations (<code>(Live in Madrid)</code>) since they're real distinctions.</li>
+<li><strong>Resolve output paths</strong> — <code>naming.artist_folder</code> + <code>naming.album_folder</code> + <code>naming.track_filename</code>. VA → <code>Various Artists</code>. Multi-disc → <code>01-NN - Title.m4a</code>.</li>
+<li><strong>Cover</strong> — <code>cover.collect_candidates</code> gathers every embedded picture across the album's tracks plus <code>folder.jpg</code>/<code>cover.jpg</code>/<code>front.jpg</code> siblings. Under <code>--enrich</code>, also fetches from MusicBrainz / Cover Art Archive. <code>cover.pick_best</code> picks the highest pixel area; <code>cover.normalize</code> resizes to <code>--cover-max-edge</code> (default 1000) JPEG quality 90.</li>
+<li><strong>Collision check</strong> — refuse to overwrite an existing output album dir unless <code>--overwrite</code>. Two source albums normalising to the same output path get the second one skipped + warned.</li>
+<li><strong>Encode</strong> — staging dir <code>&lt;out_dir_parent&gt;/.&lt;out_dir_name&gt;.staging/</code>, <code>ThreadPoolExecutor</code> per-track. <code>convert.encode</code> (or <code>remux_to_m4a</code> / <code>copy_passthrough</code> when <code>auto_resolve</code> says copy is safe). <code>metadata.write_tags</code> writes the full target tag set per track.</li>
+<li><strong>Atomic swap</strong> — rename old <code>out_dir</code> to <code>.&lt;name&gt;.backup</code>, rename <code>staging</code> into place, drop <code>backup</code>. Mid-encode failure leaves the prior album intact.</li>
+<li><strong>Source removal</strong> (if <code>--remove-source</code>) — <code>shutil.rmtree(_input_footprint(album_dir))</code> per album, on success only. Footprint computation handles wrapped multi-disc layouts.</li>
+<li><strong>Report</strong> — <code>AlbumReport</code> per album; final summary table.</li>
+</ol>
+<h2 id="-format-matrix"><code>--format</code> matrix<a class="headerlink" href="#-format-matrix" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Codec</th>
+<th>Container</th>
+<th>Lossy?</th>
+<th>Bitrate</th>
+<th>When to pick it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auto</code> (default)</td>
+<td>per-source dispatch</td>
+<td>mostly <code>.m4a</code></td>
+<td>varies</td>
+<td>varies</td>
+<td>The smart default — see below.</td>
+</tr>
+<tr>
+<td><code>alac</code></td>
+<td>Apple Lossless</td>
+<td><code>.m4a</code></td>
+<td>no — bit-perfect</td>
+<td>~600–1100 kbps for CD, ~1500–3000 kbps hi-res</td>
+<td>Archival / library master copy. Round-trips back to FLAC with no loss.</td>
+</tr>
+<tr>
+<td><code>aac</code></td>
+<td>AAC-LC (ffmpeg native)</td>
+<td><code>.m4a</code></td>
+<td>yes</td>
+<td>VBR around <code>--bitrate</code> (default 256k)</td>
+<td>Best per-byte sound quality among lossy options. <strong>256k AAC matches Apple Music streaming.</strong></td>
+</tr>
+<tr>
+<td><code>mp3</code></td>
+<td>MP3 (libmp3lame)</td>
+<td><code>.mp3</code></td>
+<td>yes</td>
+<td>VBR around <code>--bitrate</code></td>
+<td>Maximum compatibility — older car stereos, embedded systems, anything that doesn't grok MP4 containers.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="-format-auto-default"><code>--format auto</code> (default)<a class="headerlink" href="#-format-auto-default" title="Permanent link">&para;</a></h3>
+<p>Targets a <strong>uniform <code>.m4a</code> library at 256 kbps AAC</strong>. Per-source dispatch:</p>
+<table>
+<thead>
+<tr>
+<th>Source codec</th>
+<th>Action</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FLAC, WAV (lossless)</td>
+<td>encode → 256k AAC m4a</td>
+<td>One lossy pass from a lossless source — Apple Music quality, ~24% the size.</td>
+</tr>
+<tr>
+<td>AAC <code>.m4a</code></td>
+<td>stream-copy into clean re-tagged m4a</td>
+<td>Already AAC, free pass; preserves quality.</td>
+</tr>
+<tr>
+<td>ALAC <code>.m4a</code></td>
+<td>encode → 256k AAC m4a</td>
+<td>Lossless source → single lossy pass, same as FLAC.</td>
+</tr>
+<tr>
+<td>MP3, OGG, Opus, AAC, other lossy</td>
+<td>encode → 256k AAC m4a</td>
+<td>One-time tandem encode for library uniformity. The cost is below the audibility threshold on consumer playback gear (and fully masked by Bluetooth, which re-encodes at 256k AAC anyway); the win is one extension, one tag schema, metadata visible everywhere.</td>
+</tr>
+</tbody>
+</table>
+<p>To skip the tandem encode and keep lossy sources at full bitrate, use <code>--format aac</code> without <code>--allow-lossy-recompress</code>: lossy sources fall back to ALAC m4a (lossless wrapper of the lossy bytes; bigger but no further degradation). <code>--format alac</code> forces ALAC m4a for every track regardless of source.</p>
+<h3 id="size-and-quality-in-practice">Size and quality, in practice<a class="headerlink" href="#size-and-quality-in-practice" title="Permanent link">&para;</a></h3>
+<p>Approximate ratios versus an ALAC master (~1000 kbps average for a typical mixed 16/24-bit library):</p>
+<table>
+<thead>
+<tr>
+<th>Codec / bitrate</th>
+<th>Size vs ALAC</th>
+<th>Audibility vs lossless</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ALAC</td>
+<td>100%</td>
+<td>identical (lossless)</td>
+</tr>
+<tr>
+<td>AAC 320k</td>
+<td>~32%</td>
+<td>transparent on consumer gear</td>
+</tr>
+<tr>
+<td><strong>AAC 256k</strong></td>
+<td><strong>~24%</strong></td>
+<td><strong>transparent for nearly all listeners</strong></td>
+</tr>
+<tr>
+<td>AAC 192k</td>
+<td>~18%</td>
+<td>mostly transparent; rare audible artefacts</td>
+</tr>
+<tr>
+<td>MP3 320k</td>
+<td>~30%</td>
+<td>transparent for most listeners</td>
+</tr>
+<tr>
+<td>MP3 256k</td>
+<td>~24%</td>
+<td>usually transparent</td>
+</tr>
+<tr>
+<td>MP3 192k</td>
+<td>~18%</td>
+<td>audible on critical listening</td>
+</tr>
+</tbody>
+</table>
+<p>Per byte, AAC sounds noticeably better than MP3 at the same bitrate — that's why iTunes Plus and Apple Music settled on <strong>256k AAC</strong> as the lossy default rather than 320k MP3.</p>
+<h3 id="container-nuance">Container nuance<a class="headerlink" href="#container-nuance" title="Permanent link">&para;</a></h3>
+<p><code>.m4a</code> is the MP4 container — the codec inside is either ALAC (lossless) or AAC (lossy). Both resolve to the same MP4 tag atoms (<code>\xa9nam</code> title, <code>\xa9ART</code> artist, <code>aART</code> album artist, <code>trkn</code>/<code>disk</code> track/disc tuples, <code>covr</code> cover, <code>cpil</code> compilation, <code>----:com.apple.iTunes:LABEL</code> etc.). Plain <code>.mp3</code> files use ID3v2.4 frames (<code>TIT2</code>, <code>TPE1</code>, <code>TPE2</code>, <code>TALB</code>, <code>TRCK</code>, <code>TPOS</code>, <code>TCMP</code>, <code>APIC</code>, plus <code>TXXX</code> for replaygain and MusicBrainz IDs).</p>
+<p>MP3 sources are transcoded to AAC under <code>auto</code> rather than remuxed into MP4 — Finder doesn't display tags reliably for MP3-in-MP4 hybrids, so the library stays uniform-AAC instead.</p>
+<h2 id="online-enrichment-enrich-no-enrich">Online enrichment (<code>--enrich</code> / <code>--no-enrich</code>)<a class="headerlink" href="#online-enrichment-enrich-no-enrich" title="Permanent link">&para;</a></h2>
+<p><strong>On by default when an internet connection is available.</strong> A fast TCP probe to MusicBrainz at startup decides; if it fails the run continues with local-only cover sourcing. <code>--enrich</code> forces it on (skips the probe — useful on networks where the probe is blocked but HTTP works); <code>--no-enrich</code> disables it entirely.</p>
+<p>When active, each album runs:</p>
+<ol>
+<li><strong>MusicBrainz release search</strong> at <code>https://musicbrainz.org/ws/2/release/</code> keyed on the album title + album artist + track count. The top result is accepted only when its match score is ≥ 90, which avoids false positives on common compilation/best-of titles. The response carries <code>artist-credit</code> and <code>release-group</code> inline, so we populate <code>MusicBrainzIds.album_id</code>, <code>artist_id</code>, <code>release_group_id</code> in a single round trip.</li>
+<li><strong>Cover Art Archive</strong> at <code>https://coverartarchive.org/release/&lt;MBID&gt;/front-1200</code> is queried for the resolved release MBID.</li>
+</ol>
+<p>The fetched cover joins the local candidates and the picker keeps the highest-area image. The picker <strong>never downgrades</strong> — if the online result is smaller than what's already on disk, we keep local. The resolved release MBID is written to the output tags as <code>----:com.apple.iTunes:MusicBrainz Album Id</code> (MP4) / <code>TXXX:MusicBrainz Album Id</code> (MP3).</p>
+<p>Both calls go through a polite client: a 1 req/sec throttle per host, a descriptive User-Agent, and 15-second timeouts. Errors are non-fatal — the album just falls back to the offline candidate and a warning lands in the per-album notes column.</p>
+<h2 id="all-flags">All flags<a class="headerlink" href="#all-flags" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>INPUT_DIR</code> (default <code>./input</code>)</li>
+<li><code>OUTPUT_DIR</code> (default <code>./output</code>)</li>
+<li><code>--format / -f auto|alac|mp3|aac</code> (default <code>auto</code>)</li>
+<li><code>--bitrate / -b 192k|256k|320k</code> (default <code>256k</code>, ignored for ALAC)</li>
+<li><code>--enrich/--no-enrich</code> (default: auto-probe, on if reachable)</li>
+<li><code>--dry-run</code> — plan only, no files written</li>
+<li><code>--overwrite/--no-overwrite</code> — default off; existing albums are preserved + the run merges into existing output</li>
+<li><code>--remove-source/--no-remove-source</code> — default off; when on, deletes each input album dir on successful convert</li>
+<li><code>--allow-lossy-recompress</code> — opt into MP3→AAC tandem encode under <code>--format aac</code></li>
+<li><code>--workers / -w N</code> (default 2; each worker spawns ffmpeg which is itself multi-threaded)</li>
+<li><code>--cover-max-edge PX</code> (default 1000)</li>
+<li><code>--acoustid-key TEXT</code> (or <code>MUSICKIT_ACOUSTID_KEY</code> env var; off by default)</li>
+</ul>
+<p><code>-v</code>/<code>--verbose</code> is a top-level callback flag — works in any position (<code>musickit -v convert …</code> or <code>musickit convert … --verbose</code>).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2018 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Convert messy audio rips into a clean tagged library; play locally or stream over Tailscale via a Subsonic-compatible server.">
+      
+      
+      
+        <link rel="canonical" href="https://winterop-com.github.io/musickit/architecture/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../guides/quickstart/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Architecture - musickit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="musickit" class="md-header__button md-logo" aria-label="musickit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            musickit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/winterop-com/musickit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    winterop-com/musickit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/quickstart/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../edge-cases/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Edge cases
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../roadmap/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmap
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="musickit" class="md-nav__button md-logo" aria-label="musickit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    musickit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/winterop-com/musickit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    winterop-com/musickit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-five-user-facing-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five user-facing surfaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#end-to-end-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        End-to-end data flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-convert-pipeline-srcmusickitpipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The convert pipeline (src/musickit/pipeline/)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-library-index-srcmusickitlibrary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The library index (src/musickit/library/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The library index (src/musickit/library/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-the-filesystem-libraryscanpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the filesystem (library/scan.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-the-sqlite-cache-librarydbpy-libraryloadpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the SQLite cache (library/db.py, library/load.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-tui-process-model-srcmusickittui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The TUI process model (src/musickit/tui/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The TUI process model (src/musickit/tui/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-a-subprocess" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a subprocess?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-interface-stays-the-same" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public interface stays the same
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#airplay-stays-in-the-ui-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AirPlay stays in the UI process
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-visualizer-fft-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The visualizer (FFT path)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The visualizer (FFT path)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-audio-callback-hands-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the audio callback hands off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-turn-samples-into-a-frequency-spectrum" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: turn samples into a frequency spectrum
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-group-bins-into-bands-the-eye-can-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: group bins into bands the eye can read
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-normalise-smooth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: normalise + smooth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-render-columns-of-unicode-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: render columns of unicode blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-serve-process-srcmusickitserve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The serve process (src/musickit/serve/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The serve process (src/musickit/serve/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subsonic-id-stability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsonic-ID stability
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-watcher-srcmusickitservewatcherpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The watcher (src/musickit/serve/watcher.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The watcher (src/musickit/serve/watcher.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#client-triggered-rescan-via-the-subsonic-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client-triggered rescan via the Subsonic API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-every-dependency-sits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where every dependency sits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-read-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to read next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial: 0 to iPhone streaming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/convert/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit convert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/inspect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit inspect
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/tui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit tui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/serve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit serve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../edge-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Edge cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-five-user-facing-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five user-facing surfaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#end-to-end-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        End-to-end data flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-convert-pipeline-srcmusickitpipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The convert pipeline (src/musickit/pipeline/)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-library-index-srcmusickitlibrary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The library index (src/musickit/library/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The library index (src/musickit/library/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-the-filesystem-libraryscanpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the filesystem (library/scan.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-the-sqlite-cache-librarydbpy-libraryloadpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the SQLite cache (library/db.py, library/load.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-tui-process-model-srcmusickittui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The TUI process model (src/musickit/tui/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The TUI process model (src/musickit/tui/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-a-subprocess" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a subprocess?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-interface-stays-the-same" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public interface stays the same
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#airplay-stays-in-the-ui-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AirPlay stays in the UI process
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-visualizer-fft-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The visualizer (FFT path)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The visualizer (FFT path)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-audio-callback-hands-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the audio callback hands off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-turn-samples-into-a-frequency-spectrum" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: turn samples into a frequency spectrum
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-group-bins-into-bands-the-eye-can-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: group bins into bands the eye can read
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-normalise-smooth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: normalise + smooth
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-render-columns-of-unicode-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: render columns of unicode blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-serve-process-srcmusickitserve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The serve process (src/musickit/serve/)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The serve process (src/musickit/serve/)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subsonic-id-stability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsonic-ID stability
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-watcher-srcmusickitservewatcherpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The watcher (src/musickit/serve/watcher.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The watcher (src/musickit/serve/watcher.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#client-triggered-rescan-via-the-subsonic-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client-triggered rescan via the Subsonic API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-every-dependency-sits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where every dependency sits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-read-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to read next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<p>How the pieces fit together — process model, data flow, every dependency that
+sits behind a public command.</p>
+<h2 id="the-five-user-facing-surfaces">The five user-facing surfaces<a class="headerlink" href="#the-five-user-facing-surfaces" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                   +----------+
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                   | musickit |  CLI (typer)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                   +----+-----+
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                        |
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>   +---------+----------+----------+----------+----------+
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>   |         |          |          |          |          |
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>convert    library    inspect      tui        serve
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>   |         |          |          |          |
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>ffmpeg    SQLite      mutagen   Textual    FastAPI
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>encode    + audit     dump      + audio    + watcher
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                                subprocess + index cache
+</code></pre></div>
+<p>Every command lives in <code>src/musickit/cli/</code>. The <code>library</code> command is itself a
+Typer <strong>subapp</strong> carrying further verbs (<code>tree</code>, <code>audit</code>, <code>fix</code>, <code>cover</code>,
+<code>cover-pick</code>, <code>retag</code>, <code>index status|drop|rebuild</code>).</p>
+<h2 id="end-to-end-data-flow">End-to-end data flow<a class="headerlink" href="#end-to-end-data-flow" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>+--------------------+
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>|    input dir       |   raw rips: scene tags, mixed disc layouts,
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>|  (FLAC/MP3/M4A/    |   tagless tracks, missing covers
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>|   WAV/OGG/OPUS)    |
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>+----+---------------+
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>     |
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>     |  musickit convert
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>     v
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>+--------------------+
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>|  output dir        |   &lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.m4a
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>|  (clean library)   |   one shape, all M4A/AAC unless --format said otherwise
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>+----+---------------+
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>     |
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>     |  musickit library tree | audit | fix | cover-pick | retag
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>     |
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>     |  (also: hydrates `&lt;output&gt;/.musickit/index.db`,
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>     |   the persistent SQLite index of every album/track/
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>     |   audit-warning + multi-genre)
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>     v
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>+--------------------+         +-----------------------------------+
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>|  in-memory         |  same   |  &lt;output&gt;/.musickit/index.db      |
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>|  LibraryIndex      |&lt;-------&gt;|  derived cache; rebuilt on schema |
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>|  (Pydantic graph)  |         |  bump or root mismatch            |
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>+----+---------------+         +-----------------------------------+
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>     |
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>     +--&gt; consumed by `tui` and `serve` (both read the same index)
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>                              |
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>   +--------------------------+--------------------------+
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>   |                                                     |
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>   v                                                     v
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>+----------------------+                +---------------------------+
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>| musickit tui         |                | musickit serve            |
+<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>|                      |                |                           |
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>| Textual UI process   |                | FastAPI app               |
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>|   + audio engine     |                |   + IndexCache            |
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>|     subprocess       |                |   + LibraryWatcher        |
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>|     (PyAV decode +   |                |   + mDNS advertisement    |
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>|      sounddevice     |                |                           |
+<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>|      callback)       |                | Subsonic-compatible API   |
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a>|   + AirPlay path     |                | over LAN / Tailscale      |
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>|     (pyatv)          |                |                           |
+<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>+----------------------+                +---------+-----------------+
+<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a>                                                  |
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>                                                  v
+<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>                                       +--------------------+
+<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a>                                       | Subsonic clients   |
+<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a>                                       | Symfonium  / iOS   |
+<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a>                                       | Amperfy    / iOS   |
+<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a>                                       | play:Sub   / iOS   |
+<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a>                                       | Feishin    / desk. |
+<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a>                                       +--------------------+
+</code></pre></div>
+<h2 id="the-convert-pipeline-srcmusickitpipeline">The convert pipeline (<code>src/musickit/pipeline/</code>)<a class="headerlink" href="#the-convert-pipeline-srcmusickitpipeline" title="Permanent link">&para;</a></h2>
+<p>Pure batch process — runs to completion and exits. No daemon, no IPC.</p>
+<p><code>pipeline.run.run_convert()</code> is the orchestrator. Per album:</p>
+<ol>
+<li><strong><code>discover.py</code></strong> — walks the input tree, groups files by leaf directory,
+   merges multi-disc layouts (<code>Album/CD1/</code>, <code>Album/Disc 1/</code>, etc.) into one
+   logical album.</li>
+<li><strong><code>metadata.read.read_source()</code></strong> — uses mutagen to pull tags + embedded
+   picture from one representative track per album. Lowercase-stripped values
+   get <code>smart_title_case</code> so <code>the beatles</code> becomes <code>The Beatles</code> while real
+   casing (<code>AC/DC</code>, <code>iPhone</code>, <code>R.E.M.</code>) is preserved.</li>
+<li><strong><code>enrich/</code></strong> — optional MusicBrainz / Cover Art Archive / AcoustID
+   lookups when tags are missing or the cover is low-res. AcoustID uses
+   chromaprint fingerprints (via fpcalc) to identify tagless tracks by audio
+   content alone.</li>
+<li><strong><code>pipeline.cover</code></strong> — pick the best cover from candidates: embedded ≥
+   sidecar (<code>cover.jpg</code>/<code>folder.jpg</code>) ≥ MB CAA ≥ none. Normalise via Pillow
+   (max-edge resize, JPEG quality 90).</li>
+<li><strong><code>convert.py</code></strong> — call <code>ffmpeg</code> to encode each track to the target format.
+   Default is 256 kbps AAC m4a (Apple Music quality, ~24% the size of
+   lossless). <code>--format alac</code> for archival lossless; <code>--format passthrough</code>
+   for remux only.</li>
+<li><strong><code>pipeline.album.write_album()</code></strong> — write the encoded files into
+   <code>&lt;output&gt;/&lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.m4a</code>, with mutagen
+   writing tags + embedded cover.</li>
+</ol>
+<p><code>pipeline.dedupe</code> skips albums whose hash already exists in the output (cheap
+restart safety). <code>pipeline.report</code> accumulates per-album outcomes for the
+final summary table.</p>
+<h2 id="the-library-index-srcmusickitlibrary">The library index (<code>src/musickit/library/</code>)<a class="headerlink" href="#the-library-index-srcmusickitlibrary" title="Permanent link">&para;</a></h2>
+<p>The same Pydantic <code>LibraryIndex</code> graph (Artist → Album → Track) is consumed
+by <strong>every</strong> command that reads a converted library — <code>library tree/audit/fix</code>,
+<code>tui</code>, <code>serve</code>. It's defined once in <code>library/models.py</code> and built two ways:</p>
+<h3 id="from-the-filesystem-libraryscanpy">From the filesystem (<code>library/scan.py</code>)<a class="headerlink" href="#from-the-filesystem-libraryscanpy" title="Permanent link">&para;</a></h3>
+<p><code>scan(root)</code> walks <code>root</code> with <code>Path.rglob</code>, groups audio files by parent
+directory (= album), reads tags with mutagen, and returns a fresh
+<code>LibraryIndex</code>. This is the cold path — used the very first time a library is
+seen, and any time the user passes <code>--no-cache</code>.</p>
+<p><code>audit(index)</code> (<code>library/audit.py</code>) attaches <code>warnings</code> to each album by
+running rules: no cover, low-res cover, missing/mixed years, mixed
+album_artist, scene-residue dirnames, tag/path mismatch, track gaps. Pure
+analysis — no I/O after the scan.</p>
+<p><code>fix_index(index, ...)</code> (<code>library/fix.py</code>) acts on the warnings: MusicBrainz
+year backfill (one HTTP call per flagged album), tag/path mismatch resolution
+(rename dir to match tag, or invert with <code>--prefer-dirname</code>), <code>--rename</code> after
+<code>retag</code>. Each fix mutates the in-memory model AND the on-disk file/dir.</p>
+<h3 id="from-the-sqlite-cache-librarydbpy-libraryloadpy">From the SQLite cache (<code>library/db.py</code>, <code>library/load.py</code>)<a class="headerlink" href="#from-the-sqlite-cache-librarydbpy-libraryloadpy" title="Permanent link">&para;</a></h3>
+<p><code>&lt;root&gt;/.musickit/index.db</code> persists the <code>LibraryIndex</code> so cold starts
+(launching <code>tui</code> or <code>serve</code>) don't re-read every audio tag. Tables:</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>meta</code></td>
+<td><code>schema_version</code>, <code>library_root_abs</code>, <code>last_full_scan_at</code></td>
+</tr>
+<tr>
+<td><code>albums</code></td>
+<td>One row per album dir — tags, counts, <code>dir_mtime</code>, audit-relevant flags</td>
+</tr>
+<tr>
+<td><code>tracks</code></td>
+<td>One row per audio file — tags, ReplayGain, <code>file_mtime</code>, <code>file_size</code></td>
+</tr>
+<tr>
+<td><code>track_genres</code></td>
+<td><code>(track_id, genre)</code> pairs for multi-genre support</td>
+</tr>
+<tr>
+<td><code>album_warnings</code></td>
+<td><code>(album_id, warning)</code> pairs from the audit pass</td>
+</tr>
+</tbody>
+</table>
+<p><code>load_or_scan(root)</code> is the top-level entry point used by <code>tui</code>, <code>serve</code>,
+and the library subcommands:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>load_or_scan(root):
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  conn = open_db(root)            # creates schema if missing; unlinks +
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                                  # rebuilds on schema_version mismatch
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                                  # or library_root_abs mismatch
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  if is_empty(conn):
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>      scan_full(root, conn)       # full FS walk, audit, write all rows
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  else:
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>      load(root, conn)            # hydrate Pydantic from rows
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>      validate(root, conn)        # diff FS vs DB; per-album re-scan for
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>                                  # added / removed / tag-edited dirs
+</code></pre></div>
+<p><code>validate()</code> uses <code>(file_mtime, file_size)</code> per track row to detect changes
+without re-reading every tag. Affected album dirs go through <code>rescan_albums</code>,
+which deletes the old album row (cascade-drops tracks + warnings) and inserts
+a fresh one. Whole-album deletions are detected when the DB has a row for a
+dir that no longer exists on disk.</p>
+<p>The <code>serve</code> watcher (<code>serve/watcher.py</code>) drives the same <code>rescan_albums</code>
+through <code>IndexCache.rescan_paths(paths)</code> whenever filesystem events fire
+during the debounce window.</p>
+<p>Schema bumps don't run migrations — <code>db.py</code> defines a <code>SCHEMA_VERSION</code>
+constant; mismatched DBs are unlinked and rebuilt from scratch. The
+filesystem is the source of truth so destructive rebuilds are always safe.</p>
+<h2 id="the-tui-process-model-srcmusickittui">The TUI process model (<code>src/musickit/tui/</code>)<a class="headerlink" href="#the-tui-process-model-srcmusickittui" title="Permanent link">&para;</a></h2>
+<p>Two processes:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>+-----------------------------------+        +-------------------------------+
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>| UI process (Textual)              |        | Audio engine subprocess       |
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>| - MusickitApp                     |        | - engine_main()               |
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>| - render loop                     |        | - opener thread (per play)    |
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>| - keybinding dispatch             |  &lt;--&gt;  | - decoder thread (PyAV)       |
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>| - AudioPlayer (RPC client)        |        | - sounddevice OutputStream    |
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>| - AirPlayController (pyatv)       |        |   callback                    |
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>+-----------------------------------+        +-------------------------------+
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>              ^                ^                            ^         ^
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>              |                |                            |         |
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>              | reads          | sends Commands             | reads   | writes
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>              | shared mem     | (PLAY / PAUSE / SEEK /     | shared  | shared
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>              | (position,     |  SET_VOLUME / STOP / ...)  | mem     | mem
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>              |  band_levels)  |                            |         |
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>              |                v                            |         v
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>              |         +-----------------+                 |  +-----------------+
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>              |         | cmd_queue       |  -----------&gt;   |  | event_queue     |
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>              |         | (mp.Queue)      |                 |  | (mp.Queue)      |
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>              |         +-----------------+                 |  +-----------------+
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>              |                                             |  TRACK_END /
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>              |                                             |  TRACK_FAILED /
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>              |                                             |  METADATA_CHANGED
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>              |                                             |  / STARTED
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>              |                                             |  drained by
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>              |                                             |  reader thread
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>              |                                             |  in UI process
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>              v                                             v
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>        +---------------------+                       +---------------------+
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>        | Shared memory       |                       | (events fire UI    |
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>        | mp.Value:           |                       |  callbacks via     |
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>        |   position_frames   |                       |  Textual&#39;s         |
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>        |   duration_s        |                       |  call_from_thread) |
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>        |   paused / stopped  |                       +---------------------+
+<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>        |   volume            |
+<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>        |   replaygain_mult.  |
+<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>        | mp.Array:
+<a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>        |   band_levels[48]   |
+<a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>        +---------------------+
+</code></pre></div>
+<h3 id="why-a-subprocess">Why a subprocess?<a class="headerlink" href="#why-a-subprocess" title="Permanent link">&para;</a></h3>
+<p>The sounddevice audio callback is implemented in Python — it acquires the
+GIL on every fire (~43 Hz at 1024 frames @ 44.1 kHz). When the audio engine
+shared a Python interpreter with the Textual UI, a burst of UI work
+(window resize, focus switch between panes, GC) could hold the GIL long
+enough to starve the callback past PortAudio's deadline → buffer underrun
+→ audible click (xrun).</p>
+<p>Earlier mitigations stacked workarounds: 500 ms PortAudio buffer, then
+1 s buffer, resize-debounce, focus-change short-circuits. The current
+architecture eliminates the root cause: the audio engine has its own
+interpreter, its own GIL. UI work in the main process can't stall the
+callback. The PortAudio buffer is back to 200 ms.</p>
+<h3 id="public-interface-stays-the-same">Public interface stays the same<a class="headerlink" href="#public-interface-stays-the-same" title="Permanent link">&para;</a></h3>
+<p><code>AudioPlayer</code> is the public class the UI imports. After the subprocess
+move, its methods (<code>play</code>, <code>stop</code>, <code>toggle_pause</code>, <code>seek</code>, <code>set_volume</code>,
+<code>set_airplay</code>, <code>set_replaygain_mode</code>) are thin RPC wrappers — each pushes
+a <code>Command</code> onto <code>cmd_queue</code> (or writes shared memory). Properties
+(<code>position</code>, <code>band_levels</code>, <code>is_playing</code>, <code>volume</code>) read shared memory
+directly. The UI code in <code>app.py</code> doesn't know there's a subprocess.</p>
+<p>A reader thread in the UI process drains <code>event_queue</code> and dispatches to
+the registered callbacks (<code>on_track_end</code>, <code>on_track_failed</code>,
+<code>on_metadata_change</code>). The callbacks fire from the reader thread; UI
+updates inside them route through Textual's <code>call_from_thread</code> (same as
+they did in the previous threaded design).</p>
+<h3 id="airplay-stays-in-the-ui-process">AirPlay stays in the UI process<a class="headerlink" href="#airplay-stays-in-the-ui-process" title="Permanent link">&para;</a></h3>
+<p><code>pyatv</code> is asyncio-based and just sends URLs to the AirPlay device; it
+doesn't run a decoder. There's no audio callback to protect. So the
+<code>AirPlayController</code> lives alongside the UI and is consulted directly by
+<code>AudioPlayer.play()</code> / <code>set_volume()</code> / <code>toggle_pause()</code> when a device is
+connected.</p>
+<h2 id="the-visualizer-fft-path">The visualizer (FFT path)<a class="headerlink" href="#the-visualizer-fft-path" title="Permanent link">&para;</a></h2>
+<p>The visualizer is a 48-band spectrum analyser. The math is identical in
+every audio player that has ever drawn one — only the UI plumbing is
+musickit-specific.</p>
+<h3 id="what-the-audio-callback-hands-off">What the audio callback hands off<a class="headerlink" href="#what-the-audio-callback-hands-off" title="Permanent link">&para;</a></h3>
+<p>Every callback (~43 Hz) gets a chunk of N stereo float32 samples from the
+decoder queue and writes it to PortAudio's output buffer. As a side-effect
+it stashes a reference to that chunk on the engine instance, then runs
+the FFT before publishing the resulting band magnitudes into shared
+memory. Roughly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># inside AudioEngine._audio_callback (audio thread, runs in subprocess)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">outdata</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">chunk</span> <span class="o">*</span> <span class="n">volume</span> <span class="o">*</span> <span class="n">replaygain_multiplier</span>   <span class="c1"># the actual playback</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="bp">self</span><span class="o">.</span><span class="n">_latest_chunk</span> <span class="o">=</span> <span class="n">chunk</span>                            <span class="c1"># for the visualizer</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="bp">self</span><span class="o">.</span><span class="n">_update_band_levels</span><span class="p">()</span>                            <span class="c1"># FFT + decay (below)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="bp">self</span><span class="o">.</span><span class="n">_publish_band_levels</span><span class="p">()</span>                           <span class="c1"># write 48 floats to mp.Array</span>
+</code></pre></div>
+<p>The UI ticks at 30 Hz, reads the 48 floats from shared memory, and renders
+the bars. Producer-faster-than-consumer is fine: the UI just sees the most
+recent published values.</p>
+<h3 id="step-1-turn-samples-into-a-frequency-spectrum">Step 1: turn samples into a frequency spectrum<a class="headerlink" href="#step-1-turn-samples-into-a-frequency-spectrum" title="Permanent link">&para;</a></h3>
+<p>Audio samples are amplitude over time — a wiggle. The FFT (Fast Fourier
+Transform) decomposes that wiggle into the strengths of every constituent
+sinewave. NumPy does it in one call:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mono</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>            <span class="c1"># collapse stereo to mono</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">spectrum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">rfft</span><span class="p">(</span><span class="n">mono</span><span class="p">))</span> <span class="c1"># rfft = real-input FFT (twice as fast as</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                                     <span class="c1"># the complex version since audio is real)</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>                                     <span class="c1"># abs() turns complex amplitudes into</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>                                     <span class="c1"># magnitudes — &quot;how loud is this frequency&quot;.</span>
+</code></pre></div>
+<p>For a 1024-sample chunk at 44.1 kHz, <code>rfft</code> returns 513 magnitude bins
+covering 0 Hz → 22 050 Hz (the Nyquist limit). Each bin is ~43 Hz wide
+(<code>samplerate / chunk_size</code>).</p>
+<h3 id="step-2-group-bins-into-bands-the-eye-can-read">Step 2: group bins into bands the eye can read<a class="headerlink" href="#step-2-group-bins-into-bands-the-eye-can-read" title="Permanent link">&para;</a></h3>
+<p>513 bars don't fit on screen and most of them carry no useful info — the
+top 100 bins are usually inaudible content above 18 kHz. Two more
+problems with showing raw bins:</p>
+<ul>
+<li>Linear bin spacing is wrong for music. Humans perceive pitch
+  geometrically: an octave is a doubling of frequency. C4 → C5 is 261 Hz
+  → 523 Hz; C5 → C6 is 523 → 1046 Hz. Equal-width linear bands collapse
+  the bass into 1-2 bars and waste 30 bars on the brilliance range.</li>
+<li>Energy is concentrated in the bass. Without geometric spacing, almost
+  every musical signal renders as "leftmost bar maxed out, rest twitching".</li>
+</ul>
+<p>Solution: pick band edges on a logarithmic scale. <code>np.geomspace(1, n_bins, 49)</code>
+returns 49 numbers between 1 and <code>n_bins</code> that double-ish from one to the
+next. Band <code>i</code> covers bins <code>edges[i] .. edges[i+1]</code>, and we take the
+loudest bin in that range:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">geomspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_bins</span><span class="p">,</span> <span class="n">VIS_BANDS</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">VIS_BANDS</span><span class="p">):</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="n">edges</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="nb">max</span><span class="p">(</span><span class="n">edges</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">edges</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">peak</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">spectrum</span><span class="p">[</span><span class="n">lo</span><span class="p">:</span><span class="n">hi</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>   <span class="c1"># loudest bin in this geometric band</span>
+</code></pre></div>
+<p><code>max</code> (peak) instead of <code>mean</code> makes percussive transients (a snare, a
+hi-hat) pop visually — averaging would smear them across neighbouring bins.</p>
+<h3 id="step-3-normalise-smooth">Step 3: normalise + smooth<a class="headerlink" href="#step-3-normalise-smooth" title="Permanent link">&para;</a></h3>
+<p>Raw peak magnitudes have no fixed scale (they depend on the chunk size and
+input gain). The <code>/ 32.0</code> is a magic number tuned by ear so a typical
+loud passage hits 0.7-0.9 and rare peaks reach 1.0. The <code>min(1.0, ...)</code>
+clamps so a clipped input doesn't push bars off-screen.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">level</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">peak</span> <span class="o">/</span> <span class="mf">32.0</span><span class="p">)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">prev</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_band_levels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="bp">self</span><span class="o">.</span><span class="n">_band_levels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">prev</span> <span class="o">*</span> <span class="n">_VIS_DECAY</span><span class="p">)</span>
+</code></pre></div>
+<p>The <code>max(new, prev * decay)</code> is exponential smoothing on the way DOWN
+only. New peaks pop instantly; bars then decay by 15% per callback
+(<code>_VIS_DECAY = 0.85</code>), so a momentary peak fades over ~0.5 s instead of
+disappearing in 23 ms. Asymmetric attack/release is what makes the bars
+look "physical" rather than flickering with the sample-rate noise floor.</p>
+<h3 id="step-4-render-columns-of-unicode-blocks">Step 4: render columns of unicode blocks<a class="headerlink" href="#step-4-render-columns-of-unicode-blocks" title="Permanent link">&para;</a></h3>
+<p>The Visualizer widget in <code>tui/widgets.py</code> consumes the 48 floats and
+draws a column of full blocks (<code>█</code>) per band, with sub-cell vertical
+resolution from the partial-block characters <code>▁▂▃▄▅▆▇█</code> (the top of each
+bar). Bar width is computed to fill the available content area: prefer
+1-cell gaps between bars; drop the gap on terminals where even
+<code>bar_width=1</code> with gaps wouldn't fit. Leftover modulo cells become a
+leading offset so the meter is centered.</p>
+<h2 id="the-serve-process-srcmusickitserve">The serve process (<code>src/musickit/serve/</code>)<a class="headerlink" href="#the-serve-process-srcmusickitserve" title="Permanent link">&para;</a></h2>
+<p>Single FastAPI process. Components:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>+-------------------------------------------------+
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>|  uvicorn                                        |
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>|    +------------------------------------------+ |
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>|    | FastAPI app (serve/app.py)               | |
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>|    |  - Subsonic auth dependency              | |
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>|    |  - PostFormToQueryMiddleware             | |
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>|    |    (play:Sub iOS sends creds in form)    | |
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>|    |  - SubsonicFormatMiddleware              | |
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>|    |    (XML default; ?f=json opts in)        | |
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>|    |  - 7 endpoint routers under /rest/       | |
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>|    +------------------------------------------+ |
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>|                                                 |
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>|    app.state.cache = IndexCache(root)           |
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>|      - LibraryIndex                             |
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>|      - albums_by_id / tracks_by_id /            |
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>|        artists_by_id (Subsonic-ID lookups)      |
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>|      - rebuild() / rescan_paths()               |
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>|                                                 |
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>|    app.state.watcher = LibraryWatcher(cache)    |
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>|      - watchdog Observer                        |
+<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a>|      - debounce timer (5s)                      |
+<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>|      - dispatches changed paths to              |
+<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a>|        cache.rescan_paths(...)                  |
+<a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a>|                                                 |
+<a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a>|    mDNS service (Zeroconf) advertises           |
+<a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a>|    `_subsonic._tcp.local` so clients on the     |
+<a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a>|    LAN find the server without typing its IP    |
+<a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a>+-------------------------------------------------+
+</code></pre></div>
+<p>The <code>IndexCache</code> is the same pattern as the TUI's <code>AudioPlayer</code> cache:
+public methods do small things on top of the shared <code>LibraryIndex</code> /
+<code>load_or_scan</code> machinery. Endpoints in <code>serve/endpoints/</code> resolve
+incoming Subsonic IDs against <code>albums_by_id</code> / <code>tracks_by_id</code> /
+<code>artists_by_id</code> (built from the index by <code>_reindex</code>); none of them hit
+the disk on a hot request — even <code>getCoverArt</code> has the path resolved
+from the cache and only opens the on-disk image bytes for the response.</p>
+<p>The <code>/rest/stream</code> endpoint either streams raw bytes (when no transcode
+is requested) or pipes through ffmpeg-on-the-fly when the client asks for
+<code>format=mp3</code> or <code>maxBitRate=N</code>. Symfonium / Amperfy / play:Sub clients
+auto-negotiate this via <code>getMusicFolders</code> / <code>getOpenSubsonicExtensions</code>
+on first connect.</p>
+<h3 id="subsonic-id-stability">Subsonic-ID stability<a class="headerlink" href="#subsonic-id-stability" title="Permanent link">&para;</a></h3>
+<p><code>serve/ids.py</code> builds opaque Subsonic IDs from album/track paths via a
+hash. The IDs are stable across rescans for unchanged albums (rebuild
+recomputes from the same input) and across server restarts. Symfonium
+caches IDs per-server, so rolling the IDs on every restart would force
+re-downloads on every client.</p>
+<h2 id="the-watcher-srcmusickitservewatcherpy">The watcher (<code>src/musickit/serve/watcher.py</code>)<a class="headerlink" href="#the-watcher-srcmusickitservewatcherpy" title="Permanent link">&para;</a></h2>
+<p><code>watchdog</code> <code>Observer</code> watches the library root recursively. The handler
+filters by extension (audio files only — skip <code>.DS_Store</code>, <code>cover.jpg</code>)
+and pushes paths into a set during a debounce window (default 5 s). When
+no new event has arrived for the debounce period, the whole batch goes
+to <code>cache.rescan_paths(paths)</code>, which:</p>
+<ol>
+<li>Resolves each path to its album dir (file → parent; existing dir →
+   self; vanished → both, since we can't tell file-vs-dir from a missing
+   path).</li>
+<li>Calls <code>library.rescan_albums</code> to delete + re-insert only those albums
+   in one transaction.</li>
+<li>Refreshes the in-memory <code>LibraryIndex</code> and the reverse-lookup dicts
+   from the new rows.</li>
+</ol>
+<p>Dropping a brand-new album into the library directory therefore takes ~6 s
+to appear (5 s debounce + scan + rebuild dicts). A bulk copy of 100 files
+collapses to one rescan.</p>
+<h3 id="client-triggered-rescan-via-the-subsonic-api">Client-triggered rescan via the Subsonic API<a class="headerlink" href="#client-triggered-rescan-via-the-subsonic-api" title="Permanent link">&para;</a></h3>
+<p>Subsonic clients (Symfonium / Amperfy / Feishin) usually have a "refresh
+library" button that hits two standard endpoints:</p>
+<ul>
+<li><code>GET /rest/startScan</code> — kicks off a non-blocking rescan and returns
+  immediately with <code>{scanning: true, count: &lt;current-track-count&gt;}</code>.
+  musickit backs this with <code>cache.start_background_rescan(force=True)</code>,
+  which spawns a daemon thread running the same full rebuild as
+  <code>musickit library index rebuild</code>.</li>
+<li><code>GET /rest/getScanStatus</code> — poll endpoint, returns <code>{scanning: bool,
+  count: &lt;track-count&gt;}</code>. The client polls every second or two while
+  <code>scanning=true</code>, then refreshes its in-app library view.</li>
+</ul>
+<p>Streaming endpoints (<code>/rest/stream</code>, <code>/rest/getCoverArt</code>) are
+completely independent of the rescan path: stream reads bytes
+straight off disk via PyAV/ffmpeg without touching the index. The
+rescan thread does mutate the in-memory dicts (<code>albums_by_id</code> etc.)
+but <code>IndexCache._reindex</code> uses an atomic per-attribute swap, so a
+concurrent <code>/rest/getAlbum?id=X</code> sees either the old dict or the
+new dict, never a partial state. <strong>A track playing on Amperfy
+doesn't skip during a server-side rescan.</strong></p>
+<p>The watcher's auto-rescan covers most workflows, so an explicit
+<code>startScan</code> from the client is usually unnecessary — drop a file in,
+wait 5 seconds, pull-to-refresh the client.</p>
+<h2 id="where-every-dependency-sits">Where every dependency sits<a class="headerlink" href="#where-every-dependency-sits" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Used by</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>typer</code></td>
+<td><code>cli/</code></td>
+<td>CLI plumbing (subcommands, options, autocompletion).</td>
+</tr>
+<tr>
+<td><code>mutagen</code></td>
+<td><code>metadata/</code>, <code>pipeline/</code></td>
+<td>Read/write tags for FLAC, MP3, MP4, WAV, OGG, OPUS.</td>
+</tr>
+<tr>
+<td><code>Pillow</code></td>
+<td><code>cover.py</code>, <code>pipeline/</code></td>
+<td>Decode + resize cover images. Defensive against malformed JPEGs.</td>
+</tr>
+<tr>
+<td><code>httpx</code></td>
+<td><code>enrich/</code>, <code>tui/subsonic_client.py</code></td>
+<td>MusicBrainz / Cover Art Archive / AcoustID / Subsonic API HTTP.</td>
+</tr>
+<tr>
+<td><code>pydantic</code></td>
+<td><code>library/</code>, <code>metadata/</code></td>
+<td>Data models with type-checking and round-trippable JSON.</td>
+</tr>
+<tr>
+<td><code>rich</code></td>
+<td><code>cli/</code>, <code>library/</code></td>
+<td>Terminal tables, trees, progress bars.</td>
+</tr>
+<tr>
+<td><code>textual</code></td>
+<td><code>tui/</code></td>
+<td>The TUI itself (widgets, layout, async event loop).</td>
+</tr>
+<tr>
+<td><code>PyAV</code></td>
+<td><code>tui/audio_engine.py</code></td>
+<td>Audio decoding (FLAC, MP3, M4A, OGG, OPUS, Icecast streams). Wraps FFmpeg.</td>
+</tr>
+<tr>
+<td><code>sounddevice</code></td>
+<td><code>tui/audio_engine.py</code></td>
+<td>Cross-platform audio output via PortAudio.</td>
+</tr>
+<tr>
+<td><code>numpy</code></td>
+<td><code>tui/audio_engine.py</code></td>
+<td>FFT + array math for the visualizer.</td>
+</tr>
+<tr>
+<td><code>pyatv</code></td>
+<td><code>tui/airplay.py</code>, <code>tui/airplay_picker.py</code></td>
+<td>AirPlay device discovery + control.</td>
+</tr>
+<tr>
+<td><code>zeroconf</code></td>
+<td><code>serve/discovery.py</code>, <code>tui/discovery.py</code></td>
+<td>mDNS/Bonjour: server advertises, TUI auto-detects.</td>
+</tr>
+<tr>
+<td><code>watchdog</code></td>
+<td><code>serve/watcher.py</code></td>
+<td>Filesystem-event observer for auto-rescan.</td>
+</tr>
+<tr>
+<td><code>FastAPI</code></td>
+<td><code>serve/</code></td>
+<td>HTTP framework; endpoint routing, JSON serialization.</td>
+</tr>
+<tr>
+<td><code>uvicorn</code></td>
+<td><code>cli/serve.py</code></td>
+<td>ASGI server that runs the FastAPI app.</td>
+</tr>
+</tbody>
+</table>
+<p>External binaries: <code>ffmpeg</code> and <code>ffprobe</code> for the convert pipeline +
+on-the-fly transcoding. Optional: <code>chromaprint</code> (<code>fpcalc</code>) for AcoustID.</p>
+<h2 id="where-to-read-next">Where to read next<a class="headerlink" href="#where-to-read-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../guides/convert/">Convert</a> — pipeline stages in detail.</li>
+<li><a href="../guides/library/">Library</a> — audit rules + the SQLite index.</li>
+<li><a href="../guides/tui/">TUI</a> — keybindings + AirPlay + Subsonic-client mode.</li>
+<li><a href="../guides/serve/">Serve</a> — Subsonic API + Tailscale + client setup.</li>
+<li><a href="../guides/tutorial/">Tutorial: 0 to iPhone streaming</a> — end-to-end walkthrough.</li>
+<li><a href="../guides/development/">Development</a> — directory layout + test patterns.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

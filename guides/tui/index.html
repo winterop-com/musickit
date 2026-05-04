@@ -1,0 +1,1364 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Convert messy audio rips into a clean tagged library; play locally or stream over Tailscale via a Subsonic-compatible server.">
+      
+      
+      
+        <link rel="canonical" href="https://winterop-com.github.io/musickit/guides/tui/">
+      
+      
+        <link rel="prev" href="../inspect/">
+      
+      
+        <link rel="next" href="../serve/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>musickit tui - musickit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#musickit-tui" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="musickit" class="md-header__button md-logo" aria-label="musickit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            musickit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              musickit tui
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/winterop-com/musickit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    winterop-com/musickit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../quickstart/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../edge-cases/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Edge cases
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../roadmap/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmap
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../api-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="musickit" class="md-nav__button md-logo" aria-label="musickit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    musickit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/winterop-com/musickit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    winterop-com/musickit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial: 0 to iPhone streaming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../convert/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit convert
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit inspect
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit tui
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit tui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keybindings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keybindings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-library-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local library mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Local library mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#audio-engine-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audio engine architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#internet-radio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internet radio
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsonic-client-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsonic-client mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#airplay-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AirPlay output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State persistence
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../serve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit serve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../edge-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Edge cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keybindings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keybindings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-library-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local library mode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Local library mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#audio-engine-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audio engine architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#internet-radio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internet radio
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subsonic-client-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subsonic-client mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#airplay-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AirPlay output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State persistence
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="musickit-tui"><code>musickit tui</code><a class="headerlink" href="#musickit-tui" title="Permanent link">&para;</a></h1>
+<p>A Textual TUI for browsing + playing the converted library, plus a curated radio section, plus a Subsonic-client mode for connecting to a remote <code>musickit serve</code> (or any Subsonic server) over Tailscale.</p>
+<h2 id="modes">Modes<a class="headerlink" href="#modes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w">                                </span><span class="c1"># local library + radio</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>musickit<span class="w"> </span>tui<span class="w">                                         </span><span class="c1"># radio-only</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>musickit<span class="w"> </span>tui<span class="w"> </span>--subsonic<span class="w"> </span>URL<span class="w"> </span>--user<span class="w"> </span>U<span class="w"> </span>--password<span class="w"> </span>P<span class="w">    </span><span class="c1"># Subsonic client mode</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                              </span><span class="c1"># list LAN Subsonic servers + AirPlay devices, exit</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;HomePod&#39;</span><span class="w">                     </span><span class="c1"># route playback to an AirPlay device</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w"> </span>--no-cache<span class="w">                     </span><span class="c1"># skip the index DB (in-memory scan only)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w"> </span>--full-rescan<span class="w">                  </span><span class="c1"># rebuild the index DB from scratch on launch</span>
+</code></pre></div>
+<p>Subsonic credentials are NEVER persisted — pass <code>--subsonic</code> / <code>--user</code> / <code>--password</code> explicitly each session. With no arguments the TUI drops directly into radio-only mode.</p>
+<p>Local-library mode reuses the persistent SQLite index at <code>&lt;DIR&gt;/.musickit/index.db</code> so the second launch skips the filesystem walk and tag read. See <a href="../library/#index-manage-the-persistent-sqlite-cache"><code>musickit library index</code></a> for management commands and details.</p>
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>┌─ musickit ──────────────────────────────────────────────────────────────────┐
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>│  ♪ Duran Duran - Is There Something I Should Know · NTWICM                  │
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>│  00:06 / 04:08                                                  ▶ Playing   │
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│  ▆▆▆▅▅▄▃▃                          VOL ███████████░░░  70%                  │
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├─────────────────┬───────────────────────────────────────────────────────────┤
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│ Library         │ ── Playlist ── [Shuffle] [Repeat: Off] [2/30] ──          │
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│ ▸ Imagine Drag. │ ── Now That&#39;s What I Call Music (1983) ──                 │
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>│ ▸ Linkin Park   │  1.  Phil Collins - You Can&#39;t Hurry Love                  │
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>│ ▸ Robyn         │ ▶ 2. Duran Duran - Is There Something I Should Know       │
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>│ ▾ Various Art.  │  3.  UB40 - Red Red Wine                                  │
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>│   ├ 1983 NTWI…  │  4.  Limahl - Only For Love                               │
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>│   ├ 1984 NTWI…  │  ...                                                      │
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>│   └ ...         │                                                           │
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>├─────────────────┴───────────────────────────────────────────────────────────┤
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>│ ↕ Scroll  Enter Play  Spc ▶▍  ←→ Seek  Tab Focus  q Quit                    │
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>└─────────────────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<ul>
+<li><strong>Top</strong>: now-playing meta, 24-band FFT visualizer (FFT runs on the UI thread, not the audio callback), progress + state badge + volume.</li>
+<li><strong>Sidebar</strong>: library stats + Artist→Album browser tree.</li>
+<li><strong>Main</strong>: track list with <code>▶</code> marker on the playing row.</li>
+<li><strong>Bottom</strong>: status bar + keybar.</li>
+</ul>
+<h2 id="keybindings">Keybindings<a class="headerlink" href="#keybindings" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>↑</code> / <code>↓</code> / <code>j</code> / <code>k</code></td>
+<td>Navigate within the focused pane</td>
+</tr>
+<tr>
+<td><code>Enter</code></td>
+<td>Play selected track / drill into selected album / connect to selected radio station</td>
+</tr>
+<tr>
+<td><code>Space</code></td>
+<td>Play / pause</td>
+</tr>
+<tr>
+<td><code>n</code> / <code>p</code></td>
+<td>Next / previous track</td>
+</tr>
+<tr>
+<td><code>&lt;</code> / <code>&gt;</code></td>
+<td>Seek -5s / +5s</td>
+</tr>
+<tr>
+<td><code>+</code> / <code>-</code></td>
+<td>Volume up / down</td>
+</tr>
+<tr>
+<td><code>s</code></td>
+<td>Toggle shuffle</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>Cycle repeat (off → album → track)</td>
+</tr>
+<tr>
+<td><code>f</code></td>
+<td>Toggle fullscreen visualizer</td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td>Filter the focused pane (artists / albums / tracks)</td>
+</tr>
+<tr>
+<td><code>e</code></td>
+<td>Edit tags — track-level on track list, album-wide on album row</td>
+</tr>
+<tr>
+<td><code>Tab</code></td>
+<td>Cycle focus across browser / track list</td>
+</tr>
+<tr>
+<td><code>Backspace</code></td>
+<td>Browser: go up one level</td>
+</tr>
+<tr>
+<td><code>Ctrl+R</code> / <code>F5</code></td>
+<td>Rescan library</td>
+</tr>
+<tr>
+<td><code>?</code></td>
+<td>Toggle full-keybindings help panel</td>
+</tr>
+<tr>
+<td><code>Ctrl+P</code></td>
+<td>Command palette (also surfaces playback verbs)</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td>AirPlay device picker</td>
+</tr>
+<tr>
+<td><code>q</code> / <code>Ctrl+C</code></td>
+<td>Quit</td>
+</tr>
+</tbody>
+</table>
+<p>Click semantics on the track list mirror Spotify / iTunes: single click moves the cursor only (no playback), double click within ~400ms plays the track.</p>
+<h2 id="local-library-mode">Local library mode<a class="headerlink" href="#local-library-mode" title="Permanent link">&para;</a></h2>
+<p><code>musickit tui ./output</code> hydrates the persistent SQLite index at <code>&lt;DIR&gt;/.musickit/index.db</code> if present (a delta-validate pass picks up filesystem changes since the last run); otherwise it walks the directory via <code>library.scan</code> + <code>library.audit</code>. Initial scan shows a centred progress overlay with album-by-album feedback; subsequent rescans (<code>Ctrl+R</code>) re-validate against the filesystem.</p>
+<h3 id="audio-engine-architecture">Audio engine architecture<a class="headerlink" href="#audio-engine-architecture" title="Permanent link">&para;</a></h3>
+<p>PyAV decoder + sounddevice output run in a <strong>separate process</strong>, spawned at startup. The UI process (Textual) and the audio engine each have their own Python interpreter, their own GIL. This means heavy UI work — Textual reflows on resize, focus changes between panes, GC pauses — can't stall the audio callback into a buffer underrun (the cause of the audible clicks the project chased through several earlier mitigations: 500ms then 1s PortAudio buffer, resize-debounce, focus-change short-circuit).</p>
+<p>Communication:</p>
+<ul>
+<li><strong><code>multiprocessing.Queue</code> × 2</strong> — UI → engine commands (play / pause / seek / stop / shutdown), engine → UI events (track_end, track_failed, metadata_changed, started). Pickled dataclasses; one reader thread on the UI side dispatches events to registered callbacks.</li>
+<li><strong><code>multiprocessing.Value</code> / <code>Array</code></strong> — high-frequency shared state (position frames, paused/stopped flags, volume, replaygain multiplier, 24 band levels). Atomic per-slot reads/writes; the visualizer reads bands directly without round-tripping through the queue.</li>
+</ul>
+<p>Inside the audio engine:</p>
+<ul>
+<li><strong>Opener thread</strong> per <code>play()</code> — does the slow part of starting playback (<code>av.open</code> for HTTP streams = HTTP connect = 1+ second). The previous track keeps playing during the connect, so station switches don't have an audible silence-and-pop.</li>
+<li><strong>Decoder thread</strong> per playback — reads packets, decodes, resamples, pushes float32 stereo chunks into a bounded queue (~12s buffer).</li>
+<li><strong>Audio callback</strong> (sounddevice-managed) — drains chunks across <code>frames</code> boundaries with carry state, so <code>frames != _CHUNK_FRAMES</code> doesn't drop or pad samples. Also runs the FFT for the visualizer and publishes the 24 band levels into shared memory.</li>
+<li><strong>Pre-buffer</strong> — wait for ~186ms of audio before starting the output stream. Without this the first 1-2 callbacks see an empty queue and the user hears "silence-then-pop" attacks.</li>
+</ul>
+<p>PortAudio buffer latency is 200ms — small enough that the visualizer (which FFTs the chunk being sent to PortAudio) doesn't run noticeably ahead of what the user hears, and large enough to absorb decoder hiccups inside the engine process.</p>
+<h2 id="internet-radio">Internet radio<a class="headerlink" href="#internet-radio" title="Permanent link">&para;</a></h2>
+<p>When you select the <strong>Radio</strong> entry in the sidebar, the right pane shows a curated list of stations. Default ones are baked into the code (NRK mP3 / P3 / P3 Musikk / Nyheter); you can add your own via <code>~/.config/musickit/radio.toml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[[stations]]</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;BBC Radio 6 Music&quot;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://stream.live.vc.bbcmedia.co.uk/bbc_6music&quot;</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">description</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;BBC&#39;s alternative music station&quot;</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">homepage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://www.bbc.co.uk/6music&quot;</span>
+</code></pre></div>
+<p>Defaults baked into code + user TOML are merged at runtime (deduped by URL, user entries win on collision). So the default list only grows when we ship new entries; your file only grows when you add them by hand.</p>
+<p>ICY metadata polling: while a stream is playing, the decoder thread polls <code>container.metadata</code> per packet for <code>StreamTitle</code> updates. The "now playing" pane updates with the live song name as the radio station broadcasts it.</p>
+<p>Radio launches as a first-class mode — <code>musickit tui</code> with no DIR drops directly into station picking (skipping the library scan entirely).</p>
+<h2 id="subsonic-client-mode">Subsonic-client mode<a class="headerlink" href="#subsonic-client-mode" title="Permanent link">&para;</a></h2>
+<p><code>musickit tui --subsonic URL</code> makes the TUI talk to any Subsonic-compatible server — your own <code>musickit serve</code> over Tailscale, Navidrome, the original Subsonic, etc.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>musickit<span class="w"> </span>tui<span class="w"> </span>--subsonic<span class="w"> </span>http://mlaptop.tail4a4b9a.ts.net:4533<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">             </span>--user<span class="w"> </span>mort<span class="w"> </span>--password<span class="w"> </span>secret
+</code></pre></div>
+<p>Credentials are not persisted — pass <code>--subsonic</code> / <code>--user</code> / <code>--password</code> every time you want client mode.</p>
+<p>How it works:</p>
+<ul>
+<li>Launch: 1 (<code>getArtists</code>) + N (<code>getArtist</code> per artist) calls; ~80 calls for a 800-album library, sub-second over Tailscale. Albums come back as <strong>shells</strong> (metadata + <code>subsonic_id</code>, <code>tracks=[]</code>).</li>
+<li>Click an album: a <code>@work(thread=True)</code> hydrate worker fires <code>getAlbum?id=...</code> in the background; the tracklist shows <code>Loading tracks…</code> until the response arrives. Hydrated tracks are cached for the rest of the session, so re-opening an album is instant.</li>
+<li>Playback: <code>track.stream_url</code> carries the auth-loaded <code>/rest/stream</code> URL; <code>AudioPlayer.play()</code> hands it straight to PyAV (no different from a radio URL).</li>
+</ul>
+<p>Same widgets, same keybindings, same UX as local mode. The only differences are the brief loading delay on first open of each album, and the lack of a local file path (track files exist remotely on the server's disk).</p>
+<h2 id="airplay-output">AirPlay output<a class="headerlink" href="#airplay-output" title="Permanent link">&para;</a></h2>
+<p>Press <code>a</code> in the TUI to open the AirPlay picker. It scans the LAN via mDNS, lists discovered devices (HomePods, AirPort Express, Sonos in AirPlay-2 mode, etc.) plus a "Local audio (this Mac)" option that disables routing.</p>
+<p>When a device is connected:</p>
+<ul>
+<li>Radio: pass the radio URL straight to the device (it fetches and decodes itself).</li>
+<li>Subsonic-client mode: pass the server's <code>/rest/stream?id=...</code> URL with auth.</li>
+<li>Local-file mode: not supported in v1 — falls through to in-process playback (would need an inline HTTP server to serve the local file to the AirPlay device; deferred).</li>
+</ul>
+<p>The selected device persists to <code>state.toml</code> and auto-resumes on next launch (with a 2s scan; if the device isn't on the LAN we fall back silently to local).</p>
+<p>CLI flag for headless / scripted use:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;HomePod&#39;</span><span class="w">                            </span><span class="c1"># exact / substring match by name</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;192.168.1.50&#39;</span><span class="w">                       </span><span class="c1"># match by address</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                                     </span><span class="c1"># list AirPlay devices (and Subsonic servers) and exit</span>
+</code></pre></div>
+<p><code>--airplay</code> hard-fails if no device matches (you asked for a specific one). The auto-resume path (no <code>--airplay</code> flag, <code>state.toml</code> has a saved device) skips silently if not found.</p>
+<h2 id="state-persistence">State persistence<a class="headerlink" href="#state-persistence" title="Permanent link">&para;</a></h2>
+<p><code>~/.config/musickit/state.toml</code> holds:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">theme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;tokyo-night&quot;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">[airplay]</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;HomePod&quot;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">identifier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;10.0.0.5&quot;</span>
+</code></pre></div>
+<p>Theme persists across all modes. AirPlay block is set when you pick a device from the picker. Subsonic credentials are intentionally not persisted — pass them on the command line each session. Any pre-existing <code>state.json</code> is migrated to <code>state.toml</code> on first launch and removed.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
