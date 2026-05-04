@@ -63,6 +63,16 @@ def album_payload(album: LibraryAlbum, *, with_songs: bool) -> dict[str, Any]:
             pass
     if album.tag_genre:
         payload["genre"] = album.tag_genre
+    # OpenSubsonic multipleGenres: union across the album's tracks, preserving
+    # the order they first appear (Counter would lose order; dict.fromkeys
+    # gives us de-dup + insertion-order in one).
+    track_genres: dict[str, None] = {}
+    for t in album.tracks:
+        for g in t.genres:
+            if g:
+                track_genres[g] = None
+    if track_genres:
+        payload["genres"] = [{"name": name} for name in track_genres]
     if with_songs:
         payload["song"] = [song_payload(album, t) for t in album.tracks]
     return payload
@@ -106,6 +116,12 @@ def song_payload(album: LibraryAlbum, track: LibraryTrack) -> dict[str, Any]:
     track_genre = track.genre or album.tag_genre
     if track_genre:
         payload["genre"] = track_genre
+    # OpenSubsonic multipleGenres: per-track list. Falls back to the
+    # album-level genre when the track itself only has the legacy single.
+    if track.genres:
+        payload["genres"] = [{"name": g} for g in track.genres]
+    elif track_genre:
+        payload["genres"] = [{"name": track_genre}]
     return payload
 
 

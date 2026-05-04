@@ -284,6 +284,51 @@ def test_get_album_list2_by_genre_filters_correctly(tmp_path: Path) -> None:
     assert names == ["Sea Change"]
 
 
+def test_album_payload_includes_genres_list(tmp_path: Path) -> None:
+    """OpenSubsonic multipleGenres: album payload exposes `genres: [{name}]` union."""
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    album = LibraryAlbum(
+        path=tmp_path / "X" / "Album",
+        artist_dir="X",
+        album_dir="Album",
+        tag_album="Album",
+        tag_genre="Rock",
+        track_count=2,
+        tracks=[
+            LibraryTrack(
+                path=tmp_path / "X" / "Album" / "01.m4a",
+                title="A",
+                artist="X",
+                album="Album",
+                genre="Rock",
+                genres=["Rock", "Indie"],
+                track_no=1,
+                duration_s=180.0,
+            ),
+            LibraryTrack(
+                path=tmp_path / "X" / "Album" / "02.m4a",
+                title="B",
+                artist="X",
+                album="Album",
+                genre="Rock",
+                genres=["Rock", "Alternative"],
+                track_no=2,
+                duration_s=180.0,
+            ),
+        ],
+    )
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=[album]))  # noqa: SLF001
+    body = TestClient(app).get("/rest/getAlbum", params=_params(id=album_id(album))).json()
+    inner = body["subsonic-response"]["album"]
+    # Union across tracks, preserving first-seen order.
+    names = [g["name"] for g in inner["genres"]]
+    assert names == ["Rock", "Indie", "Alternative"]
+    # Per-track genres present too.
+    track_genres = [g["name"] for g in inner["song"][0]["genres"]]
+    assert track_genres == ["Rock", "Indie"]
+
+
 def test_album_payload_includes_genre(tmp_path: Path) -> None:
     """getAlbum response carries the genre field per Subsonic spec."""
     cfg = ServeConfig(username="mort", password="secret")

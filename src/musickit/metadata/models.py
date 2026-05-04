@@ -23,6 +23,10 @@ class SourceTrack(BaseModel):
     album: str | None = None
     date: str | None = None
     genre: str | None = None
+    # Multi-genre support — FLAC repeats GENRE, ID3 repeats TCON, MP4 atoms
+    # only carry one. `genre` stays as the primary (backwards-compat) and
+    # equals `genres[0]` when both are populated.
+    genres: list[str] = Field(default_factory=list)
     track_no: int | None = None
     track_total: int | None = None
     disc_no: int | None = None

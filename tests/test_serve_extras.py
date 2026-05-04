@@ -150,16 +150,14 @@ def test_get_users_returns_list_of_one(tmp_path: Path) -> None:
 
 
 def test_get_open_subsonic_extensions_advertises_supported(tmp_path: Path) -> None:
-    """Advertise the extensions we actually implement (formPost, transcodeOffset)."""
+    """Advertise the extensions we actually implement."""
     body = _client(tmp_path).get("/rest/getOpenSubsonicExtensions", params=_params()).json()
     inner = body["subsonic-response"]
     assert inner["status"] == "ok"
-    extensions = inner["openSubsonicExtensions"]
-    by_name = {e["name"]: e for e in extensions}
-    assert "formPost" in by_name
-    assert "transcodeOffset" in by_name
-    assert by_name["formPost"]["versions"] == [1]
-    assert by_name["transcodeOffset"]["versions"] == [1]
+    by_name = {e["name"]: e for e in inner["openSubsonicExtensions"]}
+    for required in ("formPost", "transcodeOffset", "multipleGenres", "songLyrics"):
+        assert required in by_name, f"missing extension: {required}"
+        assert by_name[required]["versions"] == [1]
 
 
 def test_get_genres_returns_empty_when_no_genre_data(tmp_path: Path) -> None:

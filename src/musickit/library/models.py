@@ -21,6 +21,8 @@ class LibraryTrack(BaseModel):
     track_no: int | None = None
     disc_no: int | None = None
     genre: str | None = None
+    genres: list[str] = []
+    lyrics: str | None = None
     duration_s: float = 0.0
     has_cover: bool = False
     cover_pixels: int = 0

@@ -256,6 +256,8 @@ async def get_open_subsonic_extensions() -> dict:
         [
             {"name": "formPost", "versions": [1]},
             {"name": "transcodeOffset", "versions": [1]},
+            {"name": "multipleGenres", "versions": [1]},
+            {"name": "songLyrics", "versions": [1]},
         ],
     )
 

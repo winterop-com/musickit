@@ -67,7 +67,8 @@ def _read_flac(path: Path, *, light: bool = False, measure_pictures: bool = Fals
     track.album_artist = _vorbis_first(tags, "albumartist") or _vorbis_first(tags, "album artist")
     track.album = _vorbis_first(tags, "album")
     track.date = _vorbis_first(tags, "date") or _vorbis_first(tags, "year")
-    track.genre = _vorbis_first(tags, "genre")
+    track.genres = _vorbis_all(tags, "genre")
+    track.genre = track.genres[0] if track.genres else None
 
     track_no, track_total = _split_pos(_vorbis_first(tags, "tracknumber") or _vorbis_first(tags, "track"))
     if track_total is None:
@@ -133,7 +134,16 @@ def _read_mp3(path: Path, *, light: bool = False, measure_pictures: bool = False
     track.album_artist = _id3_text(id3, "TPE2")
     track.album = _id3_text(id3, "TALB")
     track.date = _id3_text(id3, "TDRC") or _id3_text(id3, "TYER")
-    track.genre = _id3_text(id3, "TCON")
+    # ID3 multi-genre: TCON's `text` is already a list of genre strings;
+    # mutagen splits the `\x00`-separated v2.4 form for us.
+    tcon = id3.get("TCON")
+    if tcon is not None:
+        text = getattr(tcon, "text", None)
+        if isinstance(text, list):
+            track.genres = [str(g) for g in text if g]
+        elif text is not None:
+            track.genres = [str(text)]
+    track.genre = track.genres[0] if track.genres else None
     track.label = _id3_text(id3, "TPUB")
     track.lyrics = _id3_text(id3, "USLT::eng") or _id3_text(id3, "USLT")
     track.bpm = _to_int(_id3_text(id3, "TBPM"))
@@ -172,7 +182,10 @@ def _read_mp4(path: Path, *, light: bool = False, measure_pictures: bool = False
     track.album_artist = _mp4_first(tags, "aART")
     track.album = _mp4_first(tags, "\xa9alb")
     track.date = _mp4_first(tags, "\xa9day")
+    # MP4 atoms only carry one genre; populate genres = [genre] for symmetry.
     track.genre = _mp4_first(tags, "\xa9gen")
+    if track.genre:
+        track.genres = [track.genre]
     track.lyrics = _mp4_first(tags, "\xa9lyr")
 
     trkn = tags.get("trkn") if tags else None
@@ -245,6 +258,8 @@ def _read_generic(path: Path, *, light: bool = False, measure_pictures: bool = F
     track.album = _easy_first(tags, "album")
     track.date = _easy_first(tags, "date")
     track.genre = _easy_first(tags, "genre")
+    if track.genre:
+        track.genres = [track.genre]
     track.track_no, track.track_total = _split_pos(_easy_first(tags, "tracknumber"))
     track.disc_no, track.disc_total = _split_pos(_easy_first(tags, "discnumber"))
     track.bpm = _to_int(_easy_first(tags, "bpm"))
@@ -268,6 +283,21 @@ def _vorbis_first(tags: Any, key: str) -> str | None:
     if isinstance(values, list):
         return str(values[0]) if values else None
     return str(values)
+
+
+def _vorbis_all(tags: Any, key: str) -> list[str]:
+    """Return every value for `key` (FLAC repeats GENRE, ARTIST, etc.)."""
+    if not tags:
+        return []
+    try:
+        values = tags.get(key)
+    except Exception:
+        return []
+    if not values:
+        return []
+    if isinstance(values, list):
+        return [str(v) for v in values if v]
+    return [str(values)]
 
 
 def _id3_text(id3: ID3, key: str) -> str | None:
