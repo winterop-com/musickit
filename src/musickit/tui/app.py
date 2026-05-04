@@ -5,7 +5,7 @@ Composition:
     BrowserList, TrackList, StatusBar, KeyBar, ScanOverlay, …) + the
     central color palette + the `fmt_mmss` helper.
   - `commands.py` — the Ctrl+P palette provider that surfaces playback verbs.
-  - `state.py` — `~/.config/musickit/state.json` for persistent theme.
+  - `state.py` — `~/.config/musickit/state.toml` for persistent theme.
   - `app.py` (this file) — the orchestrator: wiring, actions, scan worker.
 """
 
@@ -226,7 +226,7 @@ class MusickitApp(App[None]):
                 self.theme = saved_theme
             except Exception:  # pragma: no cover — bad/old theme name
                 pass
-        # ReplayGain mode persists in state.json (default 'auto'). Validated
+        # ReplayGain mode persists in state.toml (default 'auto'). Validated
         # against the small set of supported modes; anything else falls back
         # to 'auto' silently.
         saved_rg = state.get("replaygain")
@@ -866,7 +866,7 @@ class MusickitApp(App[None]):
     def switch_airplay(self, device: AirPlayDevice | None) -> None:
         """Connect / disconnect the AirPlay output. `None` → play locally.
 
-        Persists the choice to state.json so the next launch resumes it.
+        Persists the choice to state.toml so the next launch resumes it.
         Stops any in-flight playback so the next track starts on the new
         target cleanly.
         """
@@ -1014,7 +1014,7 @@ class MusickitApp(App[None]):
 
 
 def _save_airplay_state(device: AirPlayDevice | None) -> None:
-    """Persist (or clear) the AirPlay device choice in `state.json`."""
+    """Persist (or clear) the AirPlay device choice in `state.toml`."""
     state = load_state()
     if device is None:
         state.pop("airplay", None)

@@ -23,29 +23,24 @@ def tui(
             help="Library root to browse + play. Omit for radio-only or Subsonic-client mode.",
         ),
     ] = None,
-    server: Annotated[
+    subsonic: Annotated[
         str | None,
-        typer.Option(
-            "--server",
-            help="Subsonic server URL — turns the TUI into a remote client. "
-            "Falls back to ~/.config/musickit/state.json when omitted.",
-        ),
+        typer.Option("--subsonic", help="Subsonic server URL — turns the TUI into a remote client."),
     ] = None,
     user: Annotated[
         str | None,
-        typer.Option("--user", help="Subsonic username. Falls back to state.json."),
+        typer.Option("--user", help="Subsonic username."),
     ] = None,
     password: Annotated[
         str | None,
-        typer.Option("--password", help="Subsonic password. Falls back to state.json."),
+        typer.Option("--password", help="Subsonic password."),
     ] = None,
     discover: Annotated[
         bool,
-        typer.Option("--discover", help="Browse the LAN for musickit / Subsonic servers, print, and exit."),
-    ] = False,
-    airplay_discover: Annotated[
-        bool,
-        typer.Option("--airplay-discover", help="Browse the LAN for AirPlay devices, print, and exit."),
+        typer.Option(
+            "--discover",
+            help="Browse the LAN for Subsonic servers and AirPlay devices, print, and exit.",
+        ),
     ] = False,
     airplay: Annotated[
         str | None,
@@ -58,73 +53,46 @@ def tui(
     """Browse and play the converted library, internet radio, or any Subsonic server.
 
     Three modes:
-      - `musickit tui DIR`                  — local library at DIR
-      - `musickit tui`                      — radio-only (no scan)
-      - `musickit tui --server URL ...`     — Subsonic client; works against
-                                              any compatible server (musickit
-                                              serve, Navidrome, real Subsonic).
+      - `musickit tui DIR`                       — local library at DIR
+      - `musickit tui`                           — radio-only (no scan)
+      - `musickit tui --subsonic URL ...`        — Subsonic client; works against
+                                                   any compatible server (musickit
+                                                   serve, Navidrome, real Subsonic).
 
-    Server credentials persist to `~/.config/musickit/state.json` after a
-    successful login, so subsequent runs can drop the flags and just say
-    `musickit tui --server URL` (or even nothing — see below).
-
-    With no arguments, the TUI prefers stored Subsonic creds over radio-only
-    mode, so once you've logged in once on a machine, `musickit tui` resumes
-    the remote library.
+    Subsonic credentials are NEVER persisted — pass --subsonic / --user /
+    --password explicitly each session if you want client mode. Without
+    those flags the TUI starts in local-library mode (with `DIR`) or
+    radio-only mode (without).
     """
-    from musickit.tui.state import load_state, save_state
+    from musickit.tui.state import load_state
 
     if discover:
         _run_discover_and_exit()  # raises Exit
         return
-    if airplay_discover:
-        _run_airplay_discover_and_exit()
-        return
 
     saved = load_state()
-    saved_subsonic = saved.get("subsonic") if isinstance(saved.get("subsonic"), dict) else {}
-    assert isinstance(saved_subsonic, dict)  # narrows for type-checker
-
-    final_url = server or _str_or_none(saved_subsonic.get("url"))
-    final_user = user or _str_or_none(saved_subsonic.get("user"))
-    final_password = password or _str_or_none(saved_subsonic.get("password"))
-
-    explicit_server = server is not None
-    use_subsonic = explicit_server or (target_dir is None and final_url and final_user and final_password)
 
     from musickit.tui.app import MusickitApp
 
     connected_client = None
-    if use_subsonic:
-        if not (final_url and final_user and final_password):
+    if subsonic is not None:
+        if not (user and password):
             typer.echo(
-                "error: Subsonic mode requires --server, --user, and --password "
-                "(or stored credentials in ~/.config/musickit/state.json)",
+                "error: --subsonic requires --user and --password",
                 err=True,
             )
             raise typer.Exit(code=1)
 
         from musickit.tui.subsonic_client import SubsonicClient, SubsonicError
 
-        client = SubsonicClient(final_url, final_user, final_password)
+        client = SubsonicClient(subsonic, user, password, timeout=15.0)
         try:
             client.ping()
         except SubsonicError as exc:
-            if explicit_server:
-                # Explicit --server: hard fail. The user asked for this server.
-                typer.echo(f"error: subsonic ping failed: {exc}", err=True)
-                raise typer.Exit(code=1) from exc
-            # Auto-resumed from state.json — server's offline. Radio is a
-            # first-class mode, not a fallback to apologise for; just close
-            # the client and fall through silently.
-            client.close()
-        else:
-            # Persist creds on successful login so the next launch can drop flags.
-            new_state = dict(saved)
-            new_state["subsonic"] = {"url": final_url, "user": final_user, "password": final_password}
-            save_state(new_state)
-            typer.echo(f"connected to {final_url} as {final_user}")
-            connected_client = client
+            typer.echo(f"error: subsonic ping failed: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        typer.echo(f"connected to {subsonic} as {user}")
+        connected_client = client
 
     airplay_controller = None
     if airplay:
@@ -154,19 +122,37 @@ def tui(
 
 
 def _run_discover_and_exit() -> None:
-    """Browse the LAN for Subsonic servers, print, exit."""
+    """Browse the LAN for Subsonic servers + AirPlay devices, print, exit."""
+    from musickit.tui.airplay import AirPlayController
     from musickit.tui.discovery import browse_subsonic_servers
 
     typer.echo("Browsing for Subsonic servers (mDNS)…")
     servers = browse_subsonic_servers(timeout=2.0)
-    if not servers:
-        typer.echo("  (none found — make sure `musickit serve` is running on the LAN)")
-        raise typer.Exit(0)
-    for s in servers:
-        marker = "musickit" if s.is_musickit else "other"
-        typer.echo(f"  • [{marker}] {s.name}  →  {s.url}")
-    typer.echo("\nConnect with:")
-    typer.echo(f"  musickit tui --server {servers[0].url} --user <U> --password <P>")
+    if servers:
+        for s in servers:
+            marker = "musickit" if s.is_musickit else "other"
+            typer.echo(f"  • [{marker}] {s.name}  →  {s.url}")
+    else:
+        typer.echo("  (none found)")
+
+    typer.echo("\nScanning for AirPlay devices…")
+    controller = AirPlayController()
+    try:
+        devices = controller.discover()
+    finally:
+        controller.disconnect()
+    if devices:
+        for d in devices:
+            typer.echo(f"  • {d.display_label}")
+    else:
+        typer.echo("  (none found)")
+
+    if servers:
+        typer.echo("\nConnect to a Subsonic server with:")
+        typer.echo(f"  musickit tui --subsonic {servers[0].url} --user <U> --password <P>")
+    if devices:
+        typer.echo("\nUse an AirPlay device with:")
+        typer.echo(f"  musickit tui --airplay '{devices[0].name}' [...]")
     raise typer.Exit(0)
 
 
@@ -184,27 +170,7 @@ def _print_lan_hint_if_any() -> None:
     typer.echo(f"Found {len(musickit_servers)} musickit server(s) on the LAN:")
     for s in musickit_servers[:3]:
         typer.echo(f"  • {s.url}")
-    typer.echo(f"  Connect with: musickit tui --server {musickit_servers[0].url} --user <U> --password <P>\n")
-
-
-def _run_airplay_discover_and_exit() -> None:
-    """Browse the LAN for AirPlay devices, print, exit."""
-    from musickit.tui.airplay import AirPlayController
-
-    typer.echo("Scanning for AirPlay devices…")
-    controller = AirPlayController()
-    try:
-        devices = controller.discover()
-    finally:
-        controller.disconnect()
-    if not devices:
-        typer.echo("  (none found)")
-        raise typer.Exit(0)
-    for d in devices:
-        typer.echo(f"  • {d.display_label}")
-    typer.echo("\nUse with:")
-    typer.echo(f"  musickit tui --airplay '{devices[0].name}' [...]")
-    raise typer.Exit(0)
+    typer.echo(f"  Connect with: musickit tui --subsonic {musickit_servers[0].url} --user <U> --password <P>\n")
 
 
 def _connect_airplay_or_exit(name_substring: str) -> AirPlayController:
@@ -224,8 +190,7 @@ def _connect_airplay_or_exit(name_substring: str) -> AirPlayController:
     matches = [d for d in devices if needle in d.name.casefold() or needle in d.address.casefold()]
     if not matches:
         typer.echo(
-            f"error: no AirPlay device matched '{name_substring}'. "
-            "Run with --airplay-discover to list available devices.",
+            f"error: no AirPlay device matched '{name_substring}'. Run with --discover to list available devices.",
             err=True,
         )
         controller.disconnect()

@@ -1060,6 +1060,7 @@ dependencies = [
     { name = "rich" },
     { name = "sounddevice" },
     { name = "textual" },
+    { name = "tomli-w" },
     { name = "typer" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "watchdog" },
@@ -1094,6 +1095,7 @@ requires-dist = [
     { name = "rich", specifier = ">=14.0.0" },
     { name = "sounddevice", specifier = ">=0.5.0" },
     { name = "textual", specifier = ">=1.0.0" },
+    { name = "tomli-w", specifier = ">=1.2.0" },
     { name = "typer", specifier = ">=0.24.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.46.0" },
     { name = "watchdog", specifier = ">=6.0.0" },
@@ -1808,6 +1810,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/96/59/8a8cb2331e2602b53e4dc06960f57d1387a2b18e7efd24e5f9cb60ea4925/tinytag-2.2.1.tar.gz", hash = "sha256:e6d06610ebe7cd66fd07be2d3b9495914ab32654a5e47657bb8cd44c2484523c", size = 38214, upload-time = "2026-03-15T18:48:01.11Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/34/d50e338631baaf65ec5396e70085e5de0b52b24b28db1ffbc1c6e82190dc/tinytag-2.2.1-py3-none-any.whl", hash = "sha256:ed8b1e6d25367937e3321e054f4974f9abfde1a3e0a538824c87da377130c2b6", size = 32927, upload-time = "2026-03-15T18:47:59.613Z" },
+]
+
+[[package]]
+name = "tomli-w"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/75/241269d1da26b624c0d5e110e8149093c759b7a286138f4efd61a60e75fe/tomli_w-1.2.0.tar.gz", hash = "sha256:2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021", size = 7184, upload-time = "2025-01-15T12:07:24.262Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/18/c86eb8e0202e32dd3df50d43d7ff9854f8e0603945ff398974c1d91ac1ef/tomli_w-1.2.0-py3-none-any.whl", hash = "sha256:188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90", size = 6675, upload-time = "2025-01-15T12:07:22.074Z" },
 ]
 
 [[package]]

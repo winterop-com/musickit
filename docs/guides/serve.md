@@ -69,7 +69,7 @@ The original `subsonic.org` is dead/abandoned/paid; the actively-maintained clie
 - **[Feishin](https://github.com/jeffvli/feishin)** — Electron, modern UI
 - **[Supersonic](https://github.com/dweymouth/supersonic)** — native Go/Fyne, active
 
-The musickit project also runs as a client itself — `musickit tui --server URL` connects to the same API. See [TUI](tui.md) for that.
+The musickit project also runs as a client itself — `musickit tui --subsonic URL` connects to the same API. See [TUI](tui.md) for that.
 
 ## Endpoints implemented
 
@@ -181,7 +181,7 @@ The `musickit tui` itself can also discover servers:
 
 ```bash
 musickit tui --discover                  # list and exit
-musickit tui                             # quick browse + show hint when no creds saved
+musickit tui                             # quick browse + show hint
 ```
 
 `--no-mdns` opts out.

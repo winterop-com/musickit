@@ -5,16 +5,14 @@ A Textual TUI for browsing + playing the converted library, plus a curated radio
 ## Modes
 
 ```bash
-musickit tui ./output                      # local library + radio
-musickit tui                               # radio-only (or last-used Subsonic server)
-musickit tui --server URL --user U --password P    # Subsonic client mode
-musickit tui --server URL                  # creds resumed from state.json
-musickit tui --discover                    # list LAN Subsonic servers, exit
-musickit tui --airplay-discover            # list LAN AirPlay devices, exit
-musickit tui --airplay 'HomePod'           # route playback to an AirPlay device
+musickit tui ./output                                # local library + radio
+musickit tui                                         # radio-only
+musickit tui --subsonic URL --user U --password P    # Subsonic client mode
+musickit tui --discover                              # list LAN Subsonic servers + AirPlay devices, exit
+musickit tui --airplay 'HomePod'                     # route playback to an AirPlay device
 ```
 
-When called with no arguments the TUI prefers stored Subsonic creds over radio-only mode — once you've logged in once on a machine, `musickit tui` resumes the remote library. If the saved server is unreachable it falls back silently to radio.
+Subsonic credentials are NEVER persisted — pass `--subsonic` / `--user` / `--password` explicitly each session. With no arguments the TUI drops directly into radio-only mode.
 
 ## Layout
 
@@ -94,19 +92,14 @@ Radio launches as a first-class mode — `musickit tui` with no DIR drops direct
 
 ## Subsonic-client mode
 
-`musickit tui --server URL` makes the TUI talk to any Subsonic-compatible server — your own `musickit serve` over Tailscale, Navidrome, the original Subsonic, etc.
+`musickit tui --subsonic URL` makes the TUI talk to any Subsonic-compatible server — your own `musickit serve` over Tailscale, Navidrome, the original Subsonic, etc.
 
 ```bash
-musickit tui --server http://mlaptop.tail4a4b9a.ts.net:4533 \
+musickit tui --subsonic http://mlaptop.tail4a4b9a.ts.net:4533 \
              --user mort --password secret
 ```
 
-After a successful `client.ping()` the credentials persist to `~/.config/musickit/state.json`, so subsequent launches can drop the flags:
-
-```bash
-musickit tui --server http://mlaptop.tail4a4b9a.ts.net:4533    # creds from state.json
-musickit tui                                                   # auto-resumes last server
-```
+Credentials are not persisted — pass `--subsonic` / `--user` / `--password` every time you want client mode.
 
 How it works:
 
@@ -126,36 +119,29 @@ When a device is connected:
 - Subsonic-client mode: pass the server's `/rest/stream?id=...` URL with auth.
 - Local-file mode: not supported in v1 — falls through to in-process playback (would need an inline HTTP server to serve the local file to the AirPlay device; deferred).
 
-The selected device persists to `state.json` and auto-resumes on next launch (with a 2s scan; if the device isn't on the LAN we fall back silently to local).
+The selected device persists to `state.toml` and auto-resumes on next launch (with a 2s scan; if the device isn't on the LAN we fall back silently to local).
 
 CLI flag for headless / scripted use:
 
 ```bash
 musickit tui --airplay 'HomePod'                            # exact / substring match by name
 musickit tui --airplay '192.168.1.50'                       # match by address
-musickit tui --airplay-discover                             # list and exit
+musickit tui --discover                                     # list AirPlay devices (and Subsonic servers) and exit
 ```
 
-`--airplay` hard-fails if no device matches (you asked for a specific one). The auto-resume path (no `--airplay` flag, state.json has saved creds) skips silently if not found.
+`--airplay` hard-fails if no device matches (you asked for a specific one). The auto-resume path (no `--airplay` flag, `state.toml` has a saved device) skips silently if not found.
 
 ## State persistence
 
-`~/.config/musickit/state.json` holds:
+`~/.config/musickit/state.toml` holds:
 
-```json
-{
-  "theme": "tokyo-night",
-  "subsonic": {
-    "url": "http://...",
-    "user": "...",
-    "password": "..."
-  },
-  "airplay": {
-    "name": "HomePod",
-    "identifier": "...",
-    "address": "10.0.0.5"
-  }
-}
+```toml
+theme = "tokyo-night"
+
+[airplay]
+name = "HomePod"
+identifier = "..."
+address = "10.0.0.5"
 ```
 
-All three sections are independent. Theme persists across all modes. Subsonic block is set on first successful login. AirPlay block is set when you pick a device from the picker.
+Theme persists across all modes. AirPlay block is set when you pick a device from the picker. Subsonic credentials are intentionally not persisted — pass them on the command line each session. Any pre-existing `state.json` is migrated to `state.toml` on first launch and removed.

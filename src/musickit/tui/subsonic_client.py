@@ -30,7 +30,7 @@ class SubsonicError(Exception):
 
 
 class SubsonicClient:
-    """Read-only Subsonic API client. Used by `musickit tui --server`."""
+    """Read-only Subsonic API client. Used by `musickit tui --subsonic`."""
 
     def __init__(
         self,

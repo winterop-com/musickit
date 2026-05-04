@@ -143,7 +143,7 @@ class AudioPlayer:
         self._airplay = airplay
         self._lock = threading.Lock()
         self._volume: float = 1.0
-        # ReplayGain — mode set by the TUI (or via state.json), multiplier
+        # ReplayGain — mode set by the TUI (or via state.toml), multiplier
         # computed per track in `play()` from the LibraryTrack's tags.
         self._replaygain_mode: ReplayGainMode = "auto"
         self._replaygain_multiplier: float = 1.0

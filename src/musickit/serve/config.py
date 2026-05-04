@@ -1,6 +1,6 @@
 """Server config — `~/.config/musickit/serve.toml` with user + password.
 
-The TOML lives next to `radio.toml` and `state.json`. CLI flags (`--user`,
+The TOML lives next to `radio.toml` and `state.toml`. CLI flags (`--user`,
 `--password`) override the file values; either source must produce a
 non-empty username/password or the server refuses to start.
 """
