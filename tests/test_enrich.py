@@ -40,6 +40,73 @@ def test_musicbrainz_returns_top_release_when_score_above_threshold() -> None:
     assert result.musicbrainz.album_id == "abc-123"
 
 
+def test_musicbrainz_fills_artist_and_release_group_ids_when_present() -> None:
+    """The MB search response carries artist-credit + release-group inline; populate all three."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "releases": [
+                    {
+                        "id": "rel-mbid",
+                        "score": 100,
+                        "title": "Night Visions",
+                        "artist-credit": [
+                            {
+                                "name": "Imagine Dragons",
+                                "artist": {"id": "art-mbid", "name": "Imagine Dragons"},
+                            }
+                        ],
+                        "release-group": {
+                            "id": "rg-mbid",
+                            "title": "Night Visions",
+                            "primary-type": "Album",
+                        },
+                    }
+                ]
+            },
+        )
+
+    client = _client_with(handler)
+    summary = AlbumSummary(album="Night Visions", album_artist="Imagine Dragons")
+    result = MusicBrainzProvider(client=client).enrich(summary, [])
+    assert result.musicbrainz is not None
+    assert result.musicbrainz.album_id == "rel-mbid"
+    assert result.musicbrainz.artist_id == "art-mbid"
+    assert result.musicbrainz.release_group_id == "rg-mbid"
+    # Per-track recording MBIDs aren't fetched yet — should remain None.
+    assert result.musicbrainz.track_id is None
+
+
+def test_musicbrainz_handles_missing_artist_credit_gracefully() -> None:
+    """Older MB responses sometimes lack artist-credit[].artist.id — must not crash."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "releases": [
+                    {
+                        "id": "rel-mbid",
+                        "score": 100,
+                        "title": "Album",
+                        # name-only credit, no nested artist dict
+                        "artist-credit": [{"name": "Some Artist"}],
+                    }
+                ]
+            },
+        )
+
+    client = _client_with(handler)
+    summary = AlbumSummary(album="Album", album_artist="Some Artist")
+    result = MusicBrainzProvider(client=client).enrich(summary, [])
+    assert result.musicbrainz is not None
+    assert result.musicbrainz.album_id == "rel-mbid"
+    assert result.musicbrainz.artist_id is None
+    assert result.musicbrainz.release_group_id is None
+
+
 def test_musicbrainz_skips_low_confidence_matches() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"releases": [{"id": "abc-123", "score": 70}]})

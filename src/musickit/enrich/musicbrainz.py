@@ -45,7 +45,7 @@ class MusicBrainzProvider:
 
         client = self._client or get_client()
         try:
-            mbid = self._search_release(client, title, artist_query, len(tracks))
+            ids = self._search_release(client, title, artist_query, len(tracks))
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             # Catch a wider net than just transport errors: malformed JSON,
             # unexpected response shapes (HTML error pages, missing keys),
@@ -57,12 +57,20 @@ class MusicBrainzProvider:
             if self._owns_client:
                 client.close()
 
-        if not mbid:
+        if ids is None:
             return EnrichmentResult(notes=[f"musicbrainz: no release matched {title!r}"])
 
-        return EnrichmentResult(musicbrainz=MusicBrainzIds(album_id=mbid))
+        return EnrichmentResult(musicbrainz=ids)
 
-    def _search_release(self, client: httpx.Client, title: str, artist: str, track_count: int) -> str | None:
+    def _search_release(self, client: httpx.Client, title: str, artist: str, track_count: int) -> MusicBrainzIds | None:
+        """Return the best-match release with album/artist/release-group MBIDs filled in.
+
+        MB's release search response includes `artist-credit` and
+        `release-group` inline by default, so we can populate three of the
+        four MB ID fields in a single round trip. Per-track recording MBIDs
+        require a follow-up `release/<mbid>?inc=recordings` lookup; that's
+        a future addition.
+        """
         query_parts = [f'release:"{_escape(title)}"']
         if artist:
             query_parts.append(f'artist:"{_escape(artist)}"')
@@ -85,7 +93,28 @@ class MusicBrainzProvider:
         best = releases[0]
         if int(best.get("score", 0)) < 90:
             return None
-        return str(best["id"])
+
+        album_id = str(best["id"])
+        # `artist-credit` is a list of credit objects; we want the primary
+        # (first) artist. Older MB responses occasionally put the artist at
+        # `artist-credit[0]["name"]` only — guard for the missing key.
+        artist_id: str | None = None
+        credits = best.get("artist-credit") or []
+        if credits:
+            primary_artist = credits[0].get("artist") if isinstance(credits[0], dict) else None
+            if isinstance(primary_artist, dict) and primary_artist.get("id"):
+                artist_id = str(primary_artist["id"])
+        # `release-group` is a flat dict in the search response.
+        release_group_id: str | None = None
+        rg = best.get("release-group")
+        if isinstance(rg, dict) and rg.get("id"):
+            release_group_id = str(rg["id"])
+
+        return MusicBrainzIds(
+            album_id=album_id,
+            artist_id=artist_id,
+            release_group_id=release_group_id,
+        )
 
 
 def lookup_release_year(

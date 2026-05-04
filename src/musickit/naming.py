@@ -95,6 +95,23 @@ _FOLDER_TAG_RE = re.compile(
     r")\s*[\]\)]?",
     re.IGNORECASE,
 )
+# Edition / remaster / reissue annotations that pollute folder names. Strip
+# these BEFORE year extraction so `(2018 Reissue)` doesn't leak `2018` into
+# the year pick. The pattern matches a complete bracketed expression
+# (`(...)` / `[...]`) whose contents include any of the edition keywords
+# anywhere — that handles `(Remastered)`, `(Remastered 2009)`,
+# `(2009 Remaster)`, `[40th Anniversary Edition]`, `(Deluxe Edition)`, etc.
+# Deliberately does NOT match `Live`, `Live in X`, `Live at X` — those are
+# meaningful (live albums are different works from their studio counterparts).
+_FOLDER_EDITION_RE = re.compile(
+    r"\s*[\[\(]\s*[^\[\]\(\)]*"
+    r"(?:remaster(?:ed)?|deluxe|super\s+deluxe|expanded(?:\s+edition)?|"
+    r"\d+\s*(?:st|nd|rd|th)?\s+anniversary|"
+    r"bonus\s+(?:tracks?|disc|version|edition)|"
+    r"reissue|special\s+edition|limited\s+edition|collector(?:'s)?\s+edition)"
+    r"[^\[\]\(\)]*\s*[\]\)]",
+    re.IGNORECASE,
+)
 _FOLDER_YEAR_RE = re.compile(r"[\(\[]?((?:19|20)\d{2})[\)\]]?")
 # Year at the very start of the dir name (`1983. ` / `2012 - ` / `2007_`) —
 # treated as a hand-curated canonical date that overrides reissue dates from
@@ -105,16 +122,26 @@ _VA_PREFIX_RE = re.compile(r"^\s*(?:VA|Various)\s*-\s*", re.IGNORECASE)
 
 
 def clean_folder_album_name(name: str) -> tuple[str, str | None]:
-    """Strip codec/quality tags + extract year from a folder name.
+    """Strip codec/quality tags + edition annotations + extract year.
 
     Returns `(cleaned_album_name, year_or_None)`. Used as a fallback when an
-    album has no `ALBUM` tag and we have to lean on the folder name. Also
-    drops a leading `VA -` / `Various -` prefix since that's compilation
-    noise rather than part of the album title.
+    album has no `ALBUM` tag and we have to lean on the folder name.
+
+    Strip order:
+      1. Edition annotations (`(Deluxe Edition)`, `[Remastered]`, `(2018
+         Reissue)`, `(40th Anniversary Edition)`) — these would otherwise
+         leak into `_FOLDER_YEAR_RE` and pollute the year pick.
+      2. Year extraction from any remaining `(YYYY)` / bare digits.
+      3. Codec/quality tags (`[FLAC]`, `[16Bit-44.1kHz]`).
+      4. `VA -` / `Various -` prefix.
+
+    Live annotations (`(Live)`, `(Live in Madrid 2019)`) are kept — a live
+    album is a distinct work from its studio counterpart and the audience
+    expects to see it labeled.
     """
-    year_match = _FOLDER_YEAR_RE.search(name)
+    cleaned = _FOLDER_EDITION_RE.sub(" ", name)
+    year_match = _FOLDER_YEAR_RE.search(cleaned)
     year = year_match.group(1) if year_match else None
-    cleaned = name
     if year_match:
         cleaned = cleaned.replace(year_match.group(0), " ")
     cleaned = _FOLDER_TAG_RE.sub(" ", cleaned)

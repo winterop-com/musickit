@@ -27,6 +27,42 @@ def test_clean_folder_album_name_strips_codec_and_year():
     assert clean_folder_album_name("Album [PMEDIA]") == ("Album [PMEDIA]", None)
 
 
+def test_clean_folder_album_name_strips_edition_annotations():
+    """Remaster / Deluxe / Reissue / Anniversary annotations should be removed."""
+    assert clean_folder_album_name("Album (Remastered)") == ("Album", None)
+    assert clean_folder_album_name("Album (Remastered 2009)") == ("Album", None)
+    assert clean_folder_album_name("Album (2009 Remaster)") == ("Album", None)
+    assert clean_folder_album_name("Album [Deluxe Edition]") == ("Album", None)
+    assert clean_folder_album_name("Album (Super Deluxe Edition)") == ("Album", None)
+    assert clean_folder_album_name("Album (Expanded Edition)") == ("Album", None)
+    assert clean_folder_album_name("Album (40th Anniversary Edition)") == ("Album", None)
+    assert clean_folder_album_name("Album (10th Anniversary)") == ("Album", None)
+    assert clean_folder_album_name("Album (Bonus Tracks)") == ("Album", None)
+    assert clean_folder_album_name("Album [Bonus Disc]") == ("Album", None)
+    assert clean_folder_album_name("Album (2018 Reissue)") == ("Album", None)
+    assert clean_folder_album_name("Album (Reissue)") == ("Album", None)
+    assert clean_folder_album_name("Album (Special Edition)") == ("Album", None)
+    assert clean_folder_album_name("Album (Limited Edition)") == ("Album", None)
+    assert clean_folder_album_name("Album (Collector's Edition)") == ("Album", None)
+
+
+def test_clean_folder_album_name_keeps_live_annotations():
+    """Live albums are distinct works — never strip a `(Live)` or `(Live in X)` tag."""
+    assert clean_folder_album_name("Album (Live)") == ("Album (Live)", None)
+    assert clean_folder_album_name("Album (Live in Madrid)") == ("Album (Live in Madrid)", None)
+    assert clean_folder_album_name("Album (Live at Budokan 1979)") == ("Album (Live at Budokan", "1979")
+    # The "1979" gets pulled out as the year, but the live-venue annotation stays.
+
+
+def test_clean_folder_album_name_edition_with_year_does_not_pollute_year_pick():
+    """`(2018 Reissue)` should be stripped as edition, NOT yield year=2018."""
+    cleaned, year = clean_folder_album_name("Hits 1990 [2018 Reissue]")
+    assert cleaned == "Hits"
+    # The 1990 inside the album name still gets extracted; the 2018 inside
+    # the edition annotation does NOT.
+    assert year == "1990"
+
+
 def test_va_aliases_collapse_to_various_artists():
     for alias in ["VA", "v.a.", "V/A", "Various", "various artists", "VARIOUS ARTIST"]:
         assert is_various_artists(alias) is True
