@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
 from musickit.cli import app
+
+if TYPE_CHECKING:
+    from musickit.tui.airplay import AirPlayController
 
 
 @app.command()
@@ -40,6 +43,17 @@ def tui(
         bool,
         typer.Option("--discover", help="Browse the LAN for musickit / Subsonic servers, print, and exit."),
     ] = False,
+    airplay_discover: Annotated[
+        bool,
+        typer.Option("--airplay-discover", help="Browse the LAN for AirPlay devices, print, and exit."),
+    ] = False,
+    airplay: Annotated[
+        str | None,
+        typer.Option(
+            "--airplay",
+            help="Route playback to this AirPlay device (substring match against name or address).",
+        ),
+    ] = None,
 ) -> None:
     """Browse and play the converted library, internet radio, or any Subsonic server.
 
@@ -62,6 +76,9 @@ def tui(
 
     if discover:
         _run_discover_and_exit()  # raises Exit
+        return
+    if airplay_discover:
+        _run_airplay_discover_and_exit()
         return
 
     saved = load_state()
@@ -109,8 +126,12 @@ def tui(
             typer.echo(f"connected to {final_url} as {final_user}")
             connected_client = client
 
+    airplay_controller = None
+    if airplay:
+        airplay_controller = _connect_airplay_or_exit(airplay)
+
     if connected_client is not None:
-        MusickitApp(root=None, subsonic_client=connected_client).run()
+        MusickitApp(root=None, subsonic_client=connected_client, airplay=airplay_controller).run()
         return
 
     # Last fallback: if there's no DIR and no live Subsonic connection, briefly
@@ -119,7 +140,10 @@ def tui(
     if target_dir is None:
         _print_lan_hint_if_any()
 
-    MusickitApp(target_dir.resolve() if target_dir is not None else None).run()
+    MusickitApp(
+        target_dir.resolve() if target_dir is not None else None,
+        airplay=airplay_controller,
+    ).run()
 
 
 def _run_discover_and_exit() -> None:
@@ -154,6 +178,69 @@ def _print_lan_hint_if_any() -> None:
     for s in musickit_servers[:3]:
         typer.echo(f"  • {s.url}")
     typer.echo(f"  Connect with: musickit tui --server {musickit_servers[0].url} --user <U> --password <P>\n")
+
+
+def _run_airplay_discover_and_exit() -> None:
+    """Browse the LAN for AirPlay devices, print, exit."""
+    from musickit.tui.airplay import AirPlayController
+
+    typer.echo("Scanning for AirPlay devices…")
+    controller = AirPlayController()
+    try:
+        devices = controller.discover()
+    finally:
+        controller.disconnect()
+    if not devices:
+        typer.echo("  (none found)")
+        raise typer.Exit(0)
+    for d in devices:
+        typer.echo(f"  • {d.display_label}")
+    typer.echo("\nUse with:")
+    typer.echo(f"  musickit tui --airplay '{devices[0].name}' [...]")
+    raise typer.Exit(0)
+
+
+def _connect_airplay_or_exit(name_substring: str) -> AirPlayController:
+    """Discover devices, pick by substring, connect. Exits non-zero on no match / failure."""
+    from musickit.tui.airplay import AirPlayController
+
+    typer.echo(f"Looking for AirPlay device matching '{name_substring}'…")
+    controller = AirPlayController()
+    try:
+        devices = controller.discover()
+    except Exception as exc:
+        typer.echo(f"error: AirPlay discovery failed: {exc}", err=True)
+        controller.disconnect()
+        raise typer.Exit(code=1) from exc
+
+    needle = name_substring.casefold()
+    matches = [d for d in devices if needle in d.name.casefold() or needle in d.address.casefold()]
+    if not matches:
+        typer.echo(
+            f"error: no AirPlay device matched '{name_substring}'. "
+            "Run with --airplay-discover to list available devices.",
+            err=True,
+        )
+        controller.disconnect()
+        raise typer.Exit(code=1)
+    if len(matches) > 1:
+        typer.echo(
+            f"error: '{name_substring}' matched {len(matches)} devices: "
+            f"{', '.join(d.name for d in matches)}. Be more specific.",
+            err=True,
+        )
+        controller.disconnect()
+        raise typer.Exit(code=1)
+
+    chosen = matches[0]
+    try:
+        controller.connect(chosen)
+    except Exception as exc:
+        typer.echo(f"error: failed to connect to {chosen.display_label}: {exc}", err=True)
+        controller.disconnect()
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"AirPlay → {chosen.display_label}")
+    return controller
 
 
 def _str_or_none(value: object) -> str | None:

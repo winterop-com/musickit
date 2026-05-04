@@ -31,6 +31,8 @@ if TYPE_CHECKING:
     from av.audio.resampler import AudioResampler
     from av.container.input import InputContainer
 
+    from musickit.tui.airplay import AirPlayController
+
 log = logging.getLogger(__name__)
 
 _SAMPLE_RATE = 44100
@@ -72,8 +74,18 @@ class AudioPlayer:
     on_track_failed: Callable[[Path | str, str], None] | None = None
     on_metadata_change: Callable[[], None] | None = None
 
-    def __init__(self, sample_rate: int = _SAMPLE_RATE) -> None:
+    def __init__(
+        self,
+        sample_rate: int = _SAMPLE_RATE,
+        *,
+        airplay: AirPlayController | None = None,
+    ) -> None:
         self._sample_rate = sample_rate
+        # When set, `play(source)` hands the URL straight to the AirPlay
+        # device instead of decoding locally. Only URL sources work — local
+        # `Path` sources fall back to local playback (no inline HTTP server
+        # in v1; the Subsonic-client mode covers the common remote case).
+        self._airplay = airplay
         self._lock = threading.Lock()
         self._volume: float = 1.0
         self._paused: bool = False
@@ -135,7 +147,27 @@ class AudioPlayer:
         `source` can be a local `Path` or a URL string. Multiple rapid
         `play()` calls are handled via a generation counter — only the
         latest one's opener is allowed to swap.
+
+        AirPlay routing: when an AirPlay device is connected AND `source`
+        is a URL (radio stream or `/rest/stream` from a Subsonic server),
+        hand the URL to the device instead of decoding locally. Local
+        Path sources fall through to the normal in-process player —
+        AirPlay-from-local would need a tiny inline HTTP server, which
+        is deferred.
         """
+        if self._airplay is not None and self._airplay.device is not None and isinstance(source, str):
+            self._opener_gen += 1
+            self._teardown_playback()
+            self._current_source = source
+            self._is_live = source.startswith(("http://", "https://"))
+            try:
+                self._airplay.play_url(source)
+            except Exception as exc:
+                log.warning("AirPlay play_url failed for %s: %s", source, exc)
+                if self.on_track_failed is not None:
+                    self.on_track_failed(source, f"airplay: {exc}")
+            return
+
         self._opener_gen += 1
         gen = self._opener_gen
         threading.Thread(
@@ -246,6 +278,11 @@ class AudioPlayer:
         """
         self._opener_gen += 1
         self._teardown_playback()
+        if self._airplay is not None and self._airplay.device is not None:
+            try:
+                self._airplay.stop()
+            except Exception:  # pragma: no cover — best-effort
+                pass
 
     def _teardown_playback(self) -> None:
         """Tear down the audio output stream + decoder thread + queue.

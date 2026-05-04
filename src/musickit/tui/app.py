@@ -62,6 +62,7 @@ from musickit.tui.widgets import (
 if TYPE_CHECKING:
     from musickit.library import LibraryAlbum, LibraryIndex, LibraryTrack
     from musickit.radio import RadioStation
+    from musickit.tui.airplay import AirPlayController
     from musickit.tui.subsonic_client import SubsonicClient
 
 log = logging.getLogger(__name__)
@@ -133,12 +134,19 @@ class MusickitApp(App[None]):
         Binding("question_mark", "toggle_help", "Help", show=False),
     ]
 
-    def __init__(self, root: Path | None, *, subsonic_client: SubsonicClient | None = None) -> None:
+    def __init__(
+        self,
+        root: Path | None,
+        *,
+        subsonic_client: SubsonicClient | None = None,
+        airplay: AirPlayController | None = None,
+    ) -> None:
         super().__init__()
         self._root: Path | None = root
         self._subsonic_client: SubsonicClient | None = subsonic_client
+        self._airplay: AirPlayController | None = airplay
         self._index: LibraryIndex | None = None
-        self._player = AudioPlayer()
+        self._player = AudioPlayer(airplay=airplay)
         self._player.on_track_end = self._on_track_end
         self._player.on_track_failed = self._on_track_failed
         self._player.on_metadata_change = self._on_stream_metadata_change
@@ -166,12 +174,13 @@ class MusickitApp(App[None]):
         save_state(state)
 
     async def on_unmount(self) -> None:
-        """Close the audio stream + Subsonic httpx pool on app exit.
+        """Close the audio stream + Subsonic httpx pool + AirPlay loop on app exit.
 
         Without this the process hangs after `q`: PortAudio's C thread holds
         the interpreter alive (Ctrl-C can't reach Python at that point) and
         httpx leaves connection-pool sockets open. Stopping the player closes
-        the OutputStream cleanly; closing the client drops the pool.
+        the OutputStream cleanly; closing the client drops the pool;
+        disconnecting AirPlay shuts down the background asyncio loop thread.
         """
         try:
             self._player.stop()
@@ -179,6 +188,11 @@ class MusickitApp(App[None]):
             pass
         if self._subsonic_client is not None:
             self._subsonic_client.close()
+        if self._airplay is not None:
+            try:
+                self._airplay.disconnect()
+            except Exception:  # pragma: no cover
+                pass
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="topbar")
