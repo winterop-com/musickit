@@ -183,7 +183,7 @@ class MusickitApp(App[None]):
         self._browser_filter: str = ""
         self._tracklist_filter: str = ""
         # Debounce timer for `on_resize` — reflowing track rows on every
-        # resize-burst event holds the GIL long enough to scratch audio.
+        # resize-burst event holds the GIL long enough to click the audio.
         self._resize_reflow_timer: Timer | None = None
 
     def on_resize(self, event: events.Resize) -> None:
@@ -198,7 +198,7 @@ class MusickitApp(App[None]):
         Resize events fire continuously during a drag (potentially per
         cell) — running the per-row reflow on each fire holds the GIL
         long enough to starve the audio callback and produce mid-track
-        scratches. Debouncing collapses the burst into one update once
+        clicks (xruns). Debouncing collapses the burst into one update once
         the user stops resizing.
         """
         del event
@@ -783,7 +783,7 @@ class MusickitApp(App[None]):
         Skipped while a resize burst is in flight: the visualizer fires
         30×/sec and adds GIL pressure on top of Textual's layout reflow.
         Letting the bars freeze for a few hundred milliseconds during a
-        drag is invisible; preventing audio scratches is not.
+        drag is invisible; preventing audio clicks is not.
         """
         if self._resize_reflow_timer is not None:
             return
@@ -985,12 +985,23 @@ class MusickitApp(App[None]):
         self.call_after_refresh(self._set_browser_cursor, prior_idx)
 
     def _snap_tracklist_cursor_to_playing_track(self) -> None:
-        """Move the tracklist cursor to the playing track (or clear it)."""
+        """Move the tracklist cursor to the playing track (or clear it).
+
+        Fires on every TrackList blur. Rapid pane-toggling (Tab between
+        BrowserList and TrackList) used to schedule a redundant refresh
+        every time even when the cursor was already at the playing
+        track — each scheduled refresh briefly holds the GIL on render,
+        which can starve the audio callback. Short-circuit when the
+        cursor is already where we want it.
+        """
         try:
             tracklist = self.query_one(TrackList)
         except NoMatches:
             return
         if self._current_track_idx is not None:
+            target = self._visible_row_for_track(tracklist, self._current_track_idx)
+            if target is not None and tracklist.index == target:
+                return
             self.call_after_refresh(self._set_tracklist_cursor_for_track, self._current_track_idx)
         else:
             from typing import cast as _cast

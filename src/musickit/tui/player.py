@@ -40,7 +40,7 @@ _CHANNELS = 2
 _DTYPE = "float32"
 # Buffer depth: 512 chunks × 1024 frames @ 44.1 kHz ≈ 12 seconds of stereo
 # float32 audio (~4 MB resident). Tight 3-second buffers caused audible
-# scratches on radio streams when WAN jitter spiked past the buffer drain
+# clicks on radio streams when WAN jitter spiked past the buffer drain
 # rate — most often around 30s+ once the decoder's initial backlog cleared
 # and steady-state network conditions started to bite. 12s is plenty of
 # slack for transatlantic Icecast streams without feeling sluggish on
@@ -354,24 +354,26 @@ class AudioPlayer:
         try:
             # The Python audio callback acquires the GIL on every fire,
             # so any heavy GIL work elsewhere (Textual layout reflow on
-            # resize, fullscreen toggle, GC pause) can stall the callback
-            # past the device-buffer deadline → scratch.
+            # resize, focus changes between panes, fullscreen toggle, GC
+            # pause) can stall the callback past the device-buffer
+            # deadline → audible click (PortAudio underrun / xrun).
             #
             # PortAudio's `latency='high'` on macOS only buys ~80ms of
-            # headroom, which a single resize burst can blow through
-            # (Textual repainting all widgets while dragging). An explicit
-            # 500ms is generous: Core Audio internally buffers ~500ms of
-            # audio so the callback can be very late and still recover.
-            # Trade-off is ~500ms extra startup latency, plus seek/skip
-            # taking ~500ms to take effect — imperceptible for normal
-            # music playback, the right call for jitter resistance.
+            # headroom, which a burst of focus changes or resize events
+            # can blow through (Textual repainting all widgets each time).
+            # An explicit 1.0s is generous: Core Audio internally buffers
+            # ~1s of audio so the callback can be very late and still
+            # recover. Trade-off is ~1s extra startup latency, plus
+            # seek/skip taking ~1s to take effect — imperceptible for
+            # normal music playback, the right call for jitter resistance
+            # until audio moves to a subprocess (see roadmap Tier 2).
             self._stream = sd.OutputStream(
                 samplerate=self._sample_rate,
                 channels=_CHANNELS,
                 dtype=_DTYPE,
                 callback=self._audio_callback,
                 blocksize=_CHUNK_FRAMES,
-                latency=0.5,
+                latency=1.0,
             )
             self._stream.start()
         except Exception as exc:
