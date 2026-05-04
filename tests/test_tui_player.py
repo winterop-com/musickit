@@ -39,9 +39,11 @@ class _FakeOutputStream:
         dtype: str,
         callback: Callable[..., None],
         blocksize: int,
+        latency: str | float | None = None,
     ) -> None:
         self.samplerate = samplerate
         self.channels = channels
+        self.latency = latency
         self.dtype = dtype
         self.callback = callback
         self.blocksize = blocksize

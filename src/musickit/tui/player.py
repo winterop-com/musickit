@@ -352,12 +352,22 @@ class AudioPlayer:
             time.sleep(0.01)
 
         try:
+            # `latency='high'` lets PortAudio pick a bigger internal buffer
+            # (~80ms on macOS Core Audio vs ~10ms default). The Python audio
+            # callback acquires the GIL on every fire — under any GIL
+            # contention (UI redraws, FFT, GC pause) the callback can be
+            # late. With 'high' there's ~80ms of headroom in the device
+            # buffer before an underrun, instead of ~10ms. Trade-off:
+            # roughly 70ms higher seek/start latency, imperceptible for
+            # music playback. Without this, brief decoder stalls produce
+            # audible 0.05–0.1s "scratches" mid-track.
             self._stream = sd.OutputStream(
                 samplerate=self._sample_rate,
                 channels=_CHANNELS,
                 dtype=_DTYPE,
                 callback=self._audio_callback,
                 blocksize=_CHUNK_FRAMES,
+                latency="high",
             )
             self._stream.start()
         except Exception as exc:
