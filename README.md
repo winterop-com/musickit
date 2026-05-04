@@ -39,6 +39,18 @@ uvx musickit tui ./output                   # TUI
 uvx musickit serve ./output                 # Subsonic server
 ```
 
+## Screenshots
+
+The TUI: artist browser on the left, drilled into an album, 48-band visualizer at the top.
+
+![Drilled-in album view](docs/screenshots/album-tracks.svg)
+
+Fullscreen visualizer (`f`):
+
+![Fullscreen visualizer](docs/screenshots/fullscreen-viz.svg)
+
+More screenshots in the [TUI guide](https://winterop-com.github.io/musickit/guides/tui/).
+
 ## Documentation
 
 Full docs are at **[docs/](docs/index.md)** — built with MkDocs Material. Run them locally:

@@ -20,29 +20,22 @@ Local-library mode reuses the persistent SQLite index at `<DIR>/.musickit/index.
 
 ## Layout
 
-```
-┌─ musickit ──────────────────────────────────────────────────────────────────┐
-│  ♪ Duran Duran - Is There Something I Should Know · NTWICM                  │
-│  00:06 / 04:08                                                  ▶ Playing   │
-│  ▆▆▆▅▅▄▃▃                          VOL ███████████░░░  70%                  │
-├─────────────────┬───────────────────────────────────────────────────────────┤
-│ Library         │ ── Playlist ── [Shuffle] [Repeat: Off] [2/30] ──          │
-│ ▸ Imagine Drag. │ ── Now That's What I Call Music (1983) ──                 │
-│ ▸ Linkin Park   │  1.  Phil Collins - You Can't Hurry Love                  │
-│ ▸ Robyn         │ ▶ 2. Duran Duran - Is There Something I Should Know       │
-│ ▾ Various Art.  │  3.  UB40 - Red Red Wine                                  │
-│   ├ 1983 NTWI…  │  4.  Limahl - Only For Love                               │
-│   ├ 1984 NTWI…  │  ...                                                      │
-│   └ ...         │                                                           │
-├─────────────────┴───────────────────────────────────────────────────────────┤
-│ ↕ Scroll  Enter Play  Spc ▶▍  ←→ Seek  Tab Focus  q Quit                    │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+Initial browse view (artist list):
 
-- **Top**: now-playing meta, 24-band FFT visualizer (FFT runs on the UI thread, not the audio callback), progress + state badge + volume.
-- **Sidebar**: library stats + Artist→Album browser tree.
+![Browse — artist list](../screenshots/browse-artists.svg)
+
+Drilled into an album, tracklist on the right:
+
+![Drilled-in album view](../screenshots/album-tracks.svg)
+
+Fullscreen visualizer (`f`):
+
+![Fullscreen visualizer](../screenshots/fullscreen-viz.svg)
+
+- **Top**: now-playing meta, 48-band FFT visualizer (FFT runs in the audio engine subprocess and is published to the UI via shared memory — see [Architecture](../architecture.md#the-visualizer-fft-path) for the full FFT pipeline), progress with state icon + click-to-seek.
+- **Sidebar**: library stats + Artist→Album browser. Cursor on an album row previews its tracks immediately on the right.
 - **Main**: track list with `▶` marker on the playing row.
-- **Bottom**: status bar + keybar.
+- **Bottom**: status bar + keybar (most-used shortcuts) + ?-help panel for the full binding list.
 
 ## Keybindings
 
@@ -53,7 +46,7 @@ Local-library mode reuses the persistent SQLite index at `<DIR>/.musickit/index.
 | `Space` | Play / pause |
 | `n` / `p` | Next / previous track |
 | `<` / `>` | Seek -5s / +5s |
-| `+` / `-` | Volume up / down |
+| `9` / `0` | Volume down / up (mpv-style; `+` / `-` also work) |
 | `s` | Toggle shuffle |
 | `r` | Cycle repeat (off → album → track) |
 | `f` | Toggle fullscreen visualizer |
@@ -61,13 +54,22 @@ Local-library mode reuses the persistent SQLite index at `<DIR>/.musickit/index.
 | `e` | Edit tags — track-level on track list, album-wide on album row |
 | `Tab` | Cycle focus across browser / track list |
 | `Backspace` | Browser: go up one level |
-| `Ctrl+R` / `F5` | Rescan library |
+| `Ctrl+R` / `F5` | Rescan library (delta-validate against filesystem) |
+| `Ctrl+Shift+R` | Force rescan (wipe SQLite cache + rebuild) |
 | `?` | Toggle full-keybindings help panel |
 | `Ctrl+P` | Command palette (also surfaces playback verbs) |
 | `a` | AirPlay device picker |
 | `q` / `Ctrl+C` | Quit |
 
-Click semantics on the track list mirror Spotify / iTunes: single click moves the cursor only (no playback), double click within ~400ms plays the track.
+Click semantics on the track list mirror Spotify / iTunes: single click moves the cursor only (no playback), double click within ~400ms plays the track. Click anywhere on the progress bar to seek to that position.
+
+`?` opens the full HelpPanel with every binding:
+
+![Help panel](../screenshots/help-panel.svg)
+
+`/` opens an inline filter that narrows the focused pane to a case-insensitive substring match — useful for jumping to an artist on a 1000+ album library:
+
+![Filter active on the artist pane](../screenshots/filter-active.svg)
 
 ## Local library mode
 

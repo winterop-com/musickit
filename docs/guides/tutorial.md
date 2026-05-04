@@ -261,15 +261,22 @@ Try the things you'd expect from a Subsonic client:
 - **Search** — `/rest/search3` matches against artist, album, and track
   titles.
 
-## 6. Optional: route to AirPlay devices on the Mac
+## 6. Optional: browse + play locally on the Mac
 
-If the Mac has AirPlay devices on the same network (HomePod, AirPort
-Express, AirPlay-2 Sonos), `musickit tui` can route playback to them:
+If you also want to browse the same library on the Mac itself:
 
 ```bash
 uvx musickit tui ./output
 ```
 
+This is the TUI — three-pane Textual app, library browser on the left, now-playing card + 48-band visualizer + tracklist on the right.
+
+![musickit TUI — drilled into an album](../screenshots/album-tracks.svg)
+
+Press `?` for the full keybindings panel; the most useful ones to know are `Enter` (play), `Space` (pause), `n`/`p` (next/prev), `<`/`>` (±5s seek), `9`/`0` (volume), `/` (filter the focused pane), `f` (fullscreen visualizer), `q` (quit). Click anywhere on the progress bar to seek to that position.
+
+If the Mac has AirPlay devices on the same network (HomePod, AirPort
+Express, AirPlay-2 Sonos), the TUI can route playback to them.
 Press `a` for the AirPlay picker, pick a device, music plays through
 the speaker instead of the laptop. Iterate with `--airplay 'HomePod'`
 on the CLI for headless / scripted use.
