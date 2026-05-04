@@ -564,6 +564,33 @@ class MusickitApp(App[None]):
         if event.list_view is not browser:
             return
         self._update_browser_info(event.item)
+        self._preview_highlighted_album(event.item)
+
+    def _preview_highlighted_album(self, item: ListItem | None) -> None:
+        """Sync the tracklist to the album the browser cursor is hovering on.
+
+        Without this, the tracklist persists with whatever was last opened,
+        which feels stale when the browser cursor has moved on. We update
+        on every highlight so what's shown on the right always matches
+        what's selected on the left. Skipped for non-album rows (artists,
+        the `..` back row) and for Subsonic shells whose tracks aren't
+        hydrated yet — clicking those still uses the Enter path which
+        kicks off the lazy-load.
+        """
+        if item is None:
+            return
+        kind = getattr(item, "entry_kind", None)
+        data = getattr(item, "entry_data", None)
+        if kind != "album" or not isinstance(data, library_mod.LibraryAlbum):
+            return
+        if self._current_album is data:
+            return  # already showing this album
+        # Don't fire a network request from a hover — Enter still does that.
+        if not data.tracks and self._subsonic_client is not None:
+            return
+        self._clear_tracklist_filter()
+        self._set_current_album(data, track_idx=None)
+        self._repopulate_playlist()
 
     def _handle_browser_selection(self, item: ListItem) -> None:
         kind_first = getattr(item, "entry_kind", None)
@@ -654,7 +681,27 @@ class MusickitApp(App[None]):
 
     def _set_current_album(self, album: LibraryAlbum, *, track_idx: int | None) -> None:
         self._current_album = album
+        # If track_idx wasn't supplied, derive it from the player's current
+        # source so the ▶ marker keeps showing on the playing row when the
+        # user re-enters the playing album after browsing somewhere else.
+        if track_idx is None:
+            track_idx = self._playing_track_idx_in(album)
         self._current_track_idx = track_idx
+
+    def _playing_track_idx_in(self, album: LibraryAlbum) -> int | None:
+        """Return the playing track's index within `album`, or None.
+
+        Drives the ▶ marker without a separate `_playing_album` field —
+        we already have the source-of-truth in the AudioPlayer.
+        """
+        src = self._player.current_source
+        if src is None:
+            return None
+        for i, track in enumerate(album.tracks):
+            # Local files: compare Path; subsonic streams: compare stream_url.
+            if track.path == src or (track.stream_url and track.stream_url == src):
+                return i
+        return None
 
     def _repopulate_playlist(self) -> None:
         from musickit.tui.formatters import compute_title_width
@@ -668,6 +715,11 @@ class MusickitApp(App[None]):
             self._marker_idx = None
             return
         album = self._current_album
+        # Resolve the marker from the player's current source so the ▶
+        # appears whenever the user is viewing the playing album, even
+        # after browsing somewhere else and back.
+        playing_idx = self._playing_track_idx_in(album)
+        self._current_track_idx = playing_idx
         needle = self._tracklist_filter.casefold()
         title_width = compute_title_width(tracklist.size.width, header_padding=2)
         matched = 0
@@ -676,7 +728,7 @@ class MusickitApp(App[None]):
                 hay = f"{track.title or ''} {track.artist or ''}".casefold()
                 if needle not in hay:
                     continue
-            label = format_track_row(i, track, album, marker=(i == self._current_track_idx), title_width=title_width)
+            label = format_track_row(i, track, album, marker=(i == playing_idx), title_width=title_width)
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             tracklist.append(item)

@@ -143,9 +143,12 @@ async def test_tracklist_double_click_plays(
 @pytest.mark.asyncio
 async def test_album_reentry_preserves_playing_state(silent_flac_template: Path, tmp_path: Path) -> None:
     """Regression: drill into an album, play a track, click the same album
-    row in the browser again. The currently-playing track index must
-    survive — the user expects to land on the track that's still
-    playing, not on row 0 with blank NowPlayingMeta.
+    row in the browser again. The ▶ marker must keep showing on the
+    actually-playing track — the user expects to land on the track
+    that's still playing, not on row 0 with blank NowPlayingMeta.
+
+    The marker derives from `AudioPlayer.current_source`, so the test
+    simulates playback by setting that source directly.
     """
     from musickit.tui.app import BrowserList, MusickitApp, TrackList
 
@@ -167,8 +170,9 @@ async def test_album_reentry_preserves_playing_state(silent_flac_template: Path,
         # Drill into the album → tracks shown in tracklist.
         pilot.app._handle_browser_selection(album_row)  # type: ignore[attr-defined]
         await pilot.pause()
-        # Pretend track 2 is the playing one.
-        pilot.app._current_track_idx = 1  # type: ignore[attr-defined]
+        # Pretend track 2 is the playing one — pin the player's source
+        # to that track's path so `_playing_track_idx_in` returns 1.
+        pilot.app._player._current_source = album_obj.tracks[1].path  # type: ignore[attr-defined]
         # Re-click the same album row in the browser (browser still shows
         # the album list since we're at album-level navigation).
         album_row_again = next(
@@ -178,7 +182,7 @@ async def test_album_reentry_preserves_playing_state(silent_flac_template: Path,
         )
         pilot.app._handle_browser_selection(album_row_again)  # type: ignore[attr-defined]
         await pilot.pause()
-        # The currently-playing track index must be preserved.
+        # The ▶ marker is on track index 1 (derived from the player's source).
         assert pilot.app._current_track_idx == 1  # type: ignore[attr-defined]
         # Tracklist cursor lands on the playing track (visible row index 1), not row 0.
         tracklist = pilot.app.query_one(TrackList)
