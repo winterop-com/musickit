@@ -129,6 +129,13 @@ def tui(
     airplay_controller = None
     if airplay:
         airplay_controller = _connect_airplay_or_exit(airplay)
+    else:
+        saved_airplay = saved.get("airplay")
+        if isinstance(saved_airplay, dict):
+            # Auto-resume previously selected AirPlay device. Best-effort: skip
+            # silently if the device isn't on the LAN right now (don't make the
+            # user wait through a 5s timeout for a HomePod that's powered off).
+            airplay_controller = _try_resume_airplay(saved_airplay)
 
     if connected_client is not None:
         MusickitApp(root=None, subsonic_client=connected_client, airplay=airplay_controller).run()
@@ -240,6 +247,42 @@ def _connect_airplay_or_exit(name_substring: str) -> AirPlayController:
         controller.disconnect()
         raise typer.Exit(code=1) from exc
     typer.echo(f"AirPlay → {chosen.display_label}")
+    return controller
+
+
+def _try_resume_airplay(saved: dict[str, object]) -> AirPlayController | None:
+    """Re-connect to a previously selected AirPlay device. Best-effort, silent on failure.
+
+    Looks up the device by identifier first (most stable across DHCP / SSID
+    changes), then by name. If neither matches a currently-discoverable
+    device, returns None and the TUI starts in local-audio mode.
+    """
+    from musickit.tui.airplay import AirPlayController
+
+    saved_id = _str_or_none(saved.get("identifier"))
+    saved_name = _str_or_none(saved.get("name"))
+    if not saved_id and not saved_name:
+        return None
+    controller = AirPlayController()
+    try:
+        devices = controller.discover(timeout=2.0)
+    except Exception:
+        controller.disconnect()
+        return None
+    match = None
+    if saved_id:
+        match = next((d for d in devices if d.identifier == saved_id), None)
+    if match is None and saved_name:
+        match = next((d for d in devices if d.name == saved_name), None)
+    if match is None:
+        controller.disconnect()
+        return None
+    try:
+        controller.connect(match)
+    except Exception:
+        controller.disconnect()
+        return None
+    typer.echo(f"AirPlay → {match.display_label} (resumed from last session)")
     return controller
 
 

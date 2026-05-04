@@ -85,3 +85,26 @@ def test_controller_routes_play_url_to_pyatv() -> None:
         fake_atv.stream.play_url.assert_called_once_with("http://example/stream.m3u")
     finally:
         controller.disconnect()
+
+
+def test_controller_detach_keeps_loop_alive_for_reuse() -> None:
+    """detach() resets the device but the controller's loop stays usable."""
+    from pyatv.const import Protocol
+
+    cfg = _FakeConfig("HomePod", "10.0.0.5", "hp", [Protocol.RAOP])
+    fake_atv = MagicMock()
+
+    controller = AirPlayController()
+    try:
+        with patch("musickit.tui.airplay.pyatv.connect", new_callable=AsyncMock) as connect_mock:
+            connect_mock.return_value = fake_atv
+            controller.connect(AirPlayDevice(name="HomePod", address="10.0.0.5", identifier="hp", config=cfg))  # type: ignore[arg-type]
+            assert controller.device is not None
+            controller.detach()
+            assert controller.device is None
+            # Loop is still running — discover() works after detach.
+            with patch("musickit.tui.airplay.pyatv.scan", new_callable=AsyncMock) as scan_mock:
+                scan_mock.return_value = []
+                assert controller.discover(timeout=0.1) == []
+    finally:
+        controller.disconnect()

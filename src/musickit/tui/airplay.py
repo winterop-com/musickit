@@ -146,14 +146,29 @@ class AirPlayController:
         except Exception:  # pragma: no cover
             pass
 
+    def detach(self) -> None:
+        """Close the device session but keep the loop alive for re-use.
+
+        Used by the TUI picker when switching from one device to another or
+        back to local audio. After `detach()` the controller is still usable
+        — the next `connect()` starts a fresh session on the existing loop.
+        """
+        if self._atv is None:
+            return
+        future = asyncio.run_coroutine_threadsafe(self._disconnect(), self._loop)
+        try:
+            future.result(timeout=5.0)
+        except Exception:  # pragma: no cover
+            pass
+
     def disconnect(self) -> None:
-        """Tear down the AirPlay session and stop the background loop."""
-        if self._atv is not None:
-            future = asyncio.run_coroutine_threadsafe(self._disconnect(), self._loop)
-            try:
-                future.result(timeout=5.0)
-            except Exception:  # pragma: no cover
-                pass
+        """Tear down the AirPlay session AND stop the background loop.
+
+        Final cleanup; called from `MusickitApp.on_unmount`. After this the
+        controller is dead — re-creating one means re-spawning the loop
+        thread.
+        """
+        self.detach()
         self._loop.call_soon_threadsafe(self._loop.stop)
         self._loop_thread.join(timeout=2.0)
 

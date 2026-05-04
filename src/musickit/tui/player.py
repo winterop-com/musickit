@@ -134,6 +134,16 @@ class AudioPlayer:
     # Public API
     # ------------------------------------------------------------------
 
+    def set_airplay(self, controller: AirPlayController | None) -> None:
+        """Swap the AirPlay routing target — `None` means 'play locally'.
+
+        Stops any in-flight playback so the next `play()` starts cleanly on
+        the new output. The TUI picker uses this to switch between local
+        speakers and a discovered AirPlay device without restarting.
+        """
+        self.stop()
+        self._airplay = controller
+
     def play(self, source: Path | str) -> None:
         """Schedule playback of `source`. Returns immediately.
 

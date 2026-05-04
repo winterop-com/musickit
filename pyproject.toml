@@ -19,6 +19,7 @@ dependencies = [
   "uvicorn[standard]>=0.46.0",
   "zeroconf>=0.148.0",
   "pyatv>=0.17.0",
+  "watchdog>=6.0.0",
 ]
 
 [project.scripts]

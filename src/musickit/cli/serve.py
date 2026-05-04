@@ -47,6 +47,10 @@ def serve(
         bool,
         typer.Option("--no-mdns", help="Skip mDNS / Bonjour advertisement."),
     ] = False,
+    no_watch: Annotated[
+        bool,
+        typer.Option("--no-watch", help="Skip the filesystem watcher (auto-rescan on library changes)."),
+    ] = False,
 ) -> None:
     """Start a Subsonic-compatible server for the converted library.
 
@@ -108,11 +112,21 @@ def serve(
             _, info = mdns_handle
             typer.echo(f"  mDNS: advertising as {info.name.rstrip('.')}")
 
+    watcher = None
+    if not no_watch:
+        from musickit.serve.watcher import LibraryWatcher
+
+        watcher = LibraryWatcher(fastapi_app.state.cache)
+        watcher.start()
+        typer.echo(f"  watching {target_dir.resolve()} for changes (auto-rescan on add/remove/rename)")
+
     import uvicorn
 
     try:
         uvicorn.run(fastapi_app, host=host, port=port, log_level="info")
     finally:
+        if watcher is not None:
+            watcher.stop()
         if mdns_handle is not None:
             from musickit.serve.discovery import unregister_service
 

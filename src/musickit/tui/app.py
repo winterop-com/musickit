@@ -62,7 +62,7 @@ from musickit.tui.widgets import (
 if TYPE_CHECKING:
     from musickit.library import LibraryAlbum, LibraryIndex, LibraryTrack
     from musickit.radio import RadioStation
-    from musickit.tui.airplay import AirPlayController
+    from musickit.tui.airplay import AirPlayController, AirPlayDevice
     from musickit.tui.subsonic_client import SubsonicClient
 
 log = logging.getLogger(__name__)
@@ -132,6 +132,7 @@ class MusickitApp(App[None]):
         Binding("backspace", "browser_up", "Up", show=False),
         Binding("ctrl+r,f5", "rescan_library", "Rescan", show=False),
         Binding("question_mark", "toggle_help", "Help", show=False),
+        Binding("a", "airplay_picker", "AirPlay", show=False),
     ]
 
     def __init__(
@@ -829,6 +830,52 @@ class MusickitApp(App[None]):
         else:
             panel.remove()
 
+    def action_airplay_picker(self) -> None:
+        """`a` opens the AirPlay device picker (lazy-init pyatv on first open)."""
+        from musickit.tui.airplay_picker import AirPlayPickerScreen
+
+        self.push_screen(AirPlayPickerScreen(self))
+
+    @property
+    def airplay(self) -> AirPlayController | None:
+        """Currently configured AirPlay controller (or None for local-only)."""
+        return self._airplay
+
+    def get_or_create_airplay(self) -> AirPlayController:
+        """Return the AirPlay controller, lazy-initialising on first use.
+
+        The controller spawns a background asyncio loop thread, so we avoid
+        creating one until the user actually opens the picker. Once created
+        it sticks around for the rest of the session and gets cleaned up
+        in `on_unmount`.
+        """
+        if self._airplay is None:
+            from musickit.tui.airplay import AirPlayController
+
+            self._airplay = AirPlayController()
+            self._player.set_airplay(self._airplay)
+        return self._airplay
+
+    def switch_airplay(self, device: AirPlayDevice | None) -> None:
+        """Connect / disconnect the AirPlay output. `None` → play locally.
+
+        Persists the choice to state.json so the next launch resumes it.
+        Stops any in-flight playback so the next track starts on the new
+        target cleanly.
+        """
+        controller = self.get_or_create_airplay()
+        if device is None:
+            try:
+                controller.detach()
+            except Exception:  # pragma: no cover — best-effort
+                pass
+            self._player.set_airplay(None)
+            _save_airplay_state(None)
+            return
+        controller.connect(device)
+        self._player.set_airplay(controller)
+        _save_airplay_state(device)
+
     # ------------------------------------------------------------------
     # Async library scan
     # ------------------------------------------------------------------
@@ -954,3 +1001,17 @@ class MusickitApp(App[None]):
     def _on_track_failed(self, path: Path | str, message: str) -> None:
         log.warning("track failed: %s — %s", path, message)
         self._end_pending = True
+
+
+def _save_airplay_state(device: AirPlayDevice | None) -> None:
+    """Persist (or clear) the AirPlay device choice in `state.json`."""
+    state = load_state()
+    if device is None:
+        state.pop("airplay", None)
+    else:
+        state["airplay"] = {
+            "name": device.name,
+            "identifier": device.identifier,
+            "address": device.address,
+        }
+    save_state(state)
