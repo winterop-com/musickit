@@ -35,7 +35,14 @@ log = logging.getLogger(__name__)
 _SAMPLE_RATE = 44100
 _CHANNELS = 2
 _DTYPE = "float32"
-_QUEUE_MAX_CHUNKS = 128  # ~3 seconds of buffered float32 stereo at 44.1kHz
+# Buffer depth: 512 chunks × 1024 frames @ 44.1 kHz ≈ 12 seconds of stereo
+# float32 audio (~4 MB resident). Tight 3-second buffers caused audible
+# scratches on radio streams when WAN jitter spiked past the buffer drain
+# rate — most often around 30s+ once the decoder's initial backlog cleared
+# and steady-state network conditions started to bite. 12s is plenty of
+# slack for transatlantic Icecast streams without feeling sluggish on
+# local files (they fill the buffer in ~50ms regardless).
+_QUEUE_MAX_CHUNKS = 512
 _CHUNK_FRAMES = 1024  # frames per output callback iteration
 _VIS_BANDS = 24
 _VIS_DECAY = 0.85  # per-callback decay of the band level (smooths the bars)
