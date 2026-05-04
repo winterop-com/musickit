@@ -10,9 +10,13 @@ musickit tui                                         # radio-only
 musickit tui --subsonic URL --user U --password P    # Subsonic client mode
 musickit tui --discover                              # list LAN Subsonic servers + AirPlay devices, exit
 musickit tui --airplay 'HomePod'                     # route playback to an AirPlay device
+musickit tui ./output --no-cache                     # skip the index DB (in-memory scan only)
+musickit tui ./output --full-rescan                  # rebuild the index DB from scratch on launch
 ```
 
 Subsonic credentials are NEVER persisted — pass `--subsonic` / `--user` / `--password` explicitly each session. With no arguments the TUI drops directly into radio-only mode.
+
+Local-library mode reuses the persistent SQLite index at `<DIR>/.musickit/index.db` so the second launch skips the filesystem walk and tag read. See [`musickit library`](library.md#persistent-index-db) for management commands and details.
 
 ## Layout
 
