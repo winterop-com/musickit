@@ -148,11 +148,17 @@ class MusickitApp(App[None]):
         *,
         subsonic_client: SubsonicClient | None = None,
         airplay: AirPlayController | None = None,
+        use_cache: bool = True,
+        force_rescan: bool = False,
     ) -> None:
         super().__init__()
         self._root: Path | None = root
         self._subsonic_client: SubsonicClient | None = subsonic_client
         self._airplay: AirPlayController | None = airplay
+        self._use_cache: bool = use_cache
+        # Initial scan honours --full-rescan; subsequent Ctrl+R rescans do
+        # a delta-validate via load_or_scan(force=False).
+        self._pending_force_rescan: bool = force_rescan
         self._index: LibraryIndex | None = None
         self._player = AudioPlayer(airplay=airplay)
         self._player.on_track_end = self._on_track_end
@@ -1352,8 +1358,16 @@ class MusickitApp(App[None]):
         def on_album(album_dir: Path, idx: int, total: int) -> None:
             self.call_from_thread(self._on_scan_progress, album_dir, idx, total)
 
-        new_index = library_mod.scan(root, on_album=on_album)
-        library_mod.audit(new_index)
+        force = self._pending_force_rescan
+        # The --full-rescan CLI flag fires only once, on the first scan.
+        # Subsequent Ctrl+R rescans go through the delta-validate path.
+        self._pending_force_rescan = False
+        new_index = library_mod.load_or_scan(
+            root,
+            use_cache=self._use_cache,
+            force=force,
+            on_album=on_album,
+        )
         self.call_from_thread(self._on_scan_complete, new_index, prior_artist, initial)
 
     def _on_scan_progress(self, album_dir: Path, idx: int, total: int) -> None:

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
+import sqlite3
+import time
 from collections import Counter
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -12,6 +15,8 @@ from musickit.library.models import LibraryAlbum, LibraryIndex, LibraryTrack
 from musickit.metadata import SUPPORTED_AUDIO_EXTS, read_source
 
 _ALBUM_DIR_YEAR_RE = re.compile(r"^(\d{4})\s*-\s*(.+)$")
+
+ScanProgressCallback = Callable[[Path, int, int], None]
 
 
 def scan(
@@ -133,3 +138,350 @@ def _split_dir_year(album_dir: str) -> tuple[str | None, str]:
     if match:
         return match.group(1), match.group(2)
     return None, album_dir
+
+
+def scan_full(
+    root: Path,
+    conn: sqlite3.Connection,
+    *,
+    on_album: ScanProgressCallback | None = None,
+    measure_pictures: bool = False,
+) -> LibraryIndex:
+    """Walk `root`, audit, and write the full result to the index DB.
+
+    Used on cold start when the DB is empty and after a `startScan`. Wipes
+    every album/track/genre/warning row first so the DB matches the
+    filesystem exactly. Returns the same `LibraryIndex` that callers used
+    to get from `scan()` + `audit()`.
+    """
+    # Imported here to avoid a circular import: audit.py depends on scan.py
+    # for `_split_dir_year`, so we can't import it at module scope.
+    from musickit.library.audit import audit
+
+    index = scan(root, on_album=on_album, measure_pictures=measure_pictures)
+    audit(index)
+    write_index(conn, root, index)
+    return index
+
+
+def validate(
+    root: Path,
+    conn: sqlite3.Connection,
+    *,
+    measure_pictures: bool = False,
+    on_album: ScanProgressCallback | None = None,
+) -> "ValidationResult":
+    """Diff the filesystem against DB rows and apply add/remove/update deltas.
+
+    Catches changes that happened while no `serve`/watcher was running:
+    new albums dropped in, removed albums, tag edits applied with another
+    tool. Each affected album is re-scanned in full and re-audited; rows
+    for vanished albums are dropped.
+
+    Returns a `ValidationResult` so callers can log a one-line summary.
+    """
+    fs_album_dirs = {p.resolve() for p in _iter_album_dirs(root)}
+
+    db_track_rows = list(conn.execute("SELECT id, album_id, rel_path, file_mtime, file_size FROM tracks"))
+    db_album_rows = list(conn.execute("SELECT id, rel_path FROM albums"))
+
+    db_track_keys = {row["rel_path"]: row for row in db_track_rows}
+    db_album_dirs = {(root / row["rel_path"]).resolve(): row for row in db_album_rows}
+
+    affected: set[Path] = set()
+
+    # Albums that vanished entirely → row deletion only, no rescan.
+    for db_dir, _row in db_album_dirs.items():
+        if db_dir not in fs_album_dirs:
+            affected.add(db_dir)
+
+    # New albums on disk that the DB doesn't know about.
+    for fs_dir in fs_album_dirs:
+        if fs_dir not in db_album_dirs:
+            affected.add(fs_dir)
+
+    # For album dirs the DB and FS both know, find tag-edit / file-add /
+    # file-remove deltas at the track level.
+    fs_audio_by_dir: dict[Path, set[Path]] = {}
+    for fs_dir in fs_album_dirs & set(db_album_dirs):
+        try:
+            fs_audio_by_dir[fs_dir] = {
+                p.resolve() for p in fs_dir.iterdir() if p.is_file() and p.suffix.lower() in SUPPORTED_AUDIO_EXTS
+            }
+        except OSError:
+            affected.add(fs_dir)
+            continue
+
+    # Build a per-album view of DB tracks for the dirs we still care about.
+    db_audio_by_dir: dict[Path, dict[Path, "_TrackRow"]] = {}
+    for rel, row in db_track_keys.items():
+        abs_path = (root / rel).resolve()
+        parent = abs_path.parent
+        if parent not in fs_audio_by_dir:
+            continue
+        db_audio_by_dir.setdefault(parent, {})[abs_path] = row
+
+    for fs_dir, fs_files in fs_audio_by_dir.items():
+        db_files = db_audio_by_dir.get(fs_dir, {})
+        if set(fs_files) != set(db_files):
+            affected.add(fs_dir)
+            continue
+        for fs_file in fs_files:
+            row = db_files[fs_file]
+            mtime, size = _safe_stat(fs_file)
+            if mtime != row["file_mtime"] or size != row["file_size"]:
+                affected.add(fs_dir)
+                break
+
+    if not affected:
+        return ValidationResult(added=0, removed=0, updated=0)
+
+    return rescan_albums(
+        root,
+        conn,
+        affected,
+        measure_pictures=measure_pictures,
+        on_album=on_album,
+        _db_album_dirs=db_album_dirs,
+    )
+
+
+def rescan_albums(
+    root: Path,
+    conn: sqlite3.Connection,
+    album_dirs: Iterable[Path],
+    *,
+    measure_pictures: bool = False,
+    on_album: ScanProgressCallback | None = None,
+    _db_album_dirs: dict[Path, "_AlbumRow"] | None = None,
+) -> "ValidationResult":
+    """Re-scan + re-audit each album dir; drop rows for any that vanished.
+
+    Reusable by the cold-start `validate()` pass and (in PR 2) the
+    filesystem watcher. The DB is updated under one transaction so a
+    crash mid-rescan can't half-apply changes.
+    """
+    from musickit.library.audit import audit_album
+
+    dirs = sorted({p.resolve() for p in album_dirs})
+    if _db_album_dirs is None:
+        _db_album_dirs = {
+            (root / row["rel_path"]).resolve(): row for row in conn.execute("SELECT id, rel_path FROM albums")
+        }
+
+    now = time.time()
+    root_abs = root.resolve()
+    added = removed = updated = 0
+    total = len(dirs)
+
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        for idx, album_dir in enumerate(dirs, start=1):
+            if on_album is not None:
+                on_album(album_dir, idx, total)
+
+            existing_row = _db_album_dirs.get(album_dir)
+            if existing_row is not None:
+                conn.execute("DELETE FROM albums WHERE id = ?", (existing_row["id"],))
+
+            if not album_dir.is_dir():
+                if existing_row is not None:
+                    removed += 1
+                continue
+
+            album = _scan_album(album_dir, measure_pictures=measure_pictures)
+            if album.track_count == 0 and existing_row is None:
+                # Empty dir that never had a row — nothing to do.
+                continue
+            audit_album(album)
+            new_album_id = _insert_album(conn, root_abs, album, now)
+            for track in album.tracks:
+                track_id = _insert_track(conn, new_album_id, root_abs, track, now)
+                for genre in track.genres:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO track_genres(track_id, genre) VALUES (?, ?)",
+                        (track_id, genre),
+                    )
+            for warning in album.warnings:
+                conn.execute(
+                    "INSERT OR IGNORE INTO album_warnings(album_id, warning) VALUES (?, ?)",
+                    (new_album_id, warning),
+                )
+
+            if existing_row is None:
+                added += 1
+            else:
+                updated += 1
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+
+    return ValidationResult(added=added, removed=removed, updated=updated)
+
+
+class ValidationResult:
+    """Counts returned by `validate()` for one-line logging."""
+
+    __slots__ = ("added", "removed", "updated")
+
+    def __init__(self, *, added: int, removed: int, updated: int) -> None:
+        self.added = added
+        self.removed = removed
+        self.updated = updated
+
+    def __bool__(self) -> bool:
+        return bool(self.added or self.removed or self.updated)
+
+    def __repr__(self) -> str:  # pragma: no cover — debug aid only
+        return f"ValidationResult(added={self.added}, removed={self.removed}, updated={self.updated})"
+
+
+# Type aliases for sqlite3.Row hints — Row is duck-typed so a Protocol-ish
+# stub would be overkill. These exist only so the helper signatures above
+# read cleanly.
+_TrackRow = sqlite3.Row
+_AlbumRow = sqlite3.Row
+
+
+def write_index(conn: sqlite3.Connection, root: Path, index: LibraryIndex) -> None:
+    """Replace every row in the index DB with the contents of `index`.
+
+    Wraps the writes in a single transaction so a crashed scan leaves the
+    previous state intact.
+    """
+    now = time.time()
+    root_abs = root.resolve()
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        # Cascade deletes drop tracks / track_genres / album_warnings too.
+        conn.execute("DELETE FROM albums")
+        for album in index.albums:
+            album_id = _insert_album(conn, root_abs, album, now)
+            for track in album.tracks:
+                track_id = _insert_track(conn, album_id, root_abs, track, now)
+                for genre in track.genres:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO track_genres(track_id, genre) VALUES (?, ?)",
+                        (track_id, genre),
+                    )
+            for warning in album.warnings:
+                conn.execute(
+                    "INSERT OR IGNORE INTO album_warnings(album_id, warning) VALUES (?, ?)",
+                    (album_id, warning),
+                )
+        conn.execute(
+            "INSERT INTO meta(key, value) VALUES ('last_full_scan_at', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (str(now),),
+        )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+
+
+def _insert_album(conn: sqlite3.Connection, root_abs: Path, album: LibraryAlbum, now: float) -> int:
+    rel = _rel_to_root(album.path, root_abs)
+    cursor = conn.execute(
+        """
+        INSERT INTO albums (
+            rel_path, artist_dir, album_dir,
+            tag_album, tag_year, tag_album_artist, tag_genre,
+            track_count, disc_count, is_compilation,
+            has_cover, cover_pixels, subsonic_id,
+            dir_mtime, scanned_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            rel,
+            album.artist_dir,
+            album.album_dir,
+            album.tag_album,
+            album.tag_year,
+            album.tag_album_artist,
+            album.tag_genre,
+            album.track_count,
+            album.disc_count,
+            int(album.is_compilation),
+            int(album.has_cover),
+            album.cover_pixels,
+            album.subsonic_id,
+            _safe_mtime(album.path),
+            now,
+        ),
+    )
+    rowid = cursor.lastrowid
+    if rowid is None:  # pragma: no cover — sqlite3 always populates this on INSERT
+        raise RuntimeError(f"failed to insert album {rel!r}")
+    return rowid
+
+
+def _insert_track(
+    conn: sqlite3.Connection,
+    album_id: int,
+    root_abs: Path,
+    track: LibraryTrack,
+    now: float,
+) -> int:
+    rel = _rel_to_root(track.path, root_abs)
+    mtime, size = _safe_stat(track.path)
+    cursor = conn.execute(
+        """
+        INSERT INTO tracks (
+            album_id, rel_path,
+            title, artist, album_artist, album, year,
+            track_no, disc_no, genre, lyrics, replaygain_json,
+            duration_s, has_cover, cover_pixels, stream_url,
+            file_mtime, file_size, scanned_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            album_id,
+            rel,
+            track.title,
+            track.artist,
+            track.album_artist,
+            track.album,
+            track.year,
+            track.track_no,
+            track.disc_no,
+            track.genre,
+            track.lyrics,
+            json.dumps(track.replaygain) if track.replaygain else None,
+            track.duration_s,
+            int(track.has_cover),
+            track.cover_pixels,
+            track.stream_url,
+            mtime,
+            size,
+            now,
+        ),
+    )
+    rowid = cursor.lastrowid
+    if rowid is None:  # pragma: no cover
+        raise RuntimeError(f"failed to insert track {rel!r}")
+    return rowid
+
+
+def _rel_to_root(p: Path, root_abs: Path) -> str:
+    """Return `p` as a string relative to `root_abs`, falling back to absolute."""
+    try:
+        return str(p.resolve().relative_to(root_abs))
+    except ValueError:
+        return str(p)
+
+
+def _safe_mtime(p: Path) -> float:
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _safe_stat(p: Path) -> tuple[float, int]:
+    try:
+        st = p.stat()
+        return st.st_mtime, st.st_size
+    except OSError:
+        return 0.0, 0

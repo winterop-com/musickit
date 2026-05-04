@@ -51,6 +51,20 @@ def serve(
         bool,
         typer.Option("--no-watch", help="Skip the filesystem watcher (auto-rescan on library changes)."),
     ] = False,
+    no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--no-cache",
+            help="Skip the persistent index DB at `<DIR>/.musickit/index.db`; in-memory scan only.",
+        ),
+    ] = False,
+    full_rescan: Annotated[
+        bool,
+        typer.Option(
+            "--full-rescan",
+            help="Rebuild the index DB from scratch on startup (ignores any cached rows).",
+        ),
+    ] = False,
 ) -> None:
     """Start a Subsonic-compatible server for the converted library.
 
@@ -69,7 +83,7 @@ def serve(
             err=True,
         )
 
-    fastapi_app = create_app(root=target_dir.resolve(), cfg=cfg)
+    fastapi_app = create_app(root=target_dir.resolve(), cfg=cfg, use_cache=not no_cache)
     _print_startup_banner(host=host, port=port, root=target_dir.resolve())
 
     # Block on the initial scan so the first client request hits a populated
@@ -99,7 +113,7 @@ def serve(
                 name = name[:39] + "…"
             progress.update(task, advance=1, description=f"[cyan]Scanning[/] [dim]·[/] {name}")
 
-        fastapi_app.state.cache.rebuild(on_album=on_album)
+        fastapi_app.state.cache.rebuild(on_album=on_album, force=full_rescan)
     cache = fastapi_app.state.cache
     typer.echo(f"  {cache.artist_count} artists, {cache.album_count} albums, {cache.track_count} tracks\n")
 

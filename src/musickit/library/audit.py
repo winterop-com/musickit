@@ -12,12 +12,24 @@ _LOW_RES_THRESHOLD_PIXELS = 500 * 500
 
 
 def audit(index: LibraryIndex) -> None:
-    """Append audit findings to each `album.warnings` in-place."""
+    """Replace each `album.warnings` with a fresh set of audit findings.
+
+    Idempotent: running twice on the same index gives the same warnings,
+    not duplicates. The per-album rescan path relies on this so it can
+    re-audit a single album after a tag fix.
+    """
     for album in index.albums:
-        _audit_album(album)
+        audit_album(album)
 
 
-def _audit_album(album: LibraryAlbum) -> None:
+def audit_album(album: LibraryAlbum) -> None:
+    """Replace `album.warnings` with a fresh audit pass for one album.
+
+    Warnings are sorted alphabetically at the end so the in-memory
+    `LibraryIndex` produced by `scan_full` matches the one produced by
+    `load` (SQLite returns `album_warnings` rows ORDER BY warning).
+    """
+    album.warnings = []
     _audit_cover(album)
     _audit_year(album)
     _audit_album_artist(album)
@@ -26,6 +38,11 @@ def _audit_album(album: LibraryAlbum) -> None:
     _audit_tag_path_mismatch(album)
     _audit_track_gaps(album)
     _audit_track_count(album)
+    album.warnings.sort()
+
+
+# Back-compat alias — older callers/tests may still import the underscored name.
+_audit_album = audit_album
 
 
 def _audit_cover(album: LibraryAlbum) -> None:

@@ -9,6 +9,7 @@ What's open, organized by what it would feel like.
 
 ## Tier 2 — bigger directions (~3-5 sessions)
 
+- **Watcher per-album incremental updates** — the SQLite library index landed with cold-start cache + delta-validate on launch, but the filesystem watcher still triggers full rebuilds. Next: collect changed paths during the debounce window, dispatch to `library.rescan_albums` so only the touched albums get re-read.
 - **Web UI** — small Vue/htmx frontend mounted at `/` (replacing the JSON probe response). Same Subsonic backend; lets you play from any browser without installing an app.
 - **Podcast support** — Subsonic spec already defines `getPodcasts` / `getPodcastEpisode` / `createPodcastChannel`. Add an RSS feed list, fetch episodes on schedule, store position. Symfonium has decent podcast UX out of the box.
 - **iTunes / Apple Music import** — read the local Apple Music database to import play counts, ratings, and playlists. One-shot migration tool.
@@ -20,6 +21,7 @@ What's open, organized by what it would feel like.
 - **systemd / launchd plist** — for users wanting `serve` to autostart on boot.
 - **MQTT / webhook scrobble forwarding** — push play events to Home Assistant / Last.fm / external systems.
 - **Bigger `getCoverArt` cache** — currently it's recomputed per request; an LRU keyed on `(album_id, size)` would help on slow disks.
+- **FTS5 search backed by the library index** — `/search3` and the TUI `/` filter currently do casefolded substring matching in Python over every row. With the SQLite index now in place, an FTS5 virtual table over `tracks(title, artist, album)` plus triggers would be a small win for medium libraries and a big one for very large ones.
 
 ## Tier 4 — convert-pipeline polish
 
@@ -63,6 +65,7 @@ Things that would be interesting if anyone ever asked for them, but not pursued 
 - Per-track recording MBIDs (one MB `release/<mbid>?inc=recordings` lookup at enrich time)
 - mDNS / Bonjour autodiscovery (server advertises, TUI auto-detects)
 - Filesystem watcher with debounced auto-rescan
+- Persistent SQLite library index — `<root>/.musickit/index.db` removes the cold-start filesystem walk + tag read; `library.load_or_scan` hydrates from rows then runs a delta-validate pass to pick up filesystem changes (added / removed / tag-edited albums); `musickit library --full-rescan` / `--drop-index` / `--index-status` for management
 - Genre indexing (model + scan + `getGenres` + `byGenre`)
 - cover-pick semi-automated workflow
 - Folder-name edition-annotation strip

@@ -1,7 +1,13 @@
-"""`musickit library` — Artist→Album→Track index of the converted output, with audit + fix."""
+"""`musickit library` — Artist→Album→Track index of the converted output, with audit + fix.
+
+Also the canonical CLI for managing the persistent SQLite index DB at
+`<root>/.musickit/index.db`: build / rebuild it (`--full-rescan`), inspect
+it (`--index-status`), or wipe it (`--drop-index`).
+"""
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Annotated
 
@@ -18,7 +24,7 @@ def library(
     target_dir: Annotated[
         Path,
         typer.Argument(exists=True, file_okay=False, help="Library root to scan."),
-    ] = Path("./output"),
+    ],
     audit_mode: Annotated[
         bool,
         typer.Option("--audit", help="Show the audit table (artist | album | year | tracks | cover | warnings)."),
@@ -55,6 +61,38 @@ def library(
             ),
         ),
     ] = False,
+    full_rescan: Annotated[
+        bool,
+        typer.Option(
+            "--full-rescan",
+            help=(
+                "Rebuild the index DB from scratch, ignoring any cached rows. "
+                "Without this flag, an existing index is loaded and only filesystem "
+                "deltas (added / removed / tag-edited albums) are re-scanned."
+            ),
+        ),
+    ] = False,
+    no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--no-cache",
+            help="Skip the index DB entirely; in-memory scan only. Use for read-only mounts.",
+        ),
+    ] = False,
+    drop_index: Annotated[
+        bool,
+        typer.Option(
+            "--drop-index",
+            help="Delete `<DIR>/.musickit/` (the persistent index DB) and exit.",
+        ),
+    ] = False,
+    index_status: Annotated[
+        bool,
+        typer.Option(
+            "--index-status",
+            help="Print index DB metadata + counts and exit.",
+        ),
+    ] = False,
 ) -> None:
     """Walk a converted-output directory and print an Artist→Album→Track index.
 
@@ -62,19 +100,33 @@ def library(
     table that flags concrete cleanup actions (no cover, missing year, scene
     residue in names, track gaps, tag/path mismatches, and so on). `--fix`
     closes the loop on the deterministic warnings.
+
+    The persistent index lives at `<DIR>/.musickit/index.db`. Use
+    `--index-status` to inspect it, `--full-rescan` to rebuild it, or
+    `--drop-index` to delete it (it'll be recreated on the next scan).
     """
     console = Console()
+    root = target_dir.resolve()
+
+    if drop_index:
+        _drop_index(console, root)
+        return
+    if index_status:
+        _show_index_status(console, root)
+        return
+
     verbose = bool(ctx.obj and ctx.obj.get("verbose"))
     # Audit modes need cover-pixel measurement so the low-res-cover rule can
     # fire. Otherwise stay in fast scan mode (no Pillow decode per cover).
     measure_pictures = audit_mode or issues_only or fix
     index = _scan_with_progress(
         console,
-        target_dir.resolve(),
+        root,
         verbose=verbose,
         measure_pictures=measure_pictures,
+        use_cache=not no_cache,
+        force=full_rescan,
     )
-    library_mod.audit(index)
 
     if fix:
         actions = library_mod.fix_index(
@@ -104,6 +156,8 @@ def _scan_with_progress(
     *,
     verbose: bool,
     measure_pictures: bool = False,
+    use_cache: bool = True,
+    force: bool = False,
 ) -> library_mod.LibraryIndex:
     """Thin wrapper that delegates to the shared scan-progress helper."""
     from musickit.cli._scan import scan_with_progress
@@ -113,7 +167,63 @@ def _scan_with_progress(
         root,
         verbose=verbose,
         measure_pictures=measure_pictures,
+        use_cache=use_cache,
+        force=force,
     )
+
+
+def _drop_index(console: Console, root: Path) -> None:
+    """Delete `<root>/.musickit/`. Idempotent."""
+    index_dir = root / library_mod.INDEX_DIR_NAME
+    if not index_dir.exists():
+        console.print(f"[dim]no index at {index_dir} — nothing to drop[/dim]")
+        return
+    shutil.rmtree(index_dir)
+    console.print(f"[green]removed[/green] {index_dir}")
+
+
+def _show_index_status(console: Console, root: Path) -> None:
+    """Print DB metadata + counts. Opens the DB read-only-ish."""
+    db_file = library_mod.db_path(root)
+    if not db_file.exists():
+        console.print(f"[yellow]no index at {db_file}[/yellow]")
+        console.print("[dim]run `musickit library DIR` (or `--full-rescan`) to build one[/dim]")
+        return
+
+    conn = library_mod.open_db(root)
+    try:
+        meta_rows = list(conn.execute("SELECT key, value FROM meta ORDER BY key"))
+        album_count = conn.execute("SELECT COUNT(*) FROM albums").fetchone()[0]
+        track_count = conn.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
+        warning_count = conn.execute("SELECT COUNT(*) FROM album_warnings").fetchone()[0]
+        genre_count = conn.execute("SELECT COUNT(DISTINCT genre) FROM track_genres").fetchone()[0]
+    finally:
+        conn.close()
+
+    db_size = db_file.stat().st_size
+
+    from rich.table import Table
+
+    table = Table(title=f"musickit library index — {db_file}", show_header=False)
+    table.add_column(style="cyan")
+    table.add_column()
+    for key, value in meta_rows:
+        table.add_row(key, value)
+    table.add_row("albums", str(album_count))
+    table.add_row("tracks", str(track_count))
+    table.add_row("distinct genres", str(genre_count))
+    table.add_row("audit warnings", str(warning_count))
+    table.add_row("db size", _format_size(db_size))
+    console.print(table)
+
+
+def _format_size(n: int) -> str:
+    f = float(n)
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if f < 1024:
+            return f"{f:.0f} {unit}" if unit == "B" else f"{f:.1f} {unit}"
+        f /= 1024
+    return f"{f:.1f} TiB"
 
 
 def _render_tree(console: Console, index: library_mod.LibraryIndex) -> None:

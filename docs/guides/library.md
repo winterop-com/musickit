@@ -1,12 +1,13 @@
 # `musickit library`
 
-Audit the converted library, tree-render it, fix the deterministic problems.
+Audit the converted library, tree-render it, fix the deterministic problems, and manage the persistent index DB.
 
 ```bash
-musickit library [DIR] [--audit | --issues-only | --fix [--prefer-dirname] [--dry-run]]
+musickit library DIR [--audit | --issues-only | --fix [--prefer-dirname] [--dry-run]]
+musickit library DIR --index-status | --drop-index | --full-rescan | --no-cache
 ```
 
-Default `DIR` is `./output`.
+`DIR` is required.
 
 ## Modes
 
@@ -17,6 +18,10 @@ musickit library ./output --issues-only         # only flagged albums
 musickit library ./output --fix                 # apply deterministic fixes
 musickit library ./output --fix --dry-run       # preview the fixes
 musickit library ./output --fix --prefer-dirname  # invert tag/dir resolution
+musickit library ./output --index-status        # show index DB metadata + counts
+musickit library ./output --full-rescan         # rebuild the index DB from scratch
+musickit library ./output --drop-index          # delete <DIR>/.musickit/ and exit
+musickit library ./output --no-cache            # skip the index DB (in-memory only)
 ```
 
 ## Audit rules
@@ -89,3 +94,40 @@ Per-album loop:
 5. We download, validate via Pillow, resize to fit `--cover-max-edge`, save as `cover.jpg`, and (with `--embed`, default) re-embed into every track.
 
 Honours [musichoarders' integration policy](https://covers.musichoarders.xyz/) — never scrapes the site, just pre-fills the search and lets you pick.
+
+## Persistent index DB
+
+The first scan of any library writes a SQLite cache at `<DIR>/.musickit/index.db`. On every subsequent launch — `library`, `tui`, or `serve` — the in-memory `LibraryIndex` is hydrated from rows instead of re-reading every audio file's tags. A delta-validate pass then reconciles the DB against any filesystem changes that happened since the last run (added albums, removed albums, tag edits applied with another tool).
+
+The DB is fully derived from the filesystem, so it's always safe to delete: `rm -rf <DIR>/.musickit/` (or `musickit library DIR --drop-index`). It'll be rebuilt on the next scan.
+
+### Schema
+
+| Table | Holds |
+|---|---|
+| `meta` | `schema_version`, `library_root_abs`, `last_full_scan_at` |
+| `albums` | One row per album dir — tags, counts, `dir_mtime`, audit-relevant flags |
+| `tracks` | One row per audio file — tags, ReplayGain, `file_mtime`, `file_size` |
+| `track_genres` | `(track_id, genre)` pairs for multi-genre support |
+| `album_warnings` | `(album_id, warning)` pairs from the audit pass |
+
+Schema changes don't run migrations — `db.py` defines a `SCHEMA_VERSION` constant; if the on-disk version doesn't match, the DB is unlinked and rebuilt from scratch.
+
+### Management commands
+
+```bash
+musickit library DIR --index-status   # schema version, library_root_abs, row counts, DB size
+musickit library DIR --drop-index     # delete <DIR>/.musickit/ — next scan recreates it
+musickit library DIR --full-rescan    # wipe + rebuild every row, ignoring the cache
+musickit library DIR --no-cache       # skip the DB entirely; in-memory scan only
+```
+
+`--no-cache` is the right call for read-only mounts where `<DIR>/.musickit/` can't be created. Otherwise, the cache is the default everywhere.
+
+### Cold-start flow
+
+1. `open_db(root)` opens (or creates) `<DIR>/.musickit/index.db`. Mismatched schema or relocated `library_root_abs` triggers an unlink + rebuild.
+2. If the DB has no `albums` rows → `scan_full(root, conn)` runs a fresh filesystem walk + audit and writes everything.
+3. Otherwise → `load(root, conn)` hydrates the Pydantic graph, then `validate(root, conn)` walks the filesystem, compares per-album `dir_mtime` and per-file `(file_mtime, file_size)` to detect deltas, and re-scans only the affected album dirs via `rescan_albums`.
+
+For the `serve` watcher, `--full-rescan` is what the Subsonic `startScan` endpoint triggers (per-file incremental updates land in a follow-up).

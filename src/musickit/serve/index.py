@@ -1,9 +1,11 @@
 """Cached `LibraryIndex` + reverse-lookup maps for Subsonic IDs.
 
-`IndexCache.rebuild()` runs `library.scan` + `library.audit` and refreshes
-every dict. Browsing endpoints resolve IDs against these dicts in O(1).
-A `scan_in_progress` flag drives `getScanStatus` and prevents overlapping
-rescans; `startScan` spawns a daemon thread that calls `rebuild()`.
+`IndexCache.rebuild()` calls `library.load_or_scan` (cache-aware) and
+refreshes every dict. Browsing endpoints resolve IDs against these dicts
+in O(1). A `scan_in_progress` flag drives `getScanStatus` and prevents
+overlapping rescans; `startScan` spawns a daemon thread that calls
+`rebuild(force=True)` so the watcher / startScan path always rebuilds
+the index from scratch.
 """
 
 from __future__ import annotations
@@ -20,8 +22,9 @@ from musickit.serve.ids import album_id, artist_id, track_id
 class IndexCache:
     """Wraps a `LibraryIndex` with the reverse-lookup maps endpoints need."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, use_cache: bool = True) -> None:
         self.root = root
+        self.use_cache = use_cache
         self.index: LibraryIndex = LibraryIndex(root=root, albums=[])
         self.albums_by_id: dict[str, LibraryAlbum] = {}
         self.tracks_by_id: dict[str, tuple[LibraryAlbum, LibraryTrack]] = {}
@@ -34,29 +37,40 @@ class IndexCache:
         # both think they're the "first" rescan and double-walk the disk.
         self._scan_lock = threading.Lock()
 
-    def rebuild(self, *, on_album: Callable[[Path, int, int], None] | None = None) -> None:
+    def rebuild(
+        self,
+        *,
+        on_album: Callable[[Path, int, int], None] | None = None,
+        force: bool = False,
+    ) -> None:
         """Scan + audit + repopulate all lookup maps. Blocking.
 
-        `on_album` is forwarded to `library.scan` so the CLI can drive a
-        progress bar during the initial startup scan.
+        `on_album` is forwarded to `library.load_or_scan` so the CLI can
+        drive a progress bar during the initial startup scan or the
+        per-album re-validation pass.
+
+        `force=True` bypasses the cache and rewrites every row.
         """
         with self._scan_lock:
             if self.scan_in_progress:
                 return
             self.scan_in_progress = True
         try:
-            self._rebuild_inner(on_album=on_album)
+            self._rebuild_inner(on_album=on_album, force=force)
         finally:
             with self._scan_lock:
                 self.scan_in_progress = False
 
-    def start_background_rescan(self) -> bool:
+    def start_background_rescan(self, *, force: bool = True) -> bool:
         """Kick a daemon thread that runs the rebuild. Returns False if already running.
 
         Sets `scan_in_progress=True` under the lock BEFORE spawning the thread,
         so a `getScanStatus` poll fired right after `startScan` reflects the
         intended active state. Without this the daemon thread could lose the
         race and the client would see `scanning=false` and stop polling.
+
+        `force` defaults to True because the user-triggered `startScan` and
+        watcher fallback both want a clean rebuild, not a delta-validate.
         """
         with self._scan_lock:
             if self.scan_in_progress:
@@ -65,7 +79,7 @@ class IndexCache:
 
         def runner() -> None:
             try:
-                self._rebuild_inner()
+                self._rebuild_inner(force=force)
             finally:
                 with self._scan_lock:
                     self.scan_in_progress = False
@@ -73,10 +87,19 @@ class IndexCache:
         threading.Thread(target=runner, name="musickit-rescan", daemon=True).start()
         return True
 
-    def _rebuild_inner(self, *, on_album: Callable[[Path, int, int], None] | None = None) -> None:
-        """Do the actual scan + audit + reindex work. Caller owns `scan_in_progress`."""
-        new_index = library_mod.scan(self.root, on_album=on_album)
-        library_mod.audit(new_index)
+    def _rebuild_inner(
+        self,
+        *,
+        on_album: Callable[[Path, int, int], None] | None = None,
+        force: bool = False,
+    ) -> None:
+        """Run load_or_scan + reindex. Caller owns `scan_in_progress`."""
+        new_index = library_mod.load_or_scan(
+            self.root,
+            use_cache=self.use_cache,
+            force=force,
+            on_album=on_album,
+        )
         self._reindex(new_index)
 
     def _reindex(self, idx: LibraryIndex) -> None:
