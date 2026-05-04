@@ -24,7 +24,7 @@ def library(
     target_dir: Annotated[
         Path,
         typer.Argument(exists=True, file_okay=False, help="Library root to scan."),
-    ] = Path("./output"),
+    ],
     audit_mode: Annotated[
         bool,
         typer.Option("--audit", help="Show the audit table (artist | album | year | tracks | cover | warnings)."),
