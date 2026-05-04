@@ -636,10 +636,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-optional-route-to-airplay-devices-on-the-mac" class="md-nav__link">
+  <a href="#6-optional-browse-play-locally-on-the-mac" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Optional: route to AirPlay devices on the Mac
+        6. Optional: browse + play locally on the Mac
       
     </span>
   </a>
@@ -1176,10 +1176,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-optional-route-to-airplay-devices-on-the-mac" class="md-nav__link">
+  <a href="#6-optional-browse-play-locally-on-the-mac" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Optional: route to AirPlay devices on the Mac
+        6. Optional: browse + play locally on the Mac
       
     </span>
   </a>
@@ -1481,12 +1481,16 @@ local file (HTTP buffer fill), then steady-state is real-time.</p>
 <li><strong>Search</strong> — <code>/rest/search3</code> matches against artist, album, and track
   titles.</li>
 </ul>
-<h2 id="6-optional-route-to-airplay-devices-on-the-mac">6. Optional: route to AirPlay devices on the Mac<a class="headerlink" href="#6-optional-route-to-airplay-devices-on-the-mac" title="Permanent link">&para;</a></h2>
-<p>If the Mac has AirPlay devices on the same network (HomePod, AirPort
-Express, AirPlay-2 Sonos), <code>musickit tui</code> can route playback to them:</p>
+<h2 id="6-optional-browse-play-locally-on-the-mac">6. Optional: browse + play locally on the Mac<a class="headerlink" href="#6-optional-browse-play-locally-on-the-mac" title="Permanent link">&para;</a></h2>
+<p>If you also want to browse the same library on the Mac itself:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output
 </code></pre></div>
-<p>Press <code>a</code> for the AirPlay picker, pick a device, music plays through
+<p>This is the TUI — three-pane Textual app, library browser on the left, now-playing card + 48-band visualizer + tracklist on the right.</p>
+<p><img alt="musickit TUI — drilled into an album" src="../../screenshots/album-tracks.svg" /></p>
+<p>Press <code>?</code> for the full keybindings panel; the most useful ones to know are <code>Enter</code> (play), <code>Space</code> (pause), <code>n</code>/<code>p</code> (next/prev), <code>&lt;</code>/<code>&gt;</code> (±5s seek), <code>9</code>/<code>0</code> (volume), <code>/</code> (filter the focused pane), <code>f</code> (fullscreen visualizer), <code>q</code> (quit). Click anywhere on the progress bar to seek to that position.</p>
+<p>If the Mac has AirPlay devices on the same network (HomePod, AirPort
+Express, AirPlay-2 Sonos), the TUI can route playback to them.
+Press <code>a</code> for the AirPlay picker, pick a device, music plays through
 the speaker instead of the laptop. Iterate with <code>--airplay 'HomePod'</code>
 on the CLI for headless / scripted use.</p>
 <p>This is unrelated to the iPhone setup — it's about playback on the Mac
