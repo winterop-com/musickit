@@ -53,6 +53,8 @@ Subsonic credentials are NEVER persisted — pass `--subsonic` / `--user` / `--p
 | `s` | Toggle shuffle |
 | `r` | Cycle repeat (off → album → track) |
 | `f` | Toggle fullscreen visualizer |
+| `/` | Filter the focused pane (artists / albums / tracks) |
+| `e` | Edit tags — track-level on track list, album-wide on album row |
 | `Tab` | Cycle focus across browser / track list |
 | `Backspace` | Browser: go up one level |
 | `Ctrl+R` / `F5` | Rescan library |
@@ -60,6 +62,8 @@ Subsonic credentials are NEVER persisted — pass `--subsonic` / `--user` / `--p
 | `Ctrl+P` | Command palette (also surfaces playback verbs) |
 | `a` | AirPlay device picker |
 | `q` / `Ctrl+C` | Quit |
+
+Click semantics on the track list mirror Spotify / iTunes: single click moves the cursor only (no playback), double click within ~400ms plays the track.
 
 ## Local library mode
 

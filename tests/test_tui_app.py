@@ -98,11 +98,21 @@ async def test_tracklist_single_click_only_moves_cursor(silent_flac_template: Pa
 
 
 @pytest.mark.asyncio
-async def test_tracklist_double_click_plays(silent_flac_template: Path, tmp_path: Path) -> None:
-    """Two clicks on the same row within the double-click window play the track."""
+async def test_tracklist_double_click_plays(
+    silent_flac_template: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two clicks on the same row within the double-click window play the track.
+
+    Stubs `_play_current` so we don't actually open an audio device — on CI
+    with no audio output, `play()` would fail, the track-failed callback
+    sets `_end_pending`, and the next tick auto-advances to track 2 before
+    the assertion fires (`_current_track_idx == 2` instead of 1).
+    """
     from textual.widgets import ListItem
 
     from musickit.tui.app import BrowserList, MusickitApp, TrackList
+
+    monkeypatch.setattr(MusickitApp, "_play_current", lambda self: None)
 
     root = tmp_path / "lib"
     for n in range(1, 4):
