@@ -182,17 +182,27 @@ class Visualizer(Static):
         rows = max(4, max(0, self.size.height - 1))
         red_cutoff = max(1, rows // 5)
         yellow_cutoff = red_cutoff + max(1, rows // 3)
-        # Bars touch each other (no inter-bar gap) so the meter looks
-        # like a continuous spectrum rather than a row of widely-spaced
-        # VU bars. Each bar has a base width of `avail // n_bars`; the
-        # leftover modulo is absorbed by making the first `extra` bars
-        # 1 cell wider. End result: 100% full-width fill, asymmetry
-        # bounded to 1 cell per bar (imperceptible at 48 bars on any
-        # reasonable terminal).
+        # Uniform bar width with a 1-cell gap between bars (classic VU
+        # look). Leftover modulo cells get distributed across the gaps
+        # so the meter fills the full content width — first `extra` gaps
+        # are 2 cells, the rest are 1 cell. Falls back to gap=0 only if
+        # avail is too narrow to fit even bar_width=1 with gaps.
         n_bars = len(self.levels) or 1
         avail = max(0, self.content_size.width)
-        base_width = max(1, avail // n_bars)
-        extra = max(0, avail - base_width * n_bars)
+        gaps_total = max(0, n_bars - 1)
+        if avail >= n_bars + gaps_total:
+            bar_width = (avail - gaps_total) // n_bars
+            min_gap = 1
+        else:
+            bar_width = max(1, avail // n_bars)
+            min_gap = 0
+        used = bar_width * n_bars + min_gap * gaps_total
+        leftover = max(0, avail - used)
+        # `extra` gaps get an extra +1 cell so the meter is full-width.
+        extra_gaps = leftover if gaps_total > 0 else 0
+        empty_cell = " " * bar_width
+        small_gap = " " * min_gap
+        wide_gap = " " * (min_gap + 1)
         lines: list[str] = []
         for row_idx in range(rows):
             if row_idx < red_cutoff:
@@ -205,23 +215,24 @@ class Visualizer(Static):
             row_bottom = 1.0 - (row_idx + 1) / rows
             line_parts: list[str] = []
             for i, level in enumerate(self.levels):
-                bw = base_width + (1 if i < extra else 0)
                 if level >= row_top:
-                    line_parts.append(f"[{color}]{'█' * bw}[/]")
+                    line_parts.append(f"[{color}]{'█' * bar_width}[/]")
                 elif level > row_bottom:
                     fraction = (level - row_bottom) / max(1e-6, row_top - row_bottom)
                     block = self._PARTIAL_BLOCKS[
                         min(len(self._PARTIAL_BLOCKS) - 1, int(fraction * len(self._PARTIAL_BLOCKS)))
                     ]
-                    line_parts.append(f"[{color}]{block * bw}[/]")
+                    line_parts.append(f"[{color}]{block * bar_width}[/]")
                 else:
-                    line_parts.append(" " * bw)
+                    line_parts.append(empty_cell)
+                if i < n_bars - 1:
+                    line_parts.append(wide_gap if i < extra_gaps else small_gap)
             lines.append("".join(line_parts))
         return "\n".join(lines)
 
 
 class ProgressLine(Static):
-    """`mm:ss [▰▰▰▰░░░░] mm:ss   [playing]` bar."""
+    """`▶ mm:ss <bar> mm:ss` — click anywhere on the bar to seek."""
 
     DEFAULT_CSS = """
     ProgressLine {
@@ -234,6 +245,40 @@ class ProgressLine(Static):
     position = reactive(0.0)
     duration = reactive(0.0)
     state = reactive("stopped")  # "playing" | "paused" | "stopped"
+
+    # Layout offsets — keep in sync with `render()`. The bar starts after
+    # the leading padding + icon (1 cell) + space (1) + pos label (5) +
+    # 2-space separator. We also reserve `_TRAILING_RESERVE` cells after
+    # the bar (2-space separator + dur label = 7) so clicks past the bar
+    # don't land in the dur label and seek to the end accidentally.
+    _PAD_LEFT = 2
+    _BAR_OFFSET = 9  # icon + space + pos + 2-space separator
+    _TRAILING_RESERVE = 7
+
+    class Seek(Message):
+        """Posted when the user clicks on the bar to seek."""
+
+        def __init__(self, seconds: float) -> None:
+            super().__init__()
+            self.seconds = seconds
+
+    async def _on_click(self, event: events.Click) -> None:  # noqa: PLW3201
+        """Seek to the time corresponding to the clicked column."""
+        if self.duration <= 0 or event.button != 1:
+            return
+        # Recompute bar geometry to match render(). content_size.width
+        # already excludes padding; here `event.x` is widget-relative
+        # (includes padding) so we add `_PAD_LEFT` to map into widget
+        # coordinates.
+        width = max(20, self.content_size.width - 16)
+        bar_start = self._PAD_LEFT + self._BAR_OFFSET
+        bar_end = bar_start + width
+        x = event.x
+        if x < bar_start or x >= bar_end:
+            return
+        ratio = (x - bar_start) / max(1, width - 1)
+        ratio = max(0.0, min(1.0, ratio))
+        self.post_message(self.Seek(ratio * self.duration))
 
     def render(self) -> str:
         # Layout: `<icon> <pos>  <bar>  <dur>`. Icon (1 cell) + space (1)

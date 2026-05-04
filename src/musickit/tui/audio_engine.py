@@ -146,7 +146,13 @@ class AudioEngine:
         self._decoder_thread: threading.Thread | None = None
         self._decoder_stop: threading.Event | None = None
         self._stream: sd.OutputStream | None = None
+        # `_opener_gen` is the most-recent gen the engine has seen
+        # (bumped on PLAY / STOP). `_active_gen` is the gen of the
+        # playback currently set up — used to stamp engine→UI events
+        # so a delayed event from a superseded playback can be filtered
+        # by the UI without ever touching state for the new playback.
         self._opener_gen = 0
+        self._active_gen = 0
         self._current_source: str | None = None
         self._cached_edges: np.ndarray | None = None
         self._cached_edges_n = 0
@@ -200,7 +206,7 @@ class AudioEngine:
         except Exception as exc:
             log.warning("failed to open %s: %s", source, exc)
             if gen == self._opener_gen:
-                self._emit(EventOp.TRACK_FAILED, {"source": str(source), "message": str(exc)})
+                self._emit(EventOp.TRACK_FAILED, {"source": str(source), "message": str(exc)}, gen=gen)
             return
         if gen != self._opener_gen:
             try:
@@ -215,13 +221,24 @@ class AudioEngine:
             except Exception:  # pragma: no cover
                 pass
             return
-        self._setup_playback(source, container, stream)
+        self._setup_playback(source, container, stream, gen)
 
-    def _setup_playback(self, source: Path | str, container: InputContainer, stream: Any) -> None:
+    def _setup_playback(
+        self,
+        source: Path | str,
+        container: InputContainer,
+        stream: Any,
+        gen: int,
+    ) -> None:
         self._end_fired = False
         self._set_paused(False)
         self._set_stopped(False)
         self._current_source = str(source)
+        # Lock in the gen of THIS playback so every emit / decoder /
+        # callback event from here on stamps with this gen, even if
+        # another PLAY arrives and bumps `_opener_gen` while this
+        # playback is being torn down.
+        self._active_gen = gen
         with self._state.position_frames.get_lock():
             self._state.position_frames.value = 0
 
@@ -254,11 +271,12 @@ class AudioEngine:
                 stream_station_name=self._stream_station_name,
                 sample_rate=self._sample_rate,
             ),
+            gen=gen,
         )
 
         self._decoder_thread = threading.Thread(
             target=self._decoder_loop,
-            args=(container, stream, local_queue, local_stop, source, is_live),
+            args=(container, stream, local_queue, local_stop, source, is_live, gen),
             name=f"musickit-decoder-{Path(str(source)).name}",
             daemon=True,
         )
@@ -290,8 +308,17 @@ class AudioEngine:
             self._stream.start()
         except Exception as exc:
             log.warning("failed to open audio device: %s", exc)
-            self._set_stopped(True)
-            self._emit(EventOp.TRACK_FAILED, {"source": str(source), "message": f"audio device unavailable: {exc}"})
+            # Tear down the just-spun-up decoder thread + queue so they
+            # don't sit around buffering audio for a stream nobody will
+            # play. Without this, every failed `play()` on a machine
+            # without an audio device leaks a decoder until its queue
+            # fills (~12 s of float32 stereo).
+            self._teardown_playback()
+            self._emit(
+                EventOp.TRACK_FAILED,
+                {"source": str(source), "message": f"audio device unavailable: {exc}"},
+                gen=gen,
+            )
 
     def _stop(self) -> None:
         self._opener_gen += 1
@@ -354,14 +381,15 @@ class AudioEngine:
         local_stop: threading.Event,
         source: Path | str,
         is_live: bool,
+        gen: int,
     ) -> None:
         try:
             resampler = av.AudioResampler(format="flt", layout="stereo", rate=self._sample_rate)
-            self._decode_into_queue(container, stream, resampler, local_queue, local_stop, is_live)
+            self._decode_into_queue(container, stream, resampler, local_queue, local_stop, is_live, gen)
         except Exception as exc:  # pragma: no cover
             log.warning("decoder failed for %s: %s", source, exc)
             if not local_stop.is_set():
-                self._emit(EventOp.TRACK_FAILED, {"source": str(source), "message": str(exc)})
+                self._emit(EventOp.TRACK_FAILED, {"source": str(source), "message": str(exc)}, gen=gen)
         finally:
             try:
                 container.close()
@@ -380,6 +408,7 @@ class AudioEngine:
         local_queue: queue.Queue[np.ndarray | None],
         local_stop: threading.Event,
         is_live: bool,
+        gen: int,
     ) -> None:
         for packet in container.demux(stream):
             if local_stop.is_set():
@@ -389,7 +418,7 @@ class AudioEngine:
                 self._apply_seek(container, stream, target, local_queue)
                 continue
             if is_live:
-                self._poll_stream_metadata(container)
+                self._poll_stream_metadata(container, gen)
             for frame in packet.decode():
                 if local_stop.is_set():
                     return
@@ -398,13 +427,14 @@ class AudioEngine:
                     if local_stop.is_set():
                         return
 
-    def _poll_stream_metadata(self, container: InputContainer) -> None:
+    def _poll_stream_metadata(self, container: InputContainer, gen: int) -> None:
         new_title = get_metadata_value(container, "StreamTitle")
         if new_title and new_title != self._stream_title:
             self._stream_title = new_title
             self._emit(
                 EventOp.METADATA_CHANGED,
                 {"stream_title": new_title, "stream_station_name": self._stream_station_name},
+                gen=gen,
             )
 
     def _consume_seek_target(self) -> float | None:
@@ -493,7 +523,7 @@ class AudioEngine:
                     self._advance_position(written)
                     if not self._end_fired:
                         self._end_fired = True
-                        self._emit(EventOp.TRACK_END, None)
+                        self._emit(EventOp.TRACK_END, None, gen=self._active_gen)
                     return
                 self._current_chunk = next_chunk
                 self._chunk_offset = 0
@@ -572,8 +602,19 @@ class AudioEngine:
         with self._state.position_frames.get_lock():
             self._state.position_frames.value += frames
 
-    def _emit(self, op: EventOp, payload: Any) -> None:
+    def _emit(self, op: EventOp, payload: Any, *, gen: int | None = None) -> None:
+        # Every event carries a generation tag so the UI's reader thread
+        # can drop a delayed event whose generation has been superseded
+        # (e.g. a STARTED for the prior track arriving after the user has
+        # switched sources or routed to AirPlay). Callers pass the gen of
+        # the playback the event belongs to; default to `_active_gen`
+        # which is the gen of the currently set-up playback (and is
+        # captured at `_setup_playback` time, so it doesn't shift if a
+        # newer PLAY bumps `_opener_gen` while this playback is being
+        # torn down).
+        if gen is None:
+            gen = self._active_gen
         try:
-            self._events.put(Event(op=op, payload=payload), timeout=1.0)
+            self._events.put(Event(op=op, payload=payload, gen=gen), timeout=1.0)
         except Exception:  # pragma: no cover — UI side dropped the queue
             log.warning("failed to emit %s event", op)

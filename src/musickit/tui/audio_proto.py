@@ -50,10 +50,18 @@ class Command:
 
 @dataclass
 class Event:
-    """One engine → UI event on the event_queue."""
+    """One engine → UI event on the event_queue.
+
+    `gen` is the generation of the PLAY command this event belongs to,
+    so the UI can drop a delayed STARTED / TRACK_FAILED / METADATA_CHANGED
+    that would otherwise overwrite state for a newer playback. Failure
+    mode this guards against: rapid source switching, or local → AirPlay
+    where no later engine STARTED arrives to correct stale state.
+    """
 
     op: EventOp
     payload: Any = None
+    gen: int = 0
 
 
 # ---------------------------------------------------------------------------

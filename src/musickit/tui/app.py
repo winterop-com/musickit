@@ -144,6 +144,7 @@ class MusickitApp(App[None]):
         Binding("ctrl+right", "tree_wider", "Sidebar wider", show=True),
         Binding("backspace", "browser_up", "Browse up", show=True),
         Binding("ctrl+r,f5", "rescan_library", "Rescan library", show=True),
+        Binding("ctrl+shift+r", "force_rescan_library", "Force rescan (wipe cache)", show=True),
         Binding("a", "airplay_picker", "AirPlay picker", show=True),
         Binding("slash", "start_filter", "Filter pane", show=True),
         Binding("e", "edit_tags", "Edit tags", show=True),
@@ -565,6 +566,12 @@ class MusickitApp(App[None]):
             if isinstance(idx, int):
                 self._current_track_idx = idx
                 self._play_current()
+
+    def on_progress_line_seek(self, event: ProgressLine.Seek) -> None:
+        """Click anywhere on the progress bar → seek to that position."""
+        if self._player.duration <= 0:
+            return
+        self._player.seek(event.seconds)
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         browser = self.query_one(BrowserList)
@@ -1128,6 +1135,20 @@ class MusickitApp(App[None]):
                 self._repopulate_radio_playlist()
             return
         self._show_scan_overlay("[bold cyan]Rescanning library…[/]")
+        self._scan_library_async(initial=False)
+
+    def action_force_rescan_library(self) -> None:
+        """`Ctrl+Shift+R` — wipe the SQLite cache and rebuild from the filesystem.
+
+        Use when a normal rescan (`Ctrl+R`) doesn't pick up changes —
+        e.g. files mutated outside the watcher's view, or the cache
+        looks corrupted. Equivalent to `musickit library index rebuild`
+        plus relaunching the TUI.
+        """
+        if self._root is None:
+            return
+        self._pending_force_rescan = True
+        self._show_scan_overlay("[bold cyan]Force-rescanning library…[/]")
         self._scan_library_async(initial=False)
 
     def action_toggle_fullscreen(self) -> None:

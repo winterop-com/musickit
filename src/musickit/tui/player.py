@@ -372,6 +372,15 @@ class AudioPlayer:
                 log.exception("audio event dispatch failed for %s", event.op)
 
     def _dispatch_event(self, event: Event) -> None:
+        # Drop stale events. `event.gen` is the generation of the PLAY
+        # that produced this event; we ignore anything older than the
+        # latest gen we've sent. Critical for the local→AirPlay path
+        # where the engine tears down its old playback but a delayed
+        # TRACK_FAILED / STARTED could otherwise overwrite the AirPlay
+        # state we just installed UI-side. `gen=0` is the sentinel for
+        # "no playback ever started" — we only filter when gen > 0.
+        if event.gen and event.gen < self._opener_gen:
+            return
         if event.op is EventOp.STARTED:
             payload = event.payload
             assert isinstance(payload, StartedPayload)
