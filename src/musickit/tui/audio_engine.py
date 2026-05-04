@@ -287,6 +287,18 @@ class AudioEngine:
         while time.time() < deadline and local_queue.qsize() < _PREBUFFER_CHUNKS and not local_stop.is_set():
             time.sleep(0.01)
 
+        # Re-check generation + stop event before opening the output
+        # stream. A user STOP or a newer PLAY can land during the up-to-
+        # 1.5s prebuffer window — without this, the old opener resumes
+        # and creates a stream for a playback that's been superseded
+        # (in the worst case, two callbacks racing on the new queue).
+        # `_teardown_playback` (called by STOP or by a newer PLAY's
+        # `_open_and_swap`) sets `local_stop`, so checking it here
+        # covers both cases.
+        if local_stop.is_set() or gen != self._opener_gen:
+            self._set_stopped(True)
+            return
+
         try:
             self._stream = sd.OutputStream(
                 samplerate=self._sample_rate,

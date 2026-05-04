@@ -440,12 +440,23 @@ class MusickitApp(App[None]):
         if not browser.has_focus and not isinstance(self.focused, FilterInput):
             browser.focus()
         item = browser.children[target_index]
-        if isinstance(item, ListItem):
-            # Force the new cursor row into view. Without this, popping
-            # back to the artist list leaves the scrollbar at its old
-            # position and the prior-artist cursor row may be off-screen.
-            browser.scroll_to_widget(item, animate=False)
         self._update_browser_info(item if isinstance(item, ListItem) else None)
+
+        # Force the new cursor row into view. The layout regions of
+        # freshly-appended children aren't always measured at the first
+        # `call_after_refresh` (which is how we got here), so a single
+        # `scroll_to_widget` can land on the old viewport. Chain ANOTHER
+        # `call_after_refresh` so the layout pass that placed the
+        # children has settled, then scroll the cursor row into view.
+        def _scroll_into_view() -> None:
+            try:
+                row = browser.children[target_index]
+            except IndexError:
+                return
+            if isinstance(row, ListItem):
+                row.scroll_visible(animate=False, top=False)
+
+        self.call_after_refresh(_scroll_into_view)
 
     def _update_browser_info(self, item: ListItem | None) -> None:
         info = self.query_one(BrowserInfo)
