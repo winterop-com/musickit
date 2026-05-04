@@ -114,34 +114,42 @@ class MusickitApp(App[None]):
     }
     """
 
+    # `show=True` here surfaces the binding in Textual's HelpPanel (the
+    # `?` overlay). The bottom KeyBar widget still owns the always-on
+    # quick-reference; HelpPanel is the comprehensive on-demand list.
     BINDINGS = [
-        Binding("q,ctrl+c", "quit", "Quit", show=False),
-        Binding("space", "toggle_pause", "Play/Pause", show=False),
-        Binding("enter", "play_selected", "Play", show=False),
-        Binding("n", "next_track", "Next", show=False),
-        Binding("p", "prev_track", "Prev", show=False),
-        Binding("plus,equals_sign", "vol_up", "Vol+", show=False),
-        Binding("minus", "vol_down", "Vol-", show=False),
+        Binding("space", "toggle_pause", "Play / pause", show=True),
+        Binding("enter", "play_selected", "Play selection", show=True),
+        Binding("n", "next_track", "Next track", show=True),
+        Binding("p", "prev_track", "Previous track", show=True),
+        # mpv convention: `9` quieter, `0` louder. Both are digits so
+        # they're unshifted on every layout (the `+/-` and `[/]` choices
+        # we tried first all need shift / AltGr on Nordic Mac). The
+        # original `+/-` keys still work for muscle-memory.
+        Binding("0,plus,equals_sign", "vol_up", "Volume +", show=True),
+        Binding("9,minus", "vol_down", "Volume -", show=True),
         # `←` / `→` are context-aware (see `action_left` / `action_right`):
         # they navigate between panes when one is focused, and only fall back
         # to seek when nothing's focused. Use `<` / `>` for always-on seek
         # (Shift+`,`/`.` — the "arrow" shifted variants of those keys).
-        Binding("left", "left", "Left", show=False),
-        Binding("right", "right", "Right", show=False),
-        Binding("less_than_sign", "seek_back", "Seek -", show=False),
-        Binding("greater_than_sign", "seek_fwd", "Seek +", show=False),
-        Binding("s", "toggle_shuffle", "Shuffle", show=False),
-        Binding("r", "cycle_repeat", "Repeat", show=False),
-        Binding("f", "toggle_fullscreen", "Fullscreen", show=False),
-        Binding("tab", "focus_next", "Focus", show=False),
-        Binding("ctrl+left", "tree_narrower", "Tree-", show=False),
-        Binding("ctrl+right", "tree_wider", "Tree+", show=False),
-        Binding("backspace", "browser_up", "Up", show=False),
-        Binding("ctrl+r,f5", "rescan_library", "Rescan", show=False),
-        Binding("question_mark", "toggle_help", "Help", show=False),
-        Binding("a", "airplay_picker", "AirPlay", show=False),
-        Binding("slash", "start_filter", "Filter", show=False),
-        Binding("e", "edit_tags", "Edit tags", show=False),
+        Binding("left", "left", "Navigate left", show=True),
+        Binding("right", "right", "Navigate right", show=True),
+        Binding("less_than_sign", "seek_back", "Seek backward", show=True),
+        Binding("greater_than_sign", "seek_fwd", "Seek forward", show=True),
+        Binding("s", "toggle_shuffle", "Shuffle", show=True),
+        Binding("r", "cycle_repeat", "Repeat mode", show=True),
+        Binding("f", "toggle_fullscreen", "Fullscreen viz", show=True),
+        Binding("tab", "focus_next", "Focus next pane", show=True),
+        Binding("ctrl+left", "tree_narrower", "Sidebar narrower", show=True),
+        Binding("ctrl+right", "tree_wider", "Sidebar wider", show=True),
+        Binding("backspace", "browser_up", "Browse up", show=True),
+        Binding("ctrl+r,f5", "rescan_library", "Rescan library", show=True),
+        Binding("ctrl+shift+r", "force_rescan_library", "Force rescan (wipe cache)", show=True),
+        Binding("a", "airplay_picker", "AirPlay picker", show=True),
+        Binding("slash", "start_filter", "Filter pane", show=True),
+        Binding("e", "edit_tags", "Edit tags", show=True),
+        Binding("question_mark", "toggle_help", "Toggle help", show=True),
+        Binding("q,ctrl+c", "quit", "Quit", show=True),
     ]
 
     def __init__(
@@ -283,17 +291,22 @@ class MusickitApp(App[None]):
         save_state(state)
 
     async def on_unmount(self) -> None:
-        """Close the audio stream + Subsonic httpx pool + AirPlay loop on app exit.
+        """Tear down the audio subprocess + Subsonic httpx pool + AirPlay loop on app exit.
 
-        Without this the process hangs after `q`: PortAudio's C thread holds
-        the interpreter alive (Ctrl-C can't reach Python at that point) and
-        httpx leaves connection-pool sockets open. Stopping the player closes
-        the OutputStream cleanly; closing the client drops the pool;
-        disconnecting AirPlay shuts down the background asyncio loop thread.
+        Without this the process hangs after `q`: the audio subprocess is
+        a daemon, but a clean shutdown via `_player.shutdown()` joins the
+        engine, drains its queues, and avoids the BrokenPipeError that
+        would otherwise show up at interpreter shutdown. httpx leaves
+        connection-pool sockets open without close(); pyatv's asyncio
+        thread keeps the interpreter alive without disconnect().
         """
         try:
             self._player.stop()
         except Exception:  # pragma: no cover — best effort on shutdown
+            pass
+        try:
+            self._player.shutdown()
+        except Exception:  # pragma: no cover
             pass
         if self._subsonic_client is not None:
             self._subsonic_client.close()
@@ -412,8 +425,10 @@ class MusickitApp(App[None]):
         """Place the cursor on `target_index` after children mount.
 
         Also refocuses the browser (Textual sometimes drops focus when a
-        widget's children get mass-replaced) and refreshes the info panel
-        — `index =` doesn't always fire `Highlighted` post clear+append.
+        widget's children get mass-replaced), scrolls the highlighted row
+        into view (the implicit scroll-on-index doesn't always fire post
+        clear+append), and refreshes the info panel — `index =` doesn't
+        always fire `Highlighted` post clear+append.
         """
         browser = self.query_one(BrowserList)
         if target_index >= len(browser.children):
@@ -426,6 +441,22 @@ class MusickitApp(App[None]):
             browser.focus()
         item = browser.children[target_index]
         self._update_browser_info(item if isinstance(item, ListItem) else None)
+
+        # Force the new cursor row into view. The layout regions of
+        # freshly-appended children aren't always measured at the first
+        # `call_after_refresh` (which is how we got here), so a single
+        # `scroll_to_widget` can land on the old viewport. Chain ANOTHER
+        # `call_after_refresh` so the layout pass that placed the
+        # children has settled, then scroll the cursor row into view.
+        def _scroll_into_view() -> None:
+            try:
+                row = browser.children[target_index]
+            except IndexError:
+                return
+            if isinstance(row, ListItem):
+                row.scroll_visible(animate=False, top=False)
+
+        self.call_after_refresh(_scroll_into_view)
 
     def _update_browser_info(self, item: ListItem | None) -> None:
         info = self.query_one(BrowserInfo)
@@ -547,11 +578,44 @@ class MusickitApp(App[None]):
                 self._current_track_idx = idx
                 self._play_current()
 
+    def on_progress_line_seek(self, event: ProgressLine.Seek) -> None:
+        """Click anywhere on the progress bar → seek to that position."""
+        if self._player.duration <= 0:
+            return
+        self._player.seek(event.seconds)
+
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         browser = self.query_one(BrowserList)
         if event.list_view is not browser:
             return
         self._update_browser_info(event.item)
+        self._preview_highlighted_album(event.item)
+
+    def _preview_highlighted_album(self, item: ListItem | None) -> None:
+        """Sync the tracklist to the album the browser cursor is hovering on.
+
+        Without this, the tracklist persists with whatever was last opened,
+        which feels stale when the browser cursor has moved on. We update
+        on every highlight so what's shown on the right always matches
+        what's selected on the left. Skipped for non-album rows (artists,
+        the `..` back row) and for Subsonic shells whose tracks aren't
+        hydrated yet — clicking those still uses the Enter path which
+        kicks off the lazy-load.
+        """
+        if item is None:
+            return
+        kind = getattr(item, "entry_kind", None)
+        data = getattr(item, "entry_data", None)
+        if kind != "album" or not isinstance(data, library_mod.LibraryAlbum):
+            return
+        if self._current_album is data:
+            return  # already showing this album
+        # Don't fire a network request from a hover — Enter still does that.
+        if not data.tracks and self._subsonic_client is not None:
+            return
+        self._clear_tracklist_filter()
+        self._set_current_album(data, track_idx=None)
+        self._repopulate_playlist()
 
     def _handle_browser_selection(self, item: ListItem) -> None:
         kind_first = getattr(item, "entry_kind", None)
@@ -642,7 +706,27 @@ class MusickitApp(App[None]):
 
     def _set_current_album(self, album: LibraryAlbum, *, track_idx: int | None) -> None:
         self._current_album = album
+        # If track_idx wasn't supplied, derive it from the player's current
+        # source so the ▶ marker keeps showing on the playing row when the
+        # user re-enters the playing album after browsing somewhere else.
+        if track_idx is None:
+            track_idx = self._playing_track_idx_in(album)
         self._current_track_idx = track_idx
+
+    def _playing_track_idx_in(self, album: LibraryAlbum) -> int | None:
+        """Return the playing track's index within `album`, or None.
+
+        Drives the ▶ marker without a separate `_playing_album` field —
+        we already have the source-of-truth in the AudioPlayer.
+        """
+        src = self._player.current_source
+        if src is None:
+            return None
+        for i, track in enumerate(album.tracks):
+            # Local files: compare Path; subsonic streams: compare stream_url.
+            if track.path == src or (track.stream_url and track.stream_url == src):
+                return i
+        return None
 
     def _repopulate_playlist(self) -> None:
         from musickit.tui.formatters import compute_title_width
@@ -656,6 +740,11 @@ class MusickitApp(App[None]):
             self._marker_idx = None
             return
         album = self._current_album
+        # Resolve the marker from the player's current source so the ▶
+        # appears whenever the user is viewing the playing album, even
+        # after browsing somewhere else and back.
+        playing_idx = self._playing_track_idx_in(album)
+        self._current_track_idx = playing_idx
         needle = self._tracklist_filter.casefold()
         title_width = compute_title_width(tracklist.size.width, header_padding=2)
         matched = 0
@@ -664,7 +753,7 @@ class MusickitApp(App[None]):
                 hay = f"{track.title or ''} {track.artist or ''}".casefold()
                 if needle not in hay:
                     continue
-            label = format_track_row(i, track, album, marker=(i == self._current_track_idx), title_width=title_width)
+            label = format_track_row(i, track, album, marker=(i == playing_idx), title_width=title_width)
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             tracklist.append(item)
@@ -1057,6 +1146,20 @@ class MusickitApp(App[None]):
                 self._repopulate_radio_playlist()
             return
         self._show_scan_overlay("[bold cyan]Rescanning library…[/]")
+        self._scan_library_async(initial=False)
+
+    def action_force_rescan_library(self) -> None:
+        """`Ctrl+Shift+R` — wipe the SQLite cache and rebuild from the filesystem.
+
+        Use when a normal rescan (`Ctrl+R`) doesn't pick up changes —
+        e.g. files mutated outside the watcher's view, or the cache
+        looks corrupted. Equivalent to `musickit library index rebuild`
+        plus relaunching the TUI.
+        """
+        if self._root is None:
+            return
+        self._pending_force_rescan = True
+        self._show_scan_overlay("[bold cyan]Force-rescanning library…[/]")
         self._scan_library_async(initial=False)
 
     def action_toggle_fullscreen(self) -> None:

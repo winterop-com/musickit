@@ -56,14 +56,15 @@ src/musickit/
     discovery.py     watcher.py
     endpoints/       __init__.py  system.py    browsing.py  media.py
                      search.py    scan.py      extras.py
-  tui/               Textual TUI + audio player
-    __init__.py      app.py       widgets.py   player.py    audio_io.py
+  tui/               Textual TUI + audio engine
+    __init__.py      app.py       widgets.py
+    player.py        audio_engine.py  audio_proto.py  audio_io.py
     advance.py       commands.py  formatters.py state.py    types.py
     subsonic_client.py            airplay.py   airplay_picker.py
     discovery.py
   enrich/            __init__.py  _http.py     musicbrainz.py
                      coverart.py  musichoarders.py  acoustid.py
-tests/               pytest suite — 247 tests across 22 test files
+tests/               pytest suite
 docs/                this site
 pyproject.toml       Makefile     mkdocs.yml
 input/.gitkeep       output/.gitkeep
@@ -97,7 +98,7 @@ Test patterns:
 - **Convert pipeline**: `silent_flac_template` fixture in `conftest.py` produces a 0.2s silent FLAC via ffmpeg; tests build synthetic libraries from copies.
 - **Library / metadata**: `_make_track` helper writes mutagen tags onto a copy of the silent flac.
 - **Serve API**: synthetic in-memory `LibraryIndex` injected via `app.state.cache._reindex(...)` — no disk walk. FastAPI `TestClient` for HTTP round-trips.
-- **TUI player**: `_FakeOutputStream` replaces `sounddevice.OutputStream` with a thread-driven fake that exercises the audio callback without opening a real device.
+- **TUI audio engine**: `AudioEngine` is the unit under test; `_FakeOutputStream` replaces `sounddevice.OutputStream` with a thread-driven fake that exercises the callback without opening a real device. `AudioPlayer` (the public RPC client that spawns the subprocess) gets a smoke test for volume; full-engine tests run the engine in-process so monkey-patching works.
 - **AirPlay**: pyatv `scan` / `connect` mocked via `unittest.mock.AsyncMock`.
 - **mDNS**: real Zeroconf register/unregister smoke (skips on environments without IPv4 multicast); listener filtering tested with mocked `ServiceInfo`.
 
@@ -105,24 +106,34 @@ Coverage runs via `make coverage`; CI thresholds set in `pyproject.toml`.
 
 ## Adding a new subcommand
 
-The pattern (mirrored across `convert.py`, `cover.py`, `cover_pick.py`, etc.):
+Top-level commands live on the root `app` Typer instance; library-related ones live on the `library_app` subapp (so the user types `musickit library <verb>`).
 
 1. Create `src/musickit/cli/<name>.py`:
    ```python
+   # Top-level (e.g. another sibling of convert / inspect / tui / serve):
    from musickit.cli import app
 
    @app.command(name="my-cmd")
    def my_cmd(...):
        """One-line docstring."""
        ...
+
+   # Library subcommand (e.g. another sibling of cover / retag / cover-pick):
+   from musickit.cli.library import library_app
+
+   @library_app.command(name="my-cmd")
+   def my_cmd(...):
+       """One-line docstring."""
+       ...
    ```
-2. Add a side-effect import in `cli/__init__.py`:
+2. Add a side-effect import in `cli/__init__.py`. `library` MUST be imported before any module that registers on `library_app`:
    ```python
-   from musickit.cli import my_cmd as _my_cmd_cmd  # noqa: E402
+   from musickit.cli import library as _library_cmd  # noqa: E402
+   from musickit.cli import my_cmd as _my_cmd_cmd    # noqa: E402
    _ = (..., _my_cmd_cmd)
    ```
 
-Typer handles the rest — `musickit my-cmd --help` Just Works.
+Typer handles the rest — `musickit my-cmd --help` (or `musickit library my-cmd --help`) Just Works.
 
 ## Adding a new Subsonic endpoint
 

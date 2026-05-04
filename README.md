@@ -7,7 +7,7 @@ Python 3.13 CLI for converting audio rips into a clean tagged library, browsing 
 ```bash
 uv sync
 uv run musickit convert ./input ./output       # convert
-uv run musickit library ./output --audit       # audit
+uv run musickit library audit ./output         # audit
 uv run musickit tui ./output                   # TUI
 uv run musickit serve ./output                 # Subsonic server
 ```
@@ -22,18 +22,20 @@ make docs-serve     # http://127.0.0.1:8000
 
 Or jump straight to:
 
+- [Architecture](docs/architecture.md) — how all the pieces fit together (process model, data flow, audio subprocess, SQLite index, FFT visualizer)
+- [Tutorial: 0 to iPhone streaming](docs/guides/tutorial.md) — end-to-end walkthrough including Tailscale + Amperfy
 - [Quickstart](docs/guides/quickstart.md) — install + first convert
 - [musickit convert](docs/guides/convert.md) — codec / bitrate / enrichment matrix
-- [musickit library](docs/guides/library.md) — audit rules + auto-fix
+- [musickit library](docs/guides/library.md) — audit rules + auto-fix + SQLite index
 - [musickit tui](docs/guides/tui.md) — TUI: local + radio + Subsonic-client + AirPlay
 - [musickit serve](docs/guides/serve.md) — Subsonic API + Tailscale + clients
 - [Edge cases](docs/edge-cases.md) — every weirdness encountered on real rips
 - [Roadmap](docs/roadmap.md) — what's next
-- [Development](docs/guides/development.md) — architecture + contributing
+- [Development](docs/guides/development.md) — directory layout + test patterns + commit style
 
 ## Status
 
-v0.3.0 · 297 tests, ruff + mypy + pyright clean. All eight user-facing commands shipped: `convert`, `inspect`, `library`, `retag`, `cover`, `cover-pick`, `tui`, `serve`. The TUI ships local-library playback, internet radio, Subsonic-client mode, AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, an incremental `/`-filter, in-place tag editing (`e` for track / album-wide), and a 24-band FFT visualiser. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions) and tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop.
+v0.3.0 · ruff + mypy + pyright clean, full pytest suite green. Five top-level commands — `convert`, `library`, `inspect`, `tui`, `serve` — with `library` carrying the read / mutate / manage subcommands (`tree`, `audit`, `fix`, `cover`, `cover-pick`, `retag`, `index`). The TUI ships local-library playback, internet radio, Subsonic-client mode, AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, an incremental `/`-filter, in-place tag editing (`e` for track / album-wide), and a 24-band FFT visualiser. Audio decoder + sounddevice callback run in a separate process so UI work in the main interpreter can't stall playback. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions) and tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop. A persistent SQLite library index at `<root>/.musickit/index.db` makes cold starts skip the filesystem walk + tag read; the filesystem watcher does per-album incremental rescans.
 
 ## License
 

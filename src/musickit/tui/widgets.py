@@ -151,7 +151,7 @@ class NowPlayingMeta(Static):
 
 
 class Visualizer(Static):
-    """24-band spectrum analyzer in classic VU style.
+    """48-band spectrum analyzer in classic VU style.
 
     Same green / yellow / red gradient across all bars, keyed off vertical
     position (red top → yellow mid → green bottom). Sub-cell vertical
@@ -161,6 +161,7 @@ class Visualizer(Static):
 
     DEFAULT_CSS = """
     Visualizer {
+        width: 1fr;
         height: 12;
         padding: 0 2;
         border: round $primary 30%;
@@ -175,19 +176,33 @@ class Visualizer(Static):
 
     _PARTIAL_BLOCKS = "▁▂▃▄▅▆▇█"  # 1/8th increments
 
-    levels = reactive([0.0] * 24)
+    levels = reactive([0.0] * 48)
 
     def render(self) -> str:
         rows = max(4, max(0, self.size.height - 1))
         red_cutoff = max(1, rows // 5)
         yellow_cutoff = red_cutoff + max(1, rows // 3)
-        # Spread bars across the full available width. Each bar gets
-        # `bar_width` block chars + 1 cell gap. Floor at 3 so it still looks
-        # like a meter on narrow terminals.
+        # Uniform bar width with a 1-cell gap between bars (classic VU
+        # look). Leftover modulo cells get distributed across the gaps
+        # so the meter fills the full content width — first `extra` gaps
+        # are 2 cells, the rest are 1 cell. Falls back to gap=0 only if
+        # avail is too narrow to fit even bar_width=1 with gaps.
         n_bars = len(self.levels) or 1
-        avail = max(0, self.size.width - 4)  # account for the widget's padding
-        bar_width = max(3, (avail - n_bars) // n_bars)
+        avail = max(0, self.content_size.width)
+        gaps_total = max(0, n_bars - 1)
+        if avail >= n_bars + gaps_total:
+            bar_width = (avail - gaps_total) // n_bars
+            min_gap = 1
+        else:
+            bar_width = max(1, avail // n_bars)
+            min_gap = 0
+        used = bar_width * n_bars + min_gap * gaps_total
+        leftover = max(0, avail - used)
+        # `extra` gaps get an extra +1 cell so the meter is full-width.
+        extra_gaps = leftover if gaps_total > 0 else 0
         empty_cell = " " * bar_width
+        small_gap = " " * min_gap
+        wide_gap = " " * (min_gap + 1)
         lines: list[str] = []
         for row_idx in range(rows):
             if row_idx < red_cutoff:
@@ -199,7 +214,7 @@ class Visualizer(Static):
             row_top = 1.0 - row_idx / rows
             row_bottom = 1.0 - (row_idx + 1) / rows
             line_parts: list[str] = []
-            for level in self.levels:
+            for i, level in enumerate(self.levels):
                 if level >= row_top:
                     line_parts.append(f"[{color}]{'█' * bar_width}[/]")
                 elif level > row_bottom:
@@ -210,13 +225,14 @@ class Visualizer(Static):
                     line_parts.append(f"[{color}]{block * bar_width}[/]")
                 else:
                     line_parts.append(empty_cell)
-                line_parts.append(" ")
+                if i < n_bars - 1:
+                    line_parts.append(wide_gap if i < extra_gaps else small_gap)
             lines.append("".join(line_parts))
         return "\n".join(lines)
 
 
 class ProgressLine(Static):
-    """`mm:ss [▰▰▰▰░░░░] mm:ss   [playing]` bar."""
+    """`▶ mm:ss <bar> mm:ss` — click anywhere on the bar to seek."""
 
     DEFAULT_CSS = """
     ProgressLine {
@@ -230,25 +246,68 @@ class ProgressLine(Static):
     duration = reactive(0.0)
     state = reactive("stopped")  # "playing" | "paused" | "stopped"
 
+    # Layout offsets — keep in sync with `render()`. The bar starts after
+    # the leading padding + icon (1 cell) + space (1) + pos label (5) +
+    # 2-space separator. We also reserve `_TRAILING_RESERVE` cells after
+    # the bar (2-space separator + dur label = 7) so clicks past the bar
+    # don't land in the dur label and seek to the end accidentally.
+    _PAD_LEFT = 2
+    _BAR_OFFSET = 9  # icon + space + pos + 2-space separator
+    _TRAILING_RESERVE = 7
+
+    class Seek(Message):
+        """Posted when the user clicks on the bar to seek."""
+
+        def __init__(self, seconds: float) -> None:
+            super().__init__()
+            self.seconds = seconds
+
+    async def _on_click(self, event: events.Click) -> None:  # noqa: PLW3201
+        """Seek to the time corresponding to the clicked column."""
+        if self.duration <= 0 or event.button != 1:
+            return
+        # Recompute bar geometry to match render(). content_size.width
+        # already excludes padding; here `event.x` is widget-relative
+        # (includes padding) so we add `_PAD_LEFT` to map into widget
+        # coordinates.
+        width = max(20, self.content_size.width - 16)
+        bar_start = self._PAD_LEFT + self._BAR_OFFSET
+        bar_end = bar_start + width
+        x = event.x
+        if x < bar_start or x >= bar_end:
+            return
+        ratio = (x - bar_start) / max(1, width - 1)
+        ratio = max(0.0, min(1.0, ratio))
+        self.post_message(self.Seek(ratio * self.duration))
+
     def render(self) -> str:
-        width = max(20, self.size.width - 30)
-        # `C_MUTED` (slate) for the unfilled track instead of `C_DIM`
-        # (#3a3a3a, nearly invisible against the dark background).
+        # Layout: `<icon> <pos>  <bar>  <dur>`. Icon (1 cell) + space (1)
+        # + pos (5) + 2 + bar + 2 + dur (5) = 16 cells of fixed content;
+        # the bar fills the rest. `content_size.width` already excludes
+        # padding so no double-subtract. Min width 20 for tiny terminals.
+        width = max(20, self.content_size.width - 16)
+        # Heavy block (`█`) for the filled portion + light shade (`░`) for
+        # the unfilled — both are full-cell glyphs so the bar looks like a
+        # continuous line edge-to-edge instead of a thin filled stub
+        # followed by an invisible single-pixel rule.
         if self.duration <= 0:
-            bar = f"[{C_MUTED}]{'─' * width}[/]"
+            bar = f"[{C_MUTED}]{'░' * width}[/]"
         else:
             ratio = max(0.0, min(1.0, self.position / self.duration))
             filled = int(round(ratio * width))
-            bar = f"[{C_TIME}]{'━' * filled}[/][{C_MUTED}]{'─' * (width - filled)}[/]"
+            bar = f"[{C_TIME}]{'█' * filled}[/][{C_MUTED}]{'░' * (width - filled)}[/]"
+        # Compact state icon at the line head. Always visible, no
+        # right-edge clipping risk like the previous trailing `[playing]`
+        # badge had on narrow widget widths.
         if self.state == "playing":
-            badge = f"[{C_PLAYING}][playing][/]"
+            icon = f"[{C_PLAYING}]▶[/]"
         elif self.state == "paused":
-            badge = f"[{C_PAUSED}][paused][/]"
+            icon = f"[{C_PAUSED}]‖[/]"
         else:
-            badge = "[dim][stopped][/]"
+            icon = f"[{C_DIM}]■[/]"
         pos = fmt_mmss(self.position)
         dur = fmt_mmss(self.duration)
-        return f"[{C_TIME}]{pos}[/]  {bar}  [{C_TIME}]{dur}[/]   {badge}"
+        return f"{icon} [{C_TIME}]{pos}[/]  {bar}  [{C_TIME}]{dur}[/]"
 
 
 class TrackTableHeader(Static):
@@ -505,19 +564,20 @@ class KeyBar(Static):
     """
 
     def render(self) -> str:
+        # Curated quick-reference. The full binding list lives in
+        # Textual's HelpPanel (toggled via `?`); KeyBar covers the verbs
+        # used most often during playback.
         items = [
             ("space", "Play"),
-            ("enter", "Open"),
             ("←/→", "Nav"),
             ("</>", "Seek"),
+            ("9/0", "Vol"),
             ("n", "Next"),
-            ("p", "Prev"),
-            ("s", "Shuffle"),
-            ("r", "Repeat"),
-            ("f", "Fullscreen"),
-            ("^r", "Rescan"),
-            ("tab", "Focus"),
-            ("^←/→", "Resize"),
+            ("/", "Filter"),
+            ("e", "Edit"),
+            ("a", "AirPlay"),
+            ("f", "Full"),
+            ("?", "Help"),
             ("q", "Quit"),
         ]
         # All-dim. The keys themselves are slightly less dim than labels

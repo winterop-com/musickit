@@ -9,12 +9,9 @@ What's open, organized by what it would feel like.
 
 ## Tier 2 — bigger directions (~3-5 sessions)
 
-- **Watcher per-album incremental updates** — the SQLite library index landed with cold-start cache + delta-validate on launch, but the filesystem watcher still triggers full rebuilds. Next: collect changed paths during the debounce window, dispatch to `library.rescan_albums` so only the touched albums get re-read.
 - **Web UI** — small Vue/htmx frontend mounted at `/` (replacing the JSON probe response). Same Subsonic backend; lets you play from any browser without installing an app.
 - **Podcast support** — Subsonic spec already defines `getPodcasts` / `getPodcastEpisode` / `createPodcastChannel`. Add an RSS feed list, fetch episodes on schedule, store position. Symfonium has decent podcast UX out of the box.
 - **iTunes / Apple Music import** — read the local Apple Music database to import play counts, ratings, and playlists. One-shot migration tool.
-- **Audio in a subprocess** — currently audio decoder + sounddevice callback + UI all share the GIL. We've mitigated GIL contention with a 500ms PortAudio buffer and resize-debounce, but a hard partition (audio in its own process, IPC for control) would eliminate it entirely.
-
 ## Tier 3 — server hardening / scale
 
 - **Recorded-session integration tests** — VCR-style HTTP fixtures from real Symfonium / Amperfy / Feishin sessions; replay against `TestClient`. Catches "client X probes new endpoint" regressions.
@@ -56,7 +53,7 @@ Things that would be interesting if anyone ever asked for them, but not pursued 
 - TUI: ReplayGain normalisation on local playback
 - TUI: bordered-panel UI polish (boxed sections, now-playing card, warm accent for active playback)
 - TUI: dynamic title-column width that re-flows on terminal resize (debounced)
-- TUI: 500ms PortAudio buffer to absorb GIL pressure during UI reflows
+- TUI: audio engine in a separate process — PyAV decoder + sounddevice callback live in their own interpreter, communicate via `multiprocessing.Queue` + shared memory. UI reflows / focus changes / GC pauses can no longer stall the audio callback into a buffer underrun. Replaces the prior GIL-contention mitigations (500ms / 1s PortAudio buffer, resize-debounce, focus-change short-circuit), now that the engine has its own GIL.
 - Subsonic-compatible serve (~30 endpoints)
 - XML response format (Subsonic spec default) + POST + form-body credentials
 - ffmpeg-on-the-fly transcoding (`format=mp3` / `maxBitRate`)
@@ -65,7 +62,7 @@ Things that would be interesting if anyone ever asked for them, but not pursued 
 - Per-track recording MBIDs (one MB `release/<mbid>?inc=recordings` lookup at enrich time)
 - mDNS / Bonjour autodiscovery (server advertises, TUI auto-detects)
 - Filesystem watcher with debounced auto-rescan
-- Persistent SQLite library index — `<root>/.musickit/index.db` removes the cold-start filesystem walk + tag read; `library.load_or_scan` hydrates from rows then runs a delta-validate pass to pick up filesystem changes (added / removed / tag-edited albums); `musickit library --full-rescan` / `--drop-index` / `--index-status` for management
+- Persistent SQLite library index — `<root>/.musickit/index.db` removes the cold-start filesystem walk + tag read; `library.load_or_scan` hydrates from rows then runs a delta-validate pass to pick up filesystem changes (added / removed / tag-edited albums); `musickit library index status|drop|rebuild` for management
 - Genre indexing (model + scan + `getGenres` + `byGenre`)
 - cover-pick semi-automated workflow
 - Folder-name edition-annotation strip
