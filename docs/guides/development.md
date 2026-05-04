@@ -9,7 +9,7 @@
 ## Setup
 
 ```bash
-git clone https://github.com/morteoh/musickit
+git clone https://github.com/winterop-com/musickit
 cd musickit
 uv sync
 ```

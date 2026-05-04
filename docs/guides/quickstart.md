@@ -5,7 +5,7 @@ This page gets you from zero to "music playing in a Subsonic client over Tailsca
 ## Install
 
 ```bash
-git clone https://github.com/morteoh/musickit
+git clone https://github.com/winterop-com/musickit
 cd musickit
 uv sync
 ```

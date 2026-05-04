@@ -1,8 +1,8 @@
 site_name: musickit
 site_description: Convert messy audio rips into a clean tagged library; play locally or stream over Tailscale via a Subsonic-compatible server.
-site_url: https://morteoh.github.io/musickit
-repo_url: https://github.com/morteoh/musickit
-repo_name: morteoh/musickit
+site_url: https://winterop-com.github.io/musickit
+repo_url: https://github.com/winterop-com/musickit
+repo_name: winterop-com/musickit
 
 theme:
   name: material
