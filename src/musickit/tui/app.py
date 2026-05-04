@@ -138,6 +138,7 @@ class MusickitApp(App[None]):
         Binding("question_mark", "toggle_help", "Help", show=False),
         Binding("a", "airplay_picker", "AirPlay", show=False),
         Binding("slash", "start_filter", "Filter", show=False),
+        Binding("e", "edit_tags", "Edit tags", show=False),
     ]
 
     def __init__(
@@ -174,6 +175,72 @@ class MusickitApp(App[None]):
         # substring match. Empty = inactive.
         self._browser_filter: str = ""
         self._tracklist_filter: str = ""
+
+    def on_resize(self, event: events.Resize) -> None:
+        """Reflow track rows when the terminal resizes.
+
+        The TrackTableHeader and the visualizer recompute their layout
+        from `self.size.width` every render, so they adapt automatically.
+        Each track row, on the other hand, is a `ListItem(Static(...))`
+        with a label baked in at populate time — without this hook, long
+        titles stay clipped at the OLD title width even after a resize.
+        Updates the label string in place, preserving the cursor index.
+        """
+        del event
+        from musickit.tui.formatters import compute_title_width
+
+        try:
+            tracklist = self.query_one(TrackList)
+        except NoMatches:
+            return
+        title_width = compute_title_width(tracklist.size.width, header_padding=2)
+        if self._in_radio_view:
+            for child in tracklist.children:
+                if not isinstance(child, ListItem):
+                    continue
+                station = getattr(child, "station", None)
+                idx = getattr(child, "track_index", None)
+                if station is None or not isinstance(idx, int):
+                    continue
+                rows = child.query(Static)
+                if rows:
+                    rows.first().update(
+                        format_station_row(idx, station, marker=(idx == self._marker_idx), title_width=title_width)
+                    )
+            return
+        if self._current_album is None:
+            return
+        for child in tracklist.children:
+            if not isinstance(child, ListItem):
+                continue
+            idx = getattr(child, "track_index", None)
+            if not isinstance(idx, int):
+                continue
+            if not (0 <= idx < len(self._current_album.tracks)):
+                continue
+            track = self._current_album.tracks[idx]
+            rows = child.query(Static)
+            if rows:
+                rows.first().update(
+                    format_track_row(
+                        idx,
+                        track,
+                        self._current_album,
+                        marker=(idx == self._current_track_idx),
+                        title_width=title_width,
+                    )
+                )
+
+    def on_track_list_focus_lost(self, event: TrackList.FocusLost) -> None:
+        """When focus leaves TrackList, snap its cursor to the playing track.
+
+        Otherwise the highlight on a non-playing row sticks around while
+        the user navigates the browser, which looks like a stale
+        selection. Coming back to the tracklist should land on what's
+        playing, not on the row the user happened to last hover.
+        """
+        del event  # unused
+        self._snap_tracklist_cursor_to_playing_track()
 
     def watch_theme(self, theme: str) -> None:
         """Persist theme changes (e.g. via the command palette) to disk."""
@@ -483,7 +550,13 @@ class MusickitApp(App[None]):
         elif kind == "album" and isinstance(data, library_mod.LibraryAlbum):
             self._clear_tracklist_filter()
             self._in_radio_view = False
-            self._set_current_album(data, track_idx=None)
+            # Re-entering the SAME album that's currently playing keeps
+            # `_current_track_idx` so the ▶ marker, NowPlayingMeta, and the
+            # cursor land on the playing track. Switching to a DIFFERENT
+            # album resets to None (default to row 0).
+            same_album = self._current_album is data and self._current_track_idx is not None
+            preserved_idx = self._current_track_idx if same_album else None
+            self._set_current_album(data, track_idx=preserved_idx)
             # Subsonic lazy-load: shell albums have no tracks until clicked.
             # Show a "Loading…" placeholder + kick a worker; the worker calls
             # back to repopulate when the API returns.
@@ -540,6 +613,8 @@ class MusickitApp(App[None]):
         self._current_track_idx = track_idx
 
     def _repopulate_playlist(self) -> None:
+        from musickit.tui.formatters import compute_title_width
+
         tracklist = self.query_one(TrackList)
         # Same defer-cursor pattern as the browser to avoid the
         # second-album-no-highlight bug.
@@ -550,13 +625,14 @@ class MusickitApp(App[None]):
             return
         album = self._current_album
         needle = self._tracklist_filter.casefold()
+        title_width = compute_title_width(tracklist.size.width, header_padding=2)
         matched = 0
         for i, track in enumerate(album.tracks):
             if needle:
                 hay = f"{track.title or ''} {track.artist or ''}".casefold()
                 if needle not in hay:
                     continue
-            label = format_track_row(i, track, album, marker=(i == self._current_track_idx))
+            label = format_track_row(i, track, album, marker=(i == self._current_track_idx), title_width=title_width)
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             tracklist.append(item)
@@ -599,6 +675,8 @@ class MusickitApp(App[None]):
             tracklist.index = target
 
     def _repopulate_radio_playlist(self) -> None:
+        from musickit.tui.formatters import compute_title_width
+
         tracklist = self.query_one(TrackList)
         tracklist.index = None
         tracklist.clear()
@@ -606,11 +684,12 @@ class MusickitApp(App[None]):
             tracklist.append(ListItem(Static("[dim]No stations configured. Edit `~/.config/musickit/radio.toml`.[/]")))
             return
         needle = self._tracklist_filter.casefold()
+        title_width = compute_title_width(tracklist.size.width, header_padding=2)
         matched = 0
         for i, station in enumerate(self._radio_stations):
             if needle and needle not in station.name.casefold():
                 continue
-            label = format_station_row(i, station, marker=False)
+            label = format_station_row(i, station, marker=False, title_width=title_width)
             item = ListItem(Static(label, id=f"track-row-{i}"))
             item.track_index = i  # type: ignore[attr-defined]
             item.station = station  # type: ignore[attr-defined]
@@ -621,21 +700,26 @@ class MusickitApp(App[None]):
         self.call_after_refresh(self._set_tracklist_cursor, 0)
 
     def _play_station(self, station: RadioStation) -> None:
+        from musickit.tui.formatters import compute_title_width
+
         idx = self._radio_stations.index(station) if station in self._radio_stations else None
         prev = self._marker_idx
         self._current_track_idx = idx
         self._marker_idx = idx
         self._player.play(station.url)
+        title_width = compute_title_width(self.query_one(TrackList).size.width, header_padding=2)
         if prev is not None and prev != idx:
             try:
                 self.query_one(f"#track-row-{prev}", Static).update(
-                    format_station_row(prev, self._radio_stations[prev], marker=False)
+                    format_station_row(prev, self._radio_stations[prev], marker=False, title_width=title_width)
                 )
             except Exception:  # pragma: no cover
                 pass
         if idx is not None:
             try:
-                self.query_one(f"#track-row-{idx}", Static).update(format_station_row(idx, station, marker=True))
+                self.query_one(f"#track-row-{idx}", Static).update(
+                    format_station_row(idx, station, marker=True, title_width=title_width)
+                )
             except Exception:  # pragma: no cover
                 pass
 
@@ -653,6 +737,8 @@ class MusickitApp(App[None]):
         self._marker_idx = new
 
     def _update_track_row_label(self, idx: int, *, marker: bool) -> None:
+        from musickit.tui.formatters import compute_title_width
+
         if self._current_album is None:
             return
         try:
@@ -660,7 +746,8 @@ class MusickitApp(App[None]):
         except Exception:
             return
         track = self._current_album.tracks[idx]
-        label_widget.update(format_track_row(idx, track, self._current_album, marker=marker))
+        title_width = compute_title_width(self.query_one(TrackList).size.width, header_padding=2)
+        label_widget.update(format_track_row(idx, track, self._current_album, marker=marker, title_width=title_width))
 
     # ------------------------------------------------------------------
     # Status refresh (UI ticks)
@@ -847,6 +934,11 @@ class MusickitApp(App[None]):
         self._clear_browser_filter()
         self._browse_artist = None
         self._populate_browser()
+        # When leaving the album view, reset the tracklist cursor back to
+        # the playing track (or clear it if nothing's playing) so the row
+        # the user happened to be hovering on doesn't keep its highlight
+        # while the user is browsing albums.
+        self._snap_tracklist_cursor_to_playing_track()
         if prior_artist is None or self._index is None:
             return
         # Compute prior-artist row index from the data model — `browser.children`
@@ -859,6 +951,19 @@ class MusickitApp(App[None]):
         except ValueError:
             return
         self.call_after_refresh(self._set_browser_cursor, prior_idx)
+
+    def _snap_tracklist_cursor_to_playing_track(self) -> None:
+        """Move the tracklist cursor to the playing track (or clear it)."""
+        try:
+            tracklist = self.query_one(TrackList)
+        except NoMatches:
+            return
+        if self._current_track_idx is not None:
+            self.call_after_refresh(self._set_tracklist_cursor_for_track, self._current_track_idx)
+        else:
+            from typing import cast as _cast
+
+            tracklist.index = _cast("int | None", None)
 
     def action_vol_up(self) -> None:
         self._player.set_volume(min(100, self._player.volume + 5))
@@ -927,6 +1032,109 @@ class MusickitApp(App[None]):
         from musickit.tui.airplay_picker import AirPlayPickerScreen
 
         self.push_screen(AirPlayPickerScreen(self))
+
+    def action_edit_tags(self) -> None:
+        """`e` opens a tag editor for the currently-focused row.
+
+        - BrowserList focused on an album row → album-wide editor (album,
+          album-artist, year, genre across every track).
+        - TrackList focused on a track → per-track editor (title, artist,
+          track #, etc.).
+
+        Refused in Subsonic-client mode — the synthetic `/subsonic/...`
+        paths aren't real on-disk files.
+        """
+        if self._subsonic_client is not None:
+            self.notify("Tag editing isn't available in Subsonic-client mode.", severity="warning")
+            return
+        focused = self.focused
+        if isinstance(focused, BrowserList):
+            self._open_album_editor_from_browser(focused)
+            return
+        if isinstance(focused, TrackList):
+            self._open_track_editor_from_tracklist(focused)
+            return
+
+    def _open_album_editor_from_browser(self, browser: BrowserList) -> None:
+        from musickit.tui.tag_editor import AlbumTagEditorScreen
+
+        highlighted = browser.highlighted_child
+        if highlighted is None:
+            return
+        kind = getattr(highlighted, "entry_kind", None)
+        data = getattr(highlighted, "entry_data", None)
+        if kind != "album" or not isinstance(data, library_mod.LibraryAlbum):
+            self.notify("Highlight an album row to edit album-wide tags.", severity="warning")
+            return
+        self.push_screen(AlbumTagEditorScreen(self, data))
+
+    def _open_track_editor_from_tracklist(self, tracklist: TrackList) -> None:
+        if self._in_radio_view:
+            self.notify("Tag editing only applies to library tracks.", severity="warning")
+            return
+        if self._current_album is None:
+            return
+        highlighted = tracklist.highlighted_child
+        if highlighted is None:
+            return
+        track_idx = getattr(highlighted, "track_index", None)
+        if track_idx is None or not (0 <= track_idx < len(self._current_album.tracks)):
+            return
+        track = self._current_album.tracks[track_idx]
+        from musickit.tui.tag_editor import TrackTagEditorScreen
+
+        self.push_screen(TrackTagEditorScreen(self, track))
+
+    def notify_track_tags_updated(self, track: LibraryTrack) -> None:
+        """Called by the tag editor after a successful save.
+
+        Re-renders the tracklist row so the new title / artist appear without
+        a full library rescan. Also refreshes NowPlayingMeta if the edited
+        track is the one playing.
+        """
+        if self._current_album is None:
+            return
+        try:
+            idx = self._current_album.tracks.index(track)
+        except ValueError:
+            return
+        # Re-render just this row.
+        try:
+            tracklist = self.query_one(TrackList)
+        except NoMatches:
+            return
+        if 0 <= idx < len(tracklist.children):
+            item = tracklist.children[idx]
+            if isinstance(item, ListItem):
+                rows = item.query(Static)
+                if rows:
+                    from musickit.tui.formatters import compute_title_width
+
+                    is_playing = idx == self._current_track_idx
+                    title_width = compute_title_width(tracklist.size.width, header_padding=2)
+                    rows.first().update(
+                        format_track_row(idx, track, self._current_album, marker=is_playing, title_width=title_width)
+                    )
+        if idx == self._current_track_idx:
+            self._refresh_status()
+        self.notify(f"✓ Tags saved: {track.path.name}", severity="information")
+
+    def notify_album_tags_updated(self, album: LibraryAlbum) -> None:
+        """Called by the album editor after a successful album-wide save.
+
+        Repaints the tracklist (year/genre/album columns may have changed)
+        and the now-playing block if a track from this album is playing.
+        Doesn't trigger a full library rescan — the in-memory model has
+        already been patched by the editor.
+        """
+        if self._current_album is album:
+            self._repopulate_playlist()
+        if self._current_album is album and self._current_track_idx is not None:
+            self._refresh_status()
+        self.notify(
+            f"✓ Album tags saved across {len(album.tracks)} track(s): {album.album_dir}",
+            severity="information",
+        )
 
     def action_start_filter(self) -> None:
         """`/`: open a filter input above the focused pane (browser or tracklist)."""

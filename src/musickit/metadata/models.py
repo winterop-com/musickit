@@ -87,7 +87,9 @@ class TagOverrides(BaseModel):
     album: str | None = None
     year: str | None = None
     genre: str | None = None
+    track_no: int | None = None
     track_total: int | None = None
+    disc_no: int | None = None
     disc_total: int | None = None
 
     def is_empty(self) -> bool:

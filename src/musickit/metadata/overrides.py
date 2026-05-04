@@ -65,16 +65,20 @@ def _apply_overrides_mp4(path: Path, ov: TagOverrides) -> None:
         _set_or_clear(tags, "\xa9day", _year_only(ov.year) or ov.year if ov.year else "")
     if ov.genre is not None:
         _set_or_clear(tags, "\xa9gen", ov.genre)
-    if ov.track_total is not None:
+    if ov.track_no is not None or ov.track_total is not None:
         existing_trkn = tags.get("trkn") or [(0, 0)]
-        first_trkn = existing_trkn[0]
-        current_no = first_trkn[0] if isinstance(first_trkn, tuple) else 0
-        tags["trkn"] = [(current_no, ov.track_total)]
-    if ov.disc_total is not None:
+        first_trkn = existing_trkn[0] if existing_trkn else (0, 0)
+        cur_no, cur_total = first_trkn if isinstance(first_trkn, tuple) else (0, 0)
+        new_no = ov.track_no if ov.track_no is not None else cur_no
+        new_total = ov.track_total if ov.track_total is not None else cur_total
+        tags["trkn"] = [(new_no, new_total)]
+    if ov.disc_no is not None or ov.disc_total is not None:
         existing_disk = tags.get("disk") or [(0, 0)]
-        first_disk = existing_disk[0]
-        current_disc = first_disk[0] if isinstance(first_disk, tuple) else 0
-        tags["disk"] = [(current_disc, ov.disc_total)]
+        first_disk = existing_disk[0] if existing_disk else (0, 0)
+        cur_no, cur_total = first_disk if isinstance(first_disk, tuple) else (0, 0)
+        new_no = ov.disc_no if ov.disc_no is not None else cur_no
+        new_total = ov.disc_total if ov.disc_total is not None else cur_total
+        tags["disk"] = [(new_no, new_total)]
     mp4.save()
 
 
@@ -108,20 +112,30 @@ def _apply_overrides_id3(path: Path, ov: TagOverrides) -> None:
         id3.delall("TCON")
         if ov.genre:
             id3.add(TCON(encoding=3, text=ov.genre))
-    if ov.track_total is not None:
+    if ov.track_no is not None or ov.track_total is not None:
         existing = id3.get("TRCK")
-        current_no = ""
+        cur_no, cur_total = "", ""
         if existing and existing.text:
-            current_no = str(existing.text[0]).split("/", 1)[0]
+            parts = str(existing.text[0]).split("/", 1)
+            cur_no = parts[0]
+            cur_total = parts[1] if len(parts) > 1 else ""
+        new_no = str(ov.track_no) if ov.track_no is not None else (cur_no or "0")
+        new_total = str(ov.track_total) if ov.track_total is not None else cur_total
+        text = f"{new_no}/{new_total}" if new_total else new_no
         id3.delall("TRCK")
-        id3.add(TRCK(encoding=3, text=f"{current_no or '0'}/{ov.track_total}"))
-    if ov.disc_total is not None:
+        id3.add(TRCK(encoding=3, text=text))
+    if ov.disc_no is not None or ov.disc_total is not None:
         existing_disc = id3.get("TPOS")
-        current_disc = ""
+        cur_no, cur_total = "", ""
         if existing_disc and existing_disc.text:
-            current_disc = str(existing_disc.text[0]).split("/", 1)[0]
+            parts = str(existing_disc.text[0]).split("/", 1)
+            cur_no = parts[0]
+            cur_total = parts[1] if len(parts) > 1 else ""
+        new_no = str(ov.disc_no) if ov.disc_no is not None else (cur_no or "0")
+        new_total = str(ov.disc_total) if ov.disc_total is not None else cur_total
+        text = f"{new_no}/{new_total}" if new_total else new_no
         id3.delall("TPOS")
-        id3.add(TPOS(encoding=3, text=f"{current_disc or '0'}/{ov.disc_total}"))
+        id3.add(TPOS(encoding=3, text=text))
     id3.save(path, v2_version=4)
 
 
@@ -146,8 +160,12 @@ def _apply_overrides_flac(path: Path, ov: TagOverrides) -> None:
                 del flac[key]
         else:
             flac[key] = [value]
+    if ov.track_no is not None:
+        flac["TRACKNUMBER"] = [str(ov.track_no)]
     if ov.track_total is not None:
         flac["TRACKTOTAL"] = [str(ov.track_total)]
+    if ov.disc_no is not None:
+        flac["DISCNUMBER"] = [str(ov.disc_no)]
     if ov.disc_total is not None:
         flac["DISCTOTAL"] = [str(ov.disc_total)]
     flac.save()

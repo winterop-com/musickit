@@ -62,6 +62,120 @@ async def test_app_populates_browser_with_artists(silent_flac_template: Path, tm
 
 
 @pytest.mark.asyncio
+async def test_tracklist_single_click_only_moves_cursor(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Single click on a track moves the cursor but does NOT play. Mirrors
+    Spotify / iTunes — clicking a row to select it shouldn't restart playback.
+    """
+    from textual.widgets import ListItem
+
+    from musickit.tui.app import BrowserList, MusickitApp, TrackList
+
+    root = tmp_path / "lib"
+    for n in range(1, 4):
+        _make_track(
+            root / "A" / "2020 - X", silent_flac_template, filename=f"{n:02d} - T{n}.m4a", title=f"T{n}", artist="A"
+        )
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        browser = pilot.app.query_one(BrowserList)
+        a = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        pilot.app._handle_browser_selection(a)  # type: ignore[attr-defined]
+        await pilot.pause()
+        b = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        pilot.app._handle_browser_selection(b)  # type: ignore[attr-defined]
+        await pilot.pause()
+        tracklist = pilot.app.query_one(TrackList)
+        # Simulate clicking row 2 (index 1) — call the ChildClicked handler
+        # directly. A real click bubbles via the same path.
+        target = tracklist.children[1]
+        assert isinstance(target, ListItem)
+        tracklist._on_list_item__child_clicked(ListItem._ChildClicked(target))
+        await pilot.pause()
+        # Cursor moved, but playback hasn't started: _current_track_idx still None.
+        assert tracklist.index == 1
+        assert pilot.app._current_track_idx is None  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_tracklist_double_click_plays(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Two clicks on the same row within the double-click window play the track."""
+    from textual.widgets import ListItem
+
+    from musickit.tui.app import BrowserList, MusickitApp, TrackList
+
+    root = tmp_path / "lib"
+    for n in range(1, 4):
+        _make_track(
+            root / "A" / "2020 - X", silent_flac_template, filename=f"{n:02d} - T{n}.m4a", title=f"T{n}", artist="A"
+        )
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        browser = pilot.app.query_one(BrowserList)
+        a = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        pilot.app._handle_browser_selection(a)  # type: ignore[attr-defined]
+        await pilot.pause()
+        b = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        pilot.app._handle_browser_selection(b)  # type: ignore[attr-defined]
+        await pilot.pause()
+        tracklist = pilot.app.query_one(TrackList)
+        target = tracklist.children[1]
+        assert isinstance(target, ListItem)
+        # Two clicks back-to-back on the same row → second is "double".
+        tracklist._on_list_item__child_clicked(ListItem._ChildClicked(target))
+        tracklist._on_list_item__child_clicked(ListItem._ChildClicked(target))
+        await pilot.pause()
+        # Selected was posted on second click → `_current_track_idx` is set.
+        assert pilot.app._current_track_idx == 1  # type: ignore[attr-defined,unused-ignore]
+
+
+@pytest.mark.asyncio
+async def test_album_reentry_preserves_playing_state(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Regression: drill into an album, play a track, click the same album
+    row in the browser again. The currently-playing track index must
+    survive — the user expects to land on the track that's still
+    playing, not on row 0 with blank NowPlayingMeta.
+    """
+    from musickit.tui.app import BrowserList, MusickitApp, TrackList
+
+    root = tmp_path / "lib"
+    for n in range(1, 5):
+        _make_track(
+            root / "A" / "2020 - X", silent_flac_template, filename=f"{n:02d} - T{n}.m4a", title=f"T{n}", artist="A"
+        )
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        browser = pilot.app.query_one(BrowserList)
+        # Drill into the artist → album list shown in browser.
+        artist = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        pilot.app._handle_browser_selection(artist)  # type: ignore[attr-defined]
+        await pilot.pause()
+        album_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        album_obj = album_row.entry_data  # type: ignore[attr-defined]
+        # Drill into the album → tracks shown in tracklist.
+        pilot.app._handle_browser_selection(album_row)  # type: ignore[attr-defined]
+        await pilot.pause()
+        # Pretend track 2 is the playing one.
+        pilot.app._current_track_idx = 1  # type: ignore[attr-defined]
+        # Re-click the same album row in the browser (browser still shows
+        # the album list since we're at album-level navigation).
+        album_row_again = next(
+            c
+            for c in browser.children
+            if getattr(c, "entry_kind", None) == "album" and c.entry_data is album_obj  # type: ignore[attr-defined]
+        )
+        pilot.app._handle_browser_selection(album_row_again)  # type: ignore[attr-defined]
+        await pilot.pause()
+        # The currently-playing track index must be preserved.
+        assert pilot.app._current_track_idx == 1  # type: ignore[attr-defined]
+        # Tracklist cursor lands on the playing track (visible row index 1), not row 0.
+        tracklist = pilot.app.query_one(TrackList)
+        assert tracklist.index == 1
+
+
+@pytest.mark.asyncio
 async def test_app_quits_on_q(silent_flac_template: Path, tmp_path: Path) -> None:
     """The `q` binding cleanly exits the app."""
     from musickit.tui.app import MusickitApp

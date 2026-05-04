@@ -7,9 +7,11 @@ state via `query_one(...)`.
 
 from __future__ import annotations
 
+from textual import events
 from textual.binding import Binding
+from textual.message import Message
 from textual.reactive import reactive
-from textual.widgets import Input, ListView, Static
+from textual.widgets import Input, ListItem, ListView, Static
 
 # ---------------------------------------------------------------------------
 # Palette (ncmpcpp-leaning: cyan headers, green meters, dim grey rules,
@@ -250,7 +252,12 @@ class ProgressLine(Static):
 
 
 class TrackTableHeader(Static):
-    """Column headers for the track table (`#  Title  Artist  Time`)."""
+    """Column headers for the track table (`#  Title  Artist  Time`).
+
+    Title column stretches to fill the available width; the # / Artist /
+    Time columns stay fixed at the same widths used in `format_track_row`
+    so the header lines up with the rows below it.
+    """
 
     DEFAULT_CSS = """
     TrackTableHeader {
@@ -261,10 +268,18 @@ class TrackTableHeader(Static):
     """
 
     def render(self) -> str:
-        # `padding: 0 2` → 2 cells reserved on each side.
+        from musickit.tui.formatters import ARTIST_WIDTH, TIME_WIDTH, compute_title_width
+
         rule_width = max(20, self.size.width - 4)
         rule = "─" * rule_width
-        return f"[{C_HEADER}]{'#':>3}  {'Title':<46}{'Artist':<28}{'Time':>6}[/]\n[dim]{rule}[/]"
+        # The header has 4 cells of horizontal padding; tracklist rows
+        # have 2 (their own padding only). The title column is the same
+        # in both, so this matches up.
+        title_width = compute_title_width(self.size.width, header_padding=4)
+        return (
+            f"[{C_HEADER}]{'#':>3} {'Title':<{title_width + 2}}{'Artist':<{ARTIST_WIDTH}} {'Time':>{TIME_WIDTH}}[/]\n"
+            f"[dim]{rule}[/]"
+        )
 
 
 class TrackList(ListView):
@@ -276,6 +291,11 @@ class TrackList(ListView):
     track gets the warm `C_ACTIVE` color in its label (set by
     `format_track_row`) — the visual difference between "where I am"
     (cursor) and "what's playing" (orange marker) is intentional.
+
+    Click semantics: single click moves the cursor only (no playback).
+    Double click within ~400ms plays the track. Mirrors Spotify /
+    iTunes / etc. — and lets the user click a row to edit its tags
+    via `e` without restarting whatever's currently playing.
     """
 
     DEFAULT_CSS = """
@@ -289,11 +309,65 @@ class TrackList(ListView):
     TrackList > ListItem:even {
         background: $boost 40%;
     }
-    TrackList > ListItem.--highlight {
+    TrackList > ListItem.-highlight {
         background: $primary 50%;
         text-style: bold;
     }
     """
+
+    _DOUBLE_CLICK_WINDOW_S = 0.4
+
+    class FocusLost(Message):
+        """Posted when the TrackList loses focus.
+
+        App listens to snap the cursor back to the currently-playing track.
+        """
+
+    def _on_blur(self, event: events.Blur) -> None:  # noqa: PLW3201
+        """Surface a `FocusLost` message; App listens to snap the cursor."""
+        del event
+        self.post_message(self.FocusLost())
+
+    def _on_list_item__child_clicked(self, event: ListItem._ChildClicked) -> None:  # noqa: PLW3201
+        """Override Textual's default click → Selected behaviour.
+
+        Default: any click on a row posts `Selected` (== Enter), which the
+        App treats as "play this track." We want single click to just move
+        the cursor; only a second click within the double-click window
+        actually plays.
+
+        IMPORTANT: Textual dispatches a message to a handler in EVERY class
+        in the MRO that defines one, not just the most-derived. Without
+        `event.prevent_default()` here, our override runs AND the parent
+        ListView's handler also runs (which posts Selected unconditionally
+        → plays the track). `prevent_default()` sets `_no_default_action`
+        and breaks the dispatch loop in `MessagePump._get_dispatch_methods`.
+        """
+        import time
+        from typing import cast
+
+        event.prevent_default()
+        event.stop()
+        item = event.item
+        idx = -1
+        for i, child in enumerate(self.children):
+            if child is item:
+                idx = i
+                break
+        if idx < 0:
+            return
+        last_idx: int = getattr(self, "_last_click_idx", -1)
+        last_time: float = getattr(self, "_last_click_time", 0.0)
+        now = time.monotonic()
+        is_double = last_idx == idx and (now - last_time) < self._DOUBLE_CLICK_WINDOW_S
+        self._last_click_idx = idx
+        self._last_click_time = now
+        # Cast: pyright narrows `ListView.index` to `int` after this
+        # assignment, breaking external `tracklist.index = None` calls.
+        self.index = cast("int | None", idx)
+        self.focus()
+        if is_double:
+            self.post_message(self.Selected(self, item, idx))
 
 
 class BrowserList(ListView):
@@ -316,7 +390,7 @@ class BrowserList(ListView):
     BrowserList > ListItem {
         height: 1;
     }
-    BrowserList > ListItem.--highlight {
+    BrowserList > ListItem.-highlight {
         background: $primary 30%;
     }
     """
@@ -331,13 +405,17 @@ class BrowserInfo(Static):
     DEFAULT_CSS = """
     BrowserInfo {
         height: auto;
-        max-height: 8;
+        max-height: 12;
         padding: 0 1;
         border: round $primary 30%;
     }
     """
 
-    body = reactive("")
+    # `layout=True` so the panel re-measures its auto height when `body`
+    # grows from the placeholder (1 line) to a multi-line warning list.
+    # Without this, only the first line is visible — the per-warning
+    # bullets get clipped.
+    body = reactive("", layout=True)
 
     def on_mount(self) -> None:  # noqa: D102
         self.border_title = "Info"
