@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -44,6 +45,14 @@ _DTYPE = "float32"
 # local files (they fill the buffer in ~50ms regardless).
 _QUEUE_MAX_CHUNKS = 512
 _CHUNK_FRAMES = 1024  # frames per output callback iteration
+# Wait for this many chunks to land in the queue before starting the audio
+# stream. Without prebuffer the callback fires before the decoder has
+# produced anything → first ~50ms of every track is silence-and-then-pop.
+# 8 × 1024 frames @ 44.1 kHz ≈ 186ms — imperceptible startup latency for
+# a clean attack. Capped to a small wait window so a slow stream open
+# doesn't hold up forever.
+_PREBUFFER_CHUNKS = 8
+_PREBUFFER_TIMEOUT_S = 1.5
 _VIS_BANDS = 24
 _VIS_DECAY = 0.85  # per-callback decay of the band level (smooths the bars)
 
@@ -202,6 +211,15 @@ class AudioPlayer:
             daemon=True,
         )
         self._decoder_thread.start()
+
+        # Prebuffer: don't start the output stream until the decoder has
+        # produced at least a few chunks. Without this the first ~2 audio
+        # callbacks fire while the queue is still empty, write silence, and
+        # the user hears a "silence-then-pop" attack on every track. We
+        # cap the wait so a stuck open / slow stream doesn't hang the UI.
+        prebuffer_deadline = time.time() + _PREBUFFER_TIMEOUT_S
+        while time.time() < prebuffer_deadline and local_queue.qsize() < _PREBUFFER_CHUNKS and not local_stop.is_set():
+            time.sleep(0.01)
 
         try:
             self._stream = sd.OutputStream(
