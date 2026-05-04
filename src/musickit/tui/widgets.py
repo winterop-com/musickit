@@ -236,11 +236,11 @@ class ProgressLine(Static):
     state = reactive("stopped")  # "playing" | "paused" | "stopped"
 
     def render(self) -> str:
-        # Reserve = pos (5) + 2 + 2 + dur (5) + 3 + badge (9 max) = 26.
-        # `content_size.width` already excludes padding, so we don't need
-        # to subtract for it again. Falling back to a min width of 20 so
-        # the bar still looks like a meter on tiny terminals.
-        width = max(20, self.content_size.width - 26)
+        # Layout: `<icon> <pos>  <bar>  <dur>`. Icon (1 cell) + space (1)
+        # + pos (5) + 2 + bar + 2 + dur (5) = 16 cells of fixed content;
+        # the bar fills the rest. `content_size.width` already excludes
+        # padding so no double-subtract. Min width 20 for tiny terminals.
+        width = max(20, self.content_size.width - 16)
         # Heavy block (`█`) for the filled portion + light shade (`░`) for
         # the unfilled — both are full-cell glyphs so the bar looks like a
         # continuous line edge-to-edge instead of a thin filled stub
@@ -251,15 +251,18 @@ class ProgressLine(Static):
             ratio = max(0.0, min(1.0, self.position / self.duration))
             filled = int(round(ratio * width))
             bar = f"[{C_TIME}]{'█' * filled}[/][{C_MUTED}]{'░' * (width - filled)}[/]"
+        # Compact state icon at the line head. Always visible, no
+        # right-edge clipping risk like the previous trailing `[playing]`
+        # badge had on narrow widget widths.
         if self.state == "playing":
-            badge = f"[{C_PLAYING}][playing][/]"
+            icon = f"[{C_PLAYING}]▶[/]"
         elif self.state == "paused":
-            badge = f"[{C_PAUSED}][paused][/]"
+            icon = f"[{C_PAUSED}]‖[/]"
         else:
-            badge = "[dim][stopped][/]"
+            icon = f"[{C_DIM}]■[/]"
         pos = fmt_mmss(self.position)
         dur = fmt_mmss(self.duration)
-        return f"[{C_TIME}]{pos}[/]  {bar}  [{C_TIME}]{dur}[/]   {badge}"
+        return f"{icon} [{C_TIME}]{pos}[/]  {bar}  [{C_TIME}]{dur}[/]"
 
 
 class TrackTableHeader(Static):

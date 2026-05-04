@@ -424,8 +424,10 @@ class MusickitApp(App[None]):
         """Place the cursor on `target_index` after children mount.
 
         Also refocuses the browser (Textual sometimes drops focus when a
-        widget's children get mass-replaced) and refreshes the info panel
-        — `index =` doesn't always fire `Highlighted` post clear+append.
+        widget's children get mass-replaced), scrolls the highlighted row
+        into view (the implicit scroll-on-index doesn't always fire post
+        clear+append), and refreshes the info panel — `index =` doesn't
+        always fire `Highlighted` post clear+append.
         """
         browser = self.query_one(BrowserList)
         if target_index >= len(browser.children):
@@ -437,6 +439,11 @@ class MusickitApp(App[None]):
         if not browser.has_focus and not isinstance(self.focused, FilterInput):
             browser.focus()
         item = browser.children[target_index]
+        if isinstance(item, ListItem):
+            # Force the new cursor row into view. Without this, popping
+            # back to the artist list leaves the scrollbar at its old
+            # position and the prior-artist cursor row may be off-screen.
+            browser.scroll_to_widget(item, animate=False)
         self._update_browser_info(item if isinstance(item, ListItem) else None)
 
     def _update_browser_info(self, item: ListItem | None) -> None:
