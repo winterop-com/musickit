@@ -58,6 +58,61 @@ _PREBUFFER_TIMEOUT_S = 1.5
 _VIS_BANDS = 24
 _VIS_DECAY = 0.85  # per-callback decay of the band level (smooths the bars)
 
+ReplayGainMode = str  # "auto" | "track" | "album" | "off"
+
+
+def compute_replaygain_multiplier(replaygain: dict[str, str], mode: ReplayGainMode) -> float:
+    """Translate ReplayGain tags into a linear amplitude multiplier.
+
+    Modes:
+      - "off"   → 1.0 (no normalisation)
+      - "track" → use replaygain_track_gain only
+      - "album" → use replaygain_album_gain only
+      - "auto"  → prefer album, fall back to track
+
+    Peak protection: when a peak value is also tagged, clamp the
+    multiplier so peak * multiplier <= 1.0 — prevents the post-gain
+    samples clipping past full scale.
+    """
+    if mode == "off" or not replaygain:
+        return 1.0
+    gain_str: str | None = None
+    peak_str: str | None = None
+    if mode == "track":
+        gain_str = replaygain.get("replaygain_track_gain")
+        peak_str = replaygain.get("replaygain_track_peak")
+    elif mode == "album":
+        gain_str = replaygain.get("replaygain_album_gain")
+        peak_str = replaygain.get("replaygain_album_peak")
+    else:  # "auto" or anything unrecognised
+        gain_str = replaygain.get("replaygain_album_gain") or replaygain.get("replaygain_track_gain")
+        peak_str = replaygain.get("replaygain_album_peak") or replaygain.get("replaygain_track_peak")
+    if not gain_str:
+        return 1.0
+    gain_db = _parse_db(gain_str)
+    if gain_db is None:
+        return 1.0
+    multiplier = 10 ** (gain_db / 20)
+    if peak_str:
+        try:
+            peak = float(peak_str.strip())
+        except ValueError:
+            peak = 0.0
+        if peak > 0:
+            multiplier = min(multiplier, 1.0 / peak)
+    return multiplier
+
+
+def _parse_db(value: str) -> float | None:
+    """Parse '-6.34 dB' / '-6.34 db' / '-6.34' → -6.34. None on failure."""
+    s = value.strip().lower()
+    if s.endswith("db"):
+        s = s[:-2].strip()
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
 
 class AudioPlayer:
     """Play audio files via PyAV → sounddevice with pause/seek/volume.
@@ -88,6 +143,10 @@ class AudioPlayer:
         self._airplay = airplay
         self._lock = threading.Lock()
         self._volume: float = 1.0
+        # ReplayGain — mode set by the TUI (or via state.json), multiplier
+        # computed per track in `play()` from the LibraryTrack's tags.
+        self._replaygain_mode: ReplayGainMode = "auto"
+        self._replaygain_multiplier: float = 1.0
         self._paused: bool = False
         self._stopped: bool = True
         self._frames_played: int = 0
@@ -144,7 +203,11 @@ class AudioPlayer:
         self.stop()
         self._airplay = controller
 
-    def play(self, source: Path | str) -> None:
+    def set_replaygain_mode(self, mode: ReplayGainMode) -> None:
+        """Change ReplayGain normalisation mode for subsequent tracks."""
+        self._replaygain_mode = mode
+
+    def play(self, source: Path | str, *, replaygain: dict[str, str] | None = None) -> None:
         """Schedule playback of `source`. Returns immediately.
 
         The slow part of starting playback for live streams is the HTTP
@@ -164,7 +227,18 @@ class AudioPlayer:
         Path sources fall through to the normal in-process player —
         AirPlay-from-local would need a tiny inline HTTP server, which
         is deferred.
+
+        `replaygain` is the per-track tag dict (typically
+        `LibraryTrack.replaygain`). Resolved via the current mode into a
+        scalar multiplier applied in the audio callback. AirPlay paths
+        ignore this — the device handles its own gain.
         """
+        # Compute up front so the audio callback can read it post-setup
+        # without touching tag data on a worker thread.
+        self._replaygain_multiplier = compute_replaygain_multiplier(
+            replaygain or {},
+            self._replaygain_mode,
+        )
         if self._airplay is not None and self._airplay.device is not None and isinstance(source, str):
             self._opener_gen += 1
             self._teardown_playback()
@@ -551,6 +625,10 @@ class AudioPlayer:
         with self._lock:
             paused = self._paused
             volume = self._volume
+        # ReplayGain is applied as an additional multiplier alongside the
+        # user volume slider. Computed in `play()` from the track's tags;
+        # 1.0 when RG is off, untagged, or AirPlay-routed.
+        gain = volume * self._replaygain_multiplier
         if paused:
             outdata.fill(0)
             return
@@ -585,7 +663,7 @@ class AudioPlayer:
             chunk = self._current_chunk
             available = chunk.shape[0] - self._chunk_offset
             take = min(available, frames - written)
-            outdata[written : written + take] = chunk[self._chunk_offset : self._chunk_offset + take] * volume
+            outdata[written : written + take] = chunk[self._chunk_offset : self._chunk_offset + take] * gain
             self._chunk_offset += take
             written += take
         self._frames_played += written

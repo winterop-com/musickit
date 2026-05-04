@@ -134,6 +134,72 @@ def test_player_pause_writes_silence(silent_m4a: Path, fake_stream: type[_FakeOu
     player.stop()
 
 
+def test_replaygain_off_returns_unity_multiplier() -> None:
+    from musickit.tui.player import compute_replaygain_multiplier
+
+    rg = {"replaygain_track_gain": "-6.0 dB"}
+    assert compute_replaygain_multiplier(rg, "off") == 1.0
+
+
+def test_replaygain_track_mode_uses_track_gain() -> None:
+    from musickit.tui.player import compute_replaygain_multiplier
+
+    rg = {"replaygain_track_gain": "-6.0 dB", "replaygain_album_gain": "-3.0 dB"}
+    # -6 dB → 10**(-6/20) ≈ 0.5012
+    assert abs(compute_replaygain_multiplier(rg, "track") - 0.5012) < 1e-3
+
+
+def test_replaygain_album_mode_uses_album_gain() -> None:
+    from musickit.tui.player import compute_replaygain_multiplier
+
+    rg = {"replaygain_track_gain": "-6.0 dB", "replaygain_album_gain": "-3.0 dB"}
+    # -3 dB → 10**(-3/20) ≈ 0.7079
+    assert abs(compute_replaygain_multiplier(rg, "album") - 0.7079) < 1e-3
+
+
+def test_replaygain_auto_prefers_album_falls_back_to_track() -> None:
+    from musickit.tui.player import compute_replaygain_multiplier
+
+    only_track = {"replaygain_track_gain": "-6.0 dB"}
+    both = {"replaygain_track_gain": "-6.0 dB", "replaygain_album_gain": "-3.0 dB"}
+    # Auto prefers album when present.
+    assert abs(compute_replaygain_multiplier(both, "auto") - 0.7079) < 1e-3
+    # Falls back to track when album missing.
+    assert abs(compute_replaygain_multiplier(only_track, "auto") - 0.5012) < 1e-3
+
+
+def test_replaygain_peak_clamp_prevents_clipping() -> None:
+    """Boost (+6 dB) on a track that already peaks at 0.9 must clamp to 1/0.9 ≈ 1.111."""
+    from musickit.tui.player import compute_replaygain_multiplier
+
+    rg = {"replaygain_track_gain": "+6.0 dB", "replaygain_track_peak": "0.9"}
+    # +6 dB → 1.995 multiplier; clamped by peak to 1/0.9 ≈ 1.111.
+    multiplier = compute_replaygain_multiplier(rg, "track")
+    assert abs(multiplier - (1.0 / 0.9)) < 1e-3
+
+
+def test_replaygain_handles_various_tag_formats() -> None:
+    from musickit.tui.player import compute_replaygain_multiplier
+
+    # 'dB' / 'db' / no suffix all parse the same.
+    for value in ("-6.0 dB", "-6.0 db", "-6.0", "-6.0  ", "  -6.0DB"):
+        rg = {"replaygain_track_gain": value}
+        assert abs(compute_replaygain_multiplier(rg, "track") - 0.5012) < 1e-3
+
+
+def test_replaygain_no_tags_returns_unity() -> None:
+    from musickit.tui.player import compute_replaygain_multiplier
+
+    assert compute_replaygain_multiplier({}, "auto") == 1.0
+    assert compute_replaygain_multiplier({"unrelated": "value"}, "auto") == 1.0
+
+
+def test_replaygain_garbage_tag_returns_unity() -> None:
+    from musickit.tui.player import compute_replaygain_multiplier
+
+    assert compute_replaygain_multiplier({"replaygain_track_gain": "not a number"}, "track") == 1.0
+
+
 def test_player_volume_clamps(fake_stream: type[_FakeOutputStream]) -> None:
     from musickit.tui.player import AudioPlayer
 

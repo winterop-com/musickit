@@ -81,6 +81,7 @@ def _scan_album(album_dir: Path, *, measure_pictures: bool = False) -> LibraryAl
             genre=source.genre,
             genres=list(source.genres),
             lyrics=source.lyrics,
+            replaygain=dict(source.replaygain),
             track_no=source.track_no,
             disc_no=source.disc_no,
             duration_s=source.duration_s or 0.0,

@@ -219,12 +219,19 @@ class MusickitApp(App[None]):
         self.title = "musickit"
         # Restore the user's theme choice (set via the command palette) before
         # the first paint, so we don't flash the default theme on startup.
-        saved_theme = load_state().get("theme")
+        state = load_state()
+        saved_theme = state.get("theme")
         if isinstance(saved_theme, str):
             try:
                 self.theme = saved_theme
             except Exception:  # pragma: no cover — bad/old theme name
                 pass
+        # ReplayGain mode persists in state.json (default 'auto'). Validated
+        # against the small set of supported modes; anything else falls back
+        # to 'auto' silently.
+        saved_rg = state.get("replaygain")
+        if isinstance(saved_rg, str) and saved_rg in ("auto", "track", "album", "off"):
+            self._player.set_replaygain_mode(saved_rg)
         # Visualizer ticks at 30 FPS; status text only at 4 FPS to save
         # redraws on text that doesn't need to change frame-to-frame.
         self.set_interval(1 / 30, self._refresh_visualizer)
@@ -970,7 +977,10 @@ class MusickitApp(App[None]):
         # is a synthetic placeholder. AudioPlayer accepts URL strings (it's
         # what radio uses already), so the same call works for both.
         source: Path | str = track.stream_url if track.stream_url else track.path
-        self._player.play(source)
+        # Forward ReplayGain tags so the player can apply gain. Subsonic-
+        # client mode tracks don't carry RG (Subsonic's API doesn't expose
+        # it) — the dict is empty and the multiplier resolves to 1.0.
+        self._player.play(source, replaygain=track.replaygain or {})
         self._refresh_play_marker()
 
     def _advance_track(self, *, force: bool = False) -> None:

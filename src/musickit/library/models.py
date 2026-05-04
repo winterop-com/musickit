@@ -23,6 +23,11 @@ class LibraryTrack(BaseModel):
     genre: str | None = None
     genres: list[str] = []
     lyrics: str | None = None
+    # ReplayGain values from source tags (`replaygain_track_gain`,
+    # `replaygain_album_gain`, `..._peak`). Empty dict when the source had
+    # no RG tags. AudioPlayer uses these to normalise level differences
+    # between tracks during local playback.
+    replaygain: dict[str, str] = {}
     duration_s: float = 0.0
     has_cover: bool = False
     cover_pixels: int = 0
