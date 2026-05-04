@@ -161,6 +161,7 @@ class Visualizer(Static):
 
     DEFAULT_CSS = """
     Visualizer {
+        width: 1fr;
         height: 12;
         padding: 0 2;
         border: round $primary 30%;
@@ -181,19 +182,17 @@ class Visualizer(Static):
         rows = max(4, max(0, self.size.height - 1))
         red_cutoff = max(1, rows // 5)
         yellow_cutoff = red_cutoff + max(1, rows // 3)
-        # Spread bars across the full available width. Each bar gets
-        # `bar_width` block chars + `gap` empty cells between them. We
-        # drop the gap entirely on narrow terminals where each bar is
-        # already 1 cell — without that the meter overflows. On wider
-        # terminals bars get 2-3 cells with a 1-cell gap for a classic
-        # banded VU look.
+        # Bars touch each other (no inter-bar gap) so the meter looks
+        # like a continuous spectrum rather than a row of widely-spaced
+        # VU bars. Each bar has a base width of `avail // n_bars`; the
+        # leftover modulo is absorbed by making the first `extra` bars
+        # 1 cell wider. End result: 100% full-width fill, asymmetry
+        # bounded to 1 cell per bar (imperceptible at 48 bars on any
+        # reasonable terminal).
         n_bars = len(self.levels) or 1
-        avail = max(0, self.size.width - 4)  # account for the widget's padding
-        # Try with gap=1 first; fall back to gap=0 if bars would be < 1.
-        bar_width = max(1, (avail - (n_bars - 1)) // n_bars)
-        gap = 1 if bar_width >= 2 else 0
-        empty_cell = " " * bar_width
-        gap_str = " " * gap
+        avail = max(0, self.content_size.width)
+        base_width = max(1, avail // n_bars)
+        extra = max(0, avail - base_width * n_bars)
         lines: list[str] = []
         for row_idx in range(rows):
             if row_idx < red_cutoff:
@@ -205,18 +204,18 @@ class Visualizer(Static):
             row_top = 1.0 - row_idx / rows
             row_bottom = 1.0 - (row_idx + 1) / rows
             line_parts: list[str] = []
-            for level in self.levels:
+            for i, level in enumerate(self.levels):
+                bw = base_width + (1 if i < extra else 0)
                 if level >= row_top:
-                    line_parts.append(f"[{color}]{'█' * bar_width}[/]")
+                    line_parts.append(f"[{color}]{'█' * bw}[/]")
                 elif level > row_bottom:
                     fraction = (level - row_bottom) / max(1e-6, row_top - row_bottom)
                     block = self._PARTIAL_BLOCKS[
                         min(len(self._PARTIAL_BLOCKS) - 1, int(fraction * len(self._PARTIAL_BLOCKS)))
                     ]
-                    line_parts.append(f"[{color}]{block * bar_width}[/]")
+                    line_parts.append(f"[{color}]{block * bw}[/]")
                 else:
-                    line_parts.append(empty_cell)
-                line_parts.append(gap_str)
+                    line_parts.append(" " * bw)
             lines.append("".join(line_parts))
         return "\n".join(lines)
 
@@ -237,15 +236,21 @@ class ProgressLine(Static):
     state = reactive("stopped")  # "playing" | "paused" | "stopped"
 
     def render(self) -> str:
-        width = max(20, self.size.width - 30)
-        # `C_MUTED` (slate) for the unfilled track instead of `C_DIM`
-        # (#3a3a3a, nearly invisible against the dark background).
+        # Reserve = pos (5) + 2 + 2 + dur (5) + 3 + badge (9 max) = 26.
+        # `content_size.width` already excludes padding, so we don't need
+        # to subtract for it again. Falling back to a min width of 20 so
+        # the bar still looks like a meter on tiny terminals.
+        width = max(20, self.content_size.width - 26)
+        # Heavy block (`█`) for the filled portion + light shade (`░`) for
+        # the unfilled — both are full-cell glyphs so the bar looks like a
+        # continuous line edge-to-edge instead of a thin filled stub
+        # followed by an invisible single-pixel rule.
         if self.duration <= 0:
-            bar = f"[{C_MUTED}]{'─' * width}[/]"
+            bar = f"[{C_MUTED}]{'░' * width}[/]"
         else:
             ratio = max(0.0, min(1.0, self.position / self.duration))
             filled = int(round(ratio * width))
-            bar = f"[{C_TIME}]{'━' * filled}[/][{C_MUTED}]{'─' * (width - filled)}[/]"
+            bar = f"[{C_TIME}]{'█' * filled}[/][{C_MUTED}]{'░' * (width - filled)}[/]"
         if self.state == "playing":
             badge = f"[{C_PLAYING}][playing][/]"
         elif self.state == "paused":

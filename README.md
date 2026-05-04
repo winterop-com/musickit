@@ -22,14 +22,16 @@ make docs-serve     # http://127.0.0.1:8000
 
 Or jump straight to:
 
+- [Architecture](docs/architecture.md) — how all the pieces fit together (process model, data flow, audio subprocess, SQLite index, FFT visualizer)
+- [Tutorial: 0 to iPhone streaming](docs/guides/tutorial.md) — end-to-end walkthrough including Tailscale + Amperfy
 - [Quickstart](docs/guides/quickstart.md) — install + first convert
 - [musickit convert](docs/guides/convert.md) — codec / bitrate / enrichment matrix
-- [musickit library](docs/guides/library.md) — audit rules + auto-fix
+- [musickit library](docs/guides/library.md) — audit rules + auto-fix + SQLite index
 - [musickit tui](docs/guides/tui.md) — TUI: local + radio + Subsonic-client + AirPlay
 - [musickit serve](docs/guides/serve.md) — Subsonic API + Tailscale + clients
 - [Edge cases](docs/edge-cases.md) — every weirdness encountered on real rips
 - [Roadmap](docs/roadmap.md) — what's next
-- [Development](docs/guides/development.md) — architecture + contributing
+- [Development](docs/guides/development.md) — directory layout + test patterns + commit style
 
 ## Status
 
