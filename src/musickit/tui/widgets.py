@@ -23,6 +23,10 @@ C_PAUSED = "#e0af68"  # warm amber for paused
 C_PEAK = "#f7768e"  # peak / red zone in the visualizer
 C_WARM = "#e0af68"  # mid zone (yellow / amber)
 C_ACCENT = "#bb9af7"  # accent (e.g. "Favorites" style highlights)
+# Warm orange used SPARINGLY — currently-playing track marker, now-playing
+# title. Sets the active track apart from the cyan/green palette used
+# elsewhere for navigation/structural elements.
+C_ACTIVE = "#ff9e64"
 C_DIM = "#3a3a3a"
 C_MUTED = "#565f89"
 C_TIME = "#7aa2f7"
@@ -84,7 +88,8 @@ class SidebarStats(Static):
     DEFAULT_CSS = """
     SidebarStats {
         height: auto;
-        padding: 1 1;
+        padding: 0 1;
+        border: round $primary 30%;
     }
     """
 
@@ -93,10 +98,11 @@ class SidebarStats(Static):
     artist_count = reactive(0)
     folder_count = reactive(0)
 
+    def on_mount(self) -> None:  # noqa: D102
+        self.border_title = "Library"
+
     def render(self) -> str:
         rows = [
-            f"[{C_HEADER}]Library[/]",
-            "[dim]──────────[/]",
             f" [{C_ACCENT}]♪[/]  Tracks   [dim]{self.track_count:>5}[/]",
             f" [{C_ACCENT}]◉[/]  Albums   [dim]{self.album_count:>5}[/]",
             f" [{C_ACCENT}]☺[/]  Artists  [dim]{self.artist_count:>5}[/]",
@@ -112,7 +118,8 @@ class NowPlayingMeta(Static):
     NowPlayingMeta {
         width: 1fr;
         height: auto;
-        padding: 1 2;
+        padding: 0 2;
+        border: round $primary 30%;
     }
     """
 
@@ -123,19 +130,18 @@ class NowPlayingMeta(Static):
     genre = reactive("—")
     fmt = reactive("—")
 
+    def on_mount(self) -> None:  # noqa: D102
+        self.border_title = "Now Playing"
+
     def render(self) -> str:
-        # `padding: 1 2` → 2 cells on each side reserved.
-        rule_width = max(20, self.size.width - 4)
-        rule = "─" * rule_width
+        # Title + Artist get strong emphasis (bold + accent); secondary
+        # fields stay quieter so the eye lands on what's playing first.
         rows = [
-            f"[{C_HEADER}]Now Playing[/]",
-            f"[dim]{rule}[/]",
-            f"[{C_LABEL}]Artist:[/]  {self.artist}",
-            f"[{C_LABEL}]Title:[/]   [bold]{self.title_text}[/]",
-            f"[{C_LABEL}]Album:[/]   {self.album}",
-            f"[{C_LABEL}]Year:[/]    {self.year}",
-            f"[{C_LABEL}]Genre:[/]   {self.genre}",
-            f"[{C_LABEL}]Format:[/]  {self.fmt}",
+            f"[bold {C_ACTIVE}]{self.title_text}[/]",
+            f"[bold {C_LABEL}]{self.artist}[/]  [dim]·  {self.album}[/]",
+            f"[{C_LABEL}]Year:[/]    [dim]{self.year}[/]",
+            f"[{C_LABEL}]Genre:[/]   [dim]{self.genre}[/]",
+            f"[{C_LABEL}]Format:[/]  [dim]{self.fmt}[/]",
         ]
         return "\n".join(rows)
 
@@ -151,13 +157,17 @@ class Visualizer(Static):
 
     DEFAULT_CSS = """
     Visualizer {
-        height: 6;
+        height: 7;
         padding: 0 2;
+        border: round $primary 30%;
     }
     Screen.fullscreen Visualizer {
         height: 1fr;
     }
     """
+
+    def on_mount(self) -> None:  # noqa: D102
+        self.border_title = "Levels"
 
     _PARTIAL_BLOCKS = "▁▂▃▄▅▆▇█"  # 1/8th increments
 
@@ -256,33 +266,32 @@ class TrackTableHeader(Static):
 
 
 class TrackList(ListView):
-    """Focusable playlist (column-aligned rows)."""
+    """Focusable playlist (column-aligned rows).
+
+    Zebra striping (alternate row backgrounds) makes scanning a long
+    album easier; the highlighted row is brightened further so the
+    cursor position stands out from the stripes. The currently-playing
+    track gets the warm `C_ACTIVE` color in its label (set by
+    `format_track_row`) — the visual difference between "where I am"
+    (cursor) and "what's playing" (orange marker) is intentional.
+    """
 
     DEFAULT_CSS = """
     TrackList {
         padding: 0 1;
         height: 1fr;
     }
+    TrackList > ListItem {
+        height: 1;
+    }
+    TrackList > ListItem:even {
+        background: $boost 40%;
+    }
     TrackList > ListItem.--highlight {
-        background: $primary 30%;
+        background: $primary 50%;
+        text-style: bold;
     }
     """
-
-
-class BrowserHeader(Static):
-    """Path header above the browser list (`Browse` or `Browse · <Artist>`)."""
-
-    DEFAULT_CSS = """
-    BrowserHeader {
-        height: 2;
-        padding: 1 1 0 1;
-    }
-    """
-
-    path = reactive("Browse")
-
-    def render(self) -> str:
-        return f"[{C_HEADER}]{self.path}[/]\n[dim]──────────[/]"
 
 
 class BrowserList(ListView):
@@ -300,6 +309,7 @@ class BrowserList(ListView):
         height: 1fr;
         padding: 0 1;
         overflow-x: hidden;
+        border: round $primary 30%;
     }
     BrowserList > ListItem {
         height: 1;
@@ -309,6 +319,9 @@ class BrowserList(ListView):
     }
     """
 
+    def on_mount(self) -> None:  # noqa: D102
+        self.border_title = "Browse"
+
 
 class BrowserInfo(Static):
     """Detail panel below the browser. Shows audit warnings for the highlighted album."""
@@ -317,12 +330,15 @@ class BrowserInfo(Static):
     BrowserInfo {
         height: auto;
         max-height: 8;
-        padding: 1 1;
-        background: $boost;
+        padding: 0 1;
+        border: round $primary 30%;
     }
     """
 
     body = reactive("")
+
+    def on_mount(self) -> None:  # noqa: D102
+        self.border_title = "Info"
 
     def render(self) -> str:
         return self.body or "[dim]Highlight an album to see audit warnings.[/]"
@@ -394,12 +410,17 @@ class StatusBar(Static):
 
 
 class KeyBar(Static):
-    """Bottom keybinding hint bar (ncmpcpp-style numbered shortcuts)."""
+    """Bottom keybinding hint bar (ncmpcpp-style numbered shortcuts).
+
+    Visually muted so the eye lands on `StatusBar` (playback state)
+    first; the keybindings are reference info, not active controls.
+    """
 
     DEFAULT_CSS = """
     KeyBar {
         height: 1;
         padding: 0 2;
+        color: $text-muted;
     }
     """
 
@@ -419,4 +440,6 @@ class KeyBar(Static):
             ("^←/→", "Resize"),
             ("q", "Quit"),
         ]
-        return "  ".join(f"[bold]{key}[/] [dim]{label}[/]" for key, label in items)
+        # All-dim. The keys themselves are slightly less dim than labels
+        # so a quick scan can still find a binding.
+        return "  ".join(f"[dim]{key}[/][dim]·[/][dim]{label}[/]" for key, label in items)

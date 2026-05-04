@@ -45,7 +45,6 @@ from musickit.tui.widgets import (
     C_PEAK,
     C_PLAYING,
     C_WARM,
-    BrowserHeader,
     BrowserInfo,
     BrowserList,
     FilterInput,
@@ -80,8 +79,11 @@ class MusickitApp(App[None]):
     CSS = """
     Screen { layout: vertical; }
     #body { height: 1fr; }
-    #sidebar { width: 32; border-right: tall $primary 30%; }
-    #main { width: 1fr; }
+    /* Sidebar no longer needs the right-border separator now that each
+       sidebar widget is itself a bordered panel — the borders provide
+       enough visual separation on their own. */
+    #sidebar { width: 34; padding: 0 1; }
+    #main { width: 1fr; padding: 0 1 0 0; }
     #now-playing-row { height: auto; }
     /* Fullscreen: keep the visualizer + now-playing visible, hide everything
        library-related. Visualizer height is bumped to 1fr in
@@ -207,7 +209,6 @@ class MusickitApp(App[None]):
         with Horizontal(id="body"):
             with Vertical(id="sidebar"):
                 yield SidebarStats(id="stats")
-                yield BrowserHeader(id="browser-header")
                 yield BrowserList(id="browser")
                 yield BrowserInfo(id="browser-info")
             with Vertical(id="main"):
@@ -280,14 +281,13 @@ class MusickitApp(App[None]):
 
     def _populate_browser(self) -> None:
         browser = self.query_one(BrowserList)
-        header = self.query_one(BrowserHeader)
         # Invalidate the cursor BEFORE mutating children. Otherwise a stale
         # index from the prior list (e.g. row 32 of a long album list) can
         # leak into the new list and crash the next ↑/↓ keypress.
         browser.index = None
         browser.clear()
         if self._index is None or not self._index.albums:
-            header.path = "Browse"
+            browser.border_title = "Browse"
             radio_item = ListItem(Static(f" [{C_ACCENT}]📻[/] [bold]Radio[/]  [dim]({len(self._radio_stations)})[/]"))
             radio_item.entry_kind = "radio"  # type: ignore[attr-defined]
             radio_item.entry_data = None  # type: ignore[attr-defined]
@@ -298,10 +298,10 @@ class MusickitApp(App[None]):
             self.call_after_refresh(self._set_browser_cursor, 0)
             return
         if self._browse_artist is None:
-            header.path = "Browse"
+            browser.border_title = "Browse"
             self._populate_browser_artists(browser)
         else:
-            header.path = f"Browse · [bold]{self._browse_artist}[/]"
+            browser.border_title = f"Browse · {self._browse_artist}"
             self._populate_browser_albums(browser, self._browse_artist)
         self._fit_sidebar_width()
         target_index = 0
