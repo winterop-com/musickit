@@ -69,10 +69,33 @@ def serve(
     _print_startup_banner(host=host, port=port, root=target_dir.resolve())
 
     # Block on the initial scan so the first client request hits a populated
-    # cache. Big libraries take seconds to walk; the banner above tells the
-    # user it's happening.
-    typer.echo("scanning library…")
-    fastapi_app.state.cache.rebuild()
+    # cache. Show a transient progress bar — large libraries on slow drives
+    # take many seconds to walk, and silent stalls feel like a hang.
+    from rich.console import Console
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+
+    console = Console()
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("[cyan]Scanning library", total=None)
+
+        def on_album(album_dir: Path, idx: int, total: int) -> None:
+            if progress.tasks[task].total is None:
+                progress.update(task, total=total)
+            name = album_dir.name
+            if len(name) > 40:
+                name = name[:39] + "…"
+            progress.update(task, advance=1, description=f"[cyan]Scanning[/] [dim]·[/] {name}")
+
+        fastapi_app.state.cache.rebuild(on_album=on_album)
     cache = fastapi_app.state.cache
     typer.echo(f"  {cache.artist_count} artists, {cache.album_count} albums, {cache.track_count} tracks\n")
 

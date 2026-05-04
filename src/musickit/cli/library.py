@@ -105,49 +105,15 @@ def _scan_with_progress(
     verbose: bool,
     measure_pictures: bool = False,
 ) -> library_mod.LibraryIndex:
-    """Wrap `library.scan` with a progress bar (or per-album lines if -v).
+    """Thin wrapper that delegates to the shared scan-progress helper."""
+    from musickit.cli._scan import scan_with_progress
 
-    Large libraries on slow drives (network, USB) can take seconds to minutes;
-    we want feedback either way. Default is a transient rich.Progress spinner
-    that reports `Scanning <album>  N/M`. Verbose prints one line per album so
-    the output survives in scrollback for debugging.
-    """
-    from pathlib import PurePath
-
-    from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-
-    if verbose:
-
-        def on_album_verbose(album_dir: Path, idx: int, total: int) -> None:
-            try:
-                rel: PurePath = album_dir.relative_to(root)
-            except ValueError:
-                rel = album_dir
-            console.print(f"[dim]({idx}/{total})[/] scanning {rel}")
-
-        return library_mod.scan(root, on_album=on_album_verbose, measure_pictures=measure_pictures)
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TextColumn("•"),
-        TimeElapsedColumn(),
-        console=console,
-        transient=True,
-    ) as progress:
-        task = progress.add_task("[cyan]Scanning library", total=None)
-
-        def on_album(album_dir: Path, idx: int, total: int) -> None:
-            if progress.tasks[task].total is None:
-                progress.update(task, total=total)
-            name = album_dir.name
-            if len(name) > 40:
-                name = name[:39] + "…"
-            progress.update(task, advance=1, description=f"[cyan]Scanning[/] {name}")
-
-        return library_mod.scan(root, on_album=on_album, measure_pictures=measure_pictures)
+    return scan_with_progress(
+        console,
+        root,
+        verbose=verbose,
+        measure_pictures=measure_pictures,
+    )
 
 
 def _render_tree(console: Console, index: library_mod.LibraryIndex) -> None:

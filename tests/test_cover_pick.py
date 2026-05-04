@@ -57,7 +57,10 @@ def test_audit_reason_classifies_albums() -> None:
 
 def test_collect_candidates_filters_to_issues_when_requested(tmp_path: Path) -> None:
     """An empty dir produces no candidates; --all on an empty dir also produces none."""
+    from rich.console import Console
+
     empty = tmp_path / "lib"
     empty.mkdir()
-    assert _collect_candidates(empty, issues_only=True) == []
-    assert _collect_candidates(empty, issues_only=False) == []
+    console = Console(quiet=True)
+    assert _collect_candidates(console, empty, issues_only=True) == []
+    assert _collect_candidates(console, empty, issues_only=False) == []

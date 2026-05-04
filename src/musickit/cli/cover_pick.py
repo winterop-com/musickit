@@ -24,9 +24,10 @@ from PIL import Image
 from rich.console import Console
 
 from musickit.cli import app
+from musickit.cli._scan import scan_with_progress
 from musickit.cover import DEFAULT_MAX_EDGE
 from musickit.enrich.musichoarders import build_search_url
-from musickit.library import LibraryAlbum, audit, scan
+from musickit.library import LibraryAlbum, audit
 from musickit.metadata import SUPPORTED_AUDIO_EXTS, embed_cover_only
 
 _LOW_RES_THRESHOLD_PIXELS = 500 * 500
@@ -77,7 +78,7 @@ def cover_pick(
     """
     console = Console()
 
-    candidates = _collect_candidates(target_dir, issues_only=issues_only)
+    candidates = _collect_candidates(console, target_dir, issues_only=issues_only)
     if not candidates:
         console.print(f"[green]nothing to pick[/green] — every album under {target_dir} has a usable cover")
         raise typer.Exit(0)
@@ -101,8 +102,13 @@ def cover_pick(
         http.close()
 
 
-def _collect_candidates(target_dir: Path, *, issues_only: bool) -> list[LibraryAlbum]:
-    index = scan(target_dir, measure_pictures=True)
+def _collect_candidates(console: Console, target_dir: Path, *, issues_only: bool) -> list[LibraryAlbum]:
+    index = scan_with_progress(
+        console,
+        target_dir,
+        measure_pictures=True,
+        description="[cyan]Scanning for missing covers",
+    )
     audit(index)
     if not issues_only:
         return list(index.albums)

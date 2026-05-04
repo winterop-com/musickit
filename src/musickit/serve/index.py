@@ -9,6 +9,7 @@ rescans; `startScan` spawns a daemon thread that calls `rebuild()`.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
 from musickit import library as library_mod
@@ -33,14 +34,18 @@ class IndexCache:
         # both think they're the "first" rescan and double-walk the disk.
         self._scan_lock = threading.Lock()
 
-    def rebuild(self) -> None:
-        """Scan + audit + repopulate all lookup maps. Blocking."""
+    def rebuild(self, *, on_album: Callable[[Path, int, int], None] | None = None) -> None:
+        """Scan + audit + repopulate all lookup maps. Blocking.
+
+        `on_album` is forwarded to `library.scan` so the CLI can drive a
+        progress bar during the initial startup scan.
+        """
         with self._scan_lock:
             if self.scan_in_progress:
                 return
             self.scan_in_progress = True
         try:
-            new_index = library_mod.scan(self.root)
+            new_index = library_mod.scan(self.root, on_album=on_album)
             library_mod.audit(new_index)
             self._reindex(new_index)
         finally:
