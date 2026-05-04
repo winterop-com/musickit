@@ -23,11 +23,12 @@ End-to-end pipeline:
 
 Then on top of that:
 
-- **`musickit library`** — audit the converted library for missing covers, mixed years, scene-residue dirs, track gaps, tag/path mismatches; auto-fix the deterministic ones.
+- **`musickit library`** — read, audit, fix, retag, cover, and manage the converted library. Subcommands:
+  - `library tree DIR` / `library audit DIR` / `library fix DIR` — render, audit, auto-fix
+  - `library cover DIR IMAGE` / `library cover-pick DIR` / `library retag DIR` — in-place tag and cover edits; semi-automated cover selection via [musichoarders.xyz](https://covers.musichoarders.xyz/)
+  - `library index status|drop|rebuild DIR` — manage the persistent SQLite index at `<DIR>/.musickit/index.db`
 - **`musickit tui`** — Textual UI: artist/album browser, now-playing visualizer, internet radio, and a Subsonic-client mode that connects to your own `serve` over Tailscale.
 - **`musickit serve`** — Subsonic-compatible HTTP server. Any Subsonic client (Symfonium, Amperfy, play:Sub, Feishin) can browse + stream + control via the standard API. mDNS / Bonjour for autodiscovery, ffmpeg-on-the-fly for transcoding, filesystem watcher for auto-rescan when you drop new albums in.
-- **`musickit cover-pick`** — semi-automated cover selection via [musichoarders.xyz](https://covers.musichoarders.xyz/).
-- **`musickit retag` / `cover`** — in-place tag and cover edits.
 - **`musickit inspect`** — quick tag dump for a single file.
 
 ## Quickstart
@@ -53,6 +54,6 @@ Years of rip-collection wrangling produces an audio library full of:
 
 ## Status
 
-All seven user-facing commands are shipped (`convert`, `inspect`, `library`, `retag`, `cover`, `cover-pick`, `tui`, `serve`). 247 tests, mypy + pyright + ruff clean. Real-world tested against Symfonium / Amperfy / play:Sub / Feishin clients.
+Five top-level commands shipped (`convert`, `library`, `inspect`, `tui`, `serve`); `library` carries the read/mutate/manage subcommands (`tree`, `audit`, `fix`, `cover`, `cover-pick`, `retag`, `index`). mypy + pyright + ruff clean, full pytest suite green. Real-world tested against Symfonium / Amperfy / play:Sub / Feishin clients.
 
 Roadmap items still open are listed at [Roadmap](roadmap.md).

@@ -16,7 +16,7 @@ musickit tui ./output --full-rescan                  # rebuild the index DB from
 
 Subsonic credentials are NEVER persisted — pass `--subsonic` / `--user` / `--password` explicitly each session. With no arguments the TUI drops directly into radio-only mode.
 
-Local-library mode reuses the persistent SQLite index at `<DIR>/.musickit/index.db` so the second launch skips the filesystem walk and tag read. See [`musickit library`](library.md#persistent-index-db) for management commands and details.
+Local-library mode reuses the persistent SQLite index at `<DIR>/.musickit/index.db` so the second launch skips the filesystem walk and tag read. See [`musickit library index`](library.md#index-manage-the-persistent-sqlite-cache) for management commands and details.
 
 ## Layout
 

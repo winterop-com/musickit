@@ -1,4 +1,4 @@
-"""`musickit cover IMAGE DIR` — embed an image into every audio file under DIR."""
+"""`musickit library cover IMAGE DIR` — embed an image into every audio file under DIR."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ import typer
 from rich.console import Console
 
 from musickit import cover as cover_mod
-from musickit.cli import app
+from musickit.cli.library import library_app
 from musickit.cover import DEFAULT_MAX_EDGE as DEFAULT_COVER_MAX_EDGE
 from musickit.metadata import SUPPORTED_AUDIO_EXTS, embed_cover_only
 
 
-@app.command()
+@library_app.command("cover")
 def cover(
     image: Annotated[Path, typer.Argument(exists=True, dir_okay=False, help="Cover image (JPG/PNG).")],
     target_dir: Annotated[

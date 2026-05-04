@@ -6,7 +6,7 @@ A Subsonic-compatible HTTP server. Any modern Subsonic client (Symfonium, Amperf
 musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [--no-mdns] [--no-watch] [--no-cache] [--full-rescan]
 ```
 
-`TARGET_DIR` is required. `--host 0.0.0.0`, `--port 4533`, credentials default to `admin`/`admin` with a yellow warning. `--no-cache` skips the persistent SQLite index at `<TARGET_DIR>/.musickit/index.db`; `--full-rescan` rebuilds it from scratch on startup. See [`musickit library`](library.md#persistent-index-db) for index management.
+`TARGET_DIR` is required. `--host 0.0.0.0`, `--port 4533`, credentials default to `admin`/`admin` with a yellow warning. `--no-cache` skips the persistent SQLite index at `<TARGET_DIR>/.musickit/index.db`; `--full-rescan` rebuilds it from scratch on startup. See [`musickit library index`](library.md#index-manage-the-persistent-sqlite-cache) for index management.
 
 ## Startup banner
 

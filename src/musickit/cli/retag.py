@@ -1,4 +1,4 @@
-"""`musickit retag DIR` — override tags on every audio file under DIR in-place."""
+"""`musickit library retag DIR` — override tags on every audio file under DIR in-place."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from musickit.cli import app
+from musickit.cli.library import library_app
 from musickit.metadata import SUPPORTED_AUDIO_EXTS, TagOverrides, apply_tag_overrides, read_source
 
 
-@app.command()
+@library_app.command("retag")
 def retag(
     target_dir: Annotated[
         Path, typer.Argument(exists=True, file_okay=False, help="Directory whose audio files get re-tagged.")

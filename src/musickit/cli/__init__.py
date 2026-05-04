@@ -35,11 +35,12 @@ def _global_options(
     ctx.obj["verbose"] = verbose
 
 
-# Import command modules so their `@app.command()` decorators register.
-# Order doesn't matter for Typer; alphabetical for readability.
+# Import command modules so their `@app.command()` / `@library_app.command()`
+# decorators register. `library` MUST come before cover/cover_pick/retag —
+# those modules register on `library.library_app` and need it defined first.
 # These are side-effect imports — the `_` assignment shuts up pyright's
 # reportUnusedImport without us needing per-line ignores.
-from musickit.cli import convert as _convert_cmd  # noqa: E402
+from musickit.cli import convert as _convert_cmd  # noqa: E402, I001
 from musickit.cli import cover as _cover_cmd  # noqa: E402
 from musickit.cli import cover_pick as _cover_pick_cmd  # noqa: E402
 from musickit.cli import inspect as _inspect_cmd  # noqa: E402

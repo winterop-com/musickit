@@ -1,30 +1,42 @@
 # `musickit library`
 
-Audit the converted library, tree-render it, fix the deterministic problems, and manage the persistent index DB.
+Every operation that reads, mutates, or manages the converted library lives under `musickit library`.
 
 ```bash
-musickit library DIR [--audit | --issues-only | --fix [--prefer-dirname] [--dry-run]]
-musickit library DIR --index-status | --drop-index | --full-rescan | --no-cache
+musickit library tree DIR              # rich.Tree of artists / albums / tracks
+musickit library audit DIR             # audit table with per-album warnings
+musickit library fix DIR               # apply deterministic fixes
+musickit library cover DIR IMAGE       # embed an image into every audio file
+musickit library cover-pick DIR        # semi-automated cover sourcing via musichoarders
+musickit library retag DIR             # in-place tag overrides
+musickit library index status DIR      # show index DB metadata + counts
+musickit library index drop DIR        # delete <DIR>/.musickit/
+musickit library index rebuild DIR     # rebuild the index DB from scratch
 ```
 
-`DIR` is required.
+`DIR` is required for every subcommand.
 
-## Modes
+## `tree` and `audit`
 
 ```bash
-musickit library ./output                       # rich.Tree of artists / albums / tracks
-musickit library ./output --audit               # tree + per-album warnings column
-musickit library ./output --issues-only         # only flagged albums
-musickit library ./output --fix                 # apply deterministic fixes
-musickit library ./output --fix --dry-run       # preview the fixes
-musickit library ./output --fix --prefer-dirname  # invert tag/dir resolution
-musickit library ./output --index-status        # show index DB metadata + counts
-musickit library ./output --full-rescan         # rebuild the index DB from scratch
-musickit library ./output --drop-index          # delete <DIR>/.musickit/ and exit
-musickit library ./output --no-cache            # skip the index DB (in-memory only)
+musickit library tree   DIR [--json] [--no-cache] [--full-rescan]
+musickit library audit  DIR [--issues-only] [--json] [--no-cache] [--full-rescan]
 ```
 
-## Audit rules
+`tree` prints the `rich.Tree` view; `audit` prints the warnings table.
+
+```
+Various Artists
+├── 1998 - Best Of Dance Hits of the 90-98s (18) ⚠
+└── 1998 - Party Hits (18) ⚠
+
+Imagine Dragons
+└── 2012 - Night Visions (11)
+```
+
+`--issues-only` on `audit` filters to flagged albums.
+
+### Audit rules
 
 Each rule appends to `album.warnings`. Multiple can fire on one album.
 
@@ -45,7 +57,11 @@ Each rule appends to `album.warnings`. Multiple can fire on one album.
 | `disc N track gaps: missing [...]` | Per-disc gaps on multi-disc albums. |
 | `no tracks read` | Album dir contains files but mutagen couldn't parse any. |
 
-## `--fix`
+## `fix`
+
+```bash
+musickit library fix DIR [--dry-run] [--prefer-dirname] [--no-cache] [--full-rescan]
+```
 
 Applies the deterministic fixes:
 
@@ -56,50 +72,74 @@ Applies the deterministic fixes:
 `--dry-run` prints what would change without writing anything.
 
 Fixes that are NOT auto-applied:
-- Adding a missing cover — use `musickit cover-pick` for the semi-automated flow.
+- Adding a missing cover — use `library cover-pick` (semi-automated) or `library cover IMAGE` (you provide the file).
 - Splitting an over-merged album — manual.
-- Re-tagging mixed-album_artist albums to a single value — `musickit retag` per dir.
+- Re-tagging mixed-album_artist albums to a single value — `library retag` per dir.
 
-## Output formats
-
-Default tree-render uses `rich.Tree`. Albums show `<year> · <album> (<track-count>)` with a `⚠` badge if `audit` flagged warnings.
-
-```
-Various Artists
-├── 1998 - Best Of Dance Hits of the 90-98s (18) ⚠
-└── 1998 - Party Hits (18) ⚠
-
-Imagine Dragons
-└── 2012 - Night Visions (11)
-```
-
-Under `--audit` or `--issues-only`, an extra "Warnings" column shows the rule output.
-
-## Companion: `cover-pick`
-
-For the missing/low-res-cover warnings, the manual workflow:
+## `cover` — embed an image
 
 ```bash
-musickit cover-pick ./output                          # all flagged albums
-musickit cover-pick ./output --all                    # every album, even ones with covers
-musickit cover-pick ./output --no-browser             # print URL instead of opening it
+musickit library cover DIR IMAGE [--cover-max-edge PX] [--recursive/--no-recursive]
 ```
 
-Per-album loop:
+Embeds `IMAGE` (JPG/PNG) into every audio file under `DIR`. The image is normalised once (downscaled to fit the long-edge cap, JPEG-encoded for non-PNG sources) and then written to every supported audio file. Other tags are preserved — only the cover is replaced.
 
-1. Print `Artist — Album (no cover)` line.
-2. Open `https://covers.musichoarders.xyz/?artist=...&album=...` in your browser.
-3. Click any cover on the page (musichoarders' UI copies the URL).
-4. Paste back into the terminal — `s` to skip, `q` to quit.
-5. We download, validate via Pillow, resize to fit `--cover-max-edge`, save as `cover.jpg`, and (with `--embed`, default) re-embed into every track.
+```bash
+musickit library cover ./output/Pink\ Floyd/1973\ -\ The\ Dark\ Side\ Of\ The\ Moon scan-of-the-LP.jpg
+```
+
+## `cover-pick` — semi-automated cover sourcing
+
+```bash
+musickit library cover-pick DIR [--all] [--no-embed] [--cover-max-edge PX] [--no-browser] [--no-cache] [--full-rescan]
+```
+
+For each candidate album:
+
+1. Print the album line + audit reason.
+2. Open the [musichoarders.xyz](https://covers.musichoarders.xyz/) pre-fill URL in your browser.
+3. Click any cover on the site to copy its URL (musichoarders' UI does this).
+4. Paste the URL back into the terminal — `s` to skip, `q` to quit.
+5. We download, validate, resize, save as `cover.jpg`, and (with `--embed`, default) re-embed into every track.
+
+By default only flagged albums (no cover or low-res) are surfaced. Pass `--all` to walk every album.
 
 Honours [musichoarders' integration policy](https://covers.musichoarders.xyz/) — never scrapes the site, just pre-fills the search and lets you pick.
 
-## Persistent index DB
+## `retag` — in-place tag overrides
+
+```bash
+musickit library retag DIR [--title T] [--artist A] [--album-artist AA] [--album AL] \
+                                   [--year YYYY] [--genre G] \
+                                   [--track-total N] [--disc-total N] \
+                                   [--recursive/--no-recursive] [--rename]
+```
+
+Only fields you explicitly pass are written; everything else is preserved (including covers, replaygain, MusicBrainz IDs). Useful when an album converted with the wrong name and you don't want to re-encode just to fix a tag.
+
+```bash
+musickit library retag path/to/album/01.m4a --year 1976
+musickit library retag path/to/album --track-total 12
+musickit library retag path/to/album --genre ''
+```
+
+`--rename` renames `DIR` to `YYYY - Album` based on the post-update tags after the retag completes.
+
+## `index` — manage the persistent SQLite cache
 
 The first scan of any library writes a SQLite cache at `<DIR>/.musickit/index.db`. On every subsequent launch — `library`, `tui`, or `serve` — the in-memory `LibraryIndex` is hydrated from rows instead of re-reading every audio file's tags. A delta-validate pass then reconciles the DB against any filesystem changes that happened since the last run (added albums, removed albums, tag edits applied with another tool).
 
-The DB is fully derived from the filesystem, so it's always safe to delete: `rm -rf <DIR>/.musickit/` (or `musickit library DIR --drop-index`). It'll be rebuilt on the next scan.
+The DB is fully derived from the filesystem, so it's always safe to delete.
+
+### Commands
+
+```bash
+musickit library index status  DIR     # schema version, library_root_abs, row counts, DB size
+musickit library index drop    DIR     # delete <DIR>/.musickit/
+musickit library index rebuild DIR     # wipe + rebuild from scratch
+```
+
+`--no-cache` (on `tree` / `audit` / `fix` / `cover-pick` / `tui` / `serve`) skips the DB entirely — useful for read-only mounts where `<DIR>/.musickit/` can't be created. `--full-rescan` (on the same set) rebuilds the index from scratch on this run.
 
 ### Schema
 
@@ -112,17 +152,6 @@ The DB is fully derived from the filesystem, so it's always safe to delete: `rm 
 | `album_warnings` | `(album_id, warning)` pairs from the audit pass |
 
 Schema changes don't run migrations — `db.py` defines a `SCHEMA_VERSION` constant; if the on-disk version doesn't match, the DB is unlinked and rebuilt from scratch.
-
-### Management commands
-
-```bash
-musickit library DIR --index-status   # schema version, library_root_abs, row counts, DB size
-musickit library DIR --drop-index     # delete <DIR>/.musickit/ — next scan recreates it
-musickit library DIR --full-rescan    # wipe + rebuild every row, ignoring the cache
-musickit library DIR --no-cache       # skip the DB entirely; in-memory scan only
-```
-
-`--no-cache` is the right call for read-only mounts where `<DIR>/.musickit/` can't be created. Otherwise, the cache is the default everywhere.
 
 ### Cold-start flow
 

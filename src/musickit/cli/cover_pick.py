@@ -23,17 +23,17 @@ import typer
 from PIL import Image
 from rich.console import Console
 
-from musickit.cli import app
 from musickit.cli._scan import scan_with_progress
+from musickit.cli.library import library_app
 from musickit.cover import DEFAULT_MAX_EDGE
 from musickit.enrich.musichoarders import build_search_url
-from musickit.library import LibraryAlbum, audit
+from musickit.library import LibraryAlbum
 from musickit.metadata import SUPPORTED_AUDIO_EXTS, embed_cover_only
 
 _LOW_RES_THRESHOLD_PIXELS = 500 * 500
 
 
-@app.command(name="cover-pick")
+@library_app.command(name="cover-pick")
 def cover_pick(
     target_dir: Annotated[
         Path,
@@ -42,7 +42,7 @@ def cover_pick(
             file_okay=False,
             help="Library root or single album directory.",
         ),
-    ] = Path("./output"),
+    ],
     issues_only: Annotated[
         bool,
         typer.Option(
@@ -103,13 +103,14 @@ def cover_pick(
 
 
 def _collect_candidates(console: Console, target_dir: Path, *, issues_only: bool) -> list[LibraryAlbum]:
+    # scan_with_progress runs through library.load_or_scan, which audits
+    # internally — no need to re-run library.audit() here.
     index = scan_with_progress(
         console,
         target_dir,
         measure_pictures=True,
         description="[cyan]Scanning for missing covers",
     )
-    audit(index)
     if not issues_only:
         return list(index.albums)
     return [
