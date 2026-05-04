@@ -2,21 +2,26 @@
 
 This file provides guidance to Claude Code when working with this repository.
 
-## NO EMOJIS EVER
+## Emoji policy
 
-**CRITICAL RULE: ABSOLUTELY NO EMOJIS ANYWHERE**
+No emojis or decorative Unicode in:
+- Commit messages, PR titles, PR descriptions
+- Code identifiers, comments, docstrings
+- Documentation, README, mkdocs pages
+- AI-generated chat output
 
-This means:
-- NO emojis in commit messages, PR titles, or PR descriptions
-- NO emojis in code, comments, or docstrings
-- NO emojis in documentation or README files
-- NO emojis in any output whatsoever
+In those contexts use plain text:
+- "[x]" instead of a check mark
+- "[ ]" instead of a cross mark
+- "Note:" instead of a note icon
+- "WARNING:" instead of a warning icon
 
-Use plain text instead:
-- "[x]" instead of any check mark
-- "[ ]" instead of any cross mark
-- "Note:" instead of any note icon
-- "WARNING:" instead of any warning icon
+EXCEPTION — TUI / UI rendering. The TUI is a graphical surface that renders
+Unicode block-drawing chars, glyphs, arrows, and status icons as part of its
+visual language. Symbols like `▶ ♪ ◉ ☺ ▦ ⚠ ✓ ─ ▸ 📻` ARE allowed inside
+user-facing TUI strings (notifications, row labels, status panels, widget
+content). The rule above is about source-code and prose hygiene, not about
+restricting what the rendered UI can show.
 
 ## Project Overview
 
