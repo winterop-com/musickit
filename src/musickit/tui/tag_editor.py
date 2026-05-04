@@ -21,7 +21,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Label
 
 if TYPE_CHECKING:
-    from musickit.library import LibraryTrack
+    from musickit.library import LibraryAlbum, LibraryTrack
     from musickit.metadata import TagOverrides
     from musickit.tui.app import MusickitApp
 
@@ -189,6 +189,172 @@ class TrackTagEditorScreen(ModalScreen[None]):
             self._track.track_no = overrides.track_no
         if overrides.disc_no is not None:
             self._track.disc_no = overrides.disc_no
+
+    def _set_status(self, markup: str) -> None:
+        self.query_one("#status", Label).update(markup)
+
+    def action_dismiss_screen(self) -> None:
+        """Close without saving."""
+        self.dismiss(None)
+
+
+class AlbumTagEditorScreen(ModalScreen[None]):
+    """Edit album-wide tags + apply across every track in the album.
+
+    Album-wide fields only: Album, Album Artist, Year, Genre. Per-track
+    fields (title, artist, track #) stay per-track and aren't shown here
+    — for those use the per-track editor (`e` on a tracklist row).
+    """
+
+    BINDINGS = [
+        Binding("escape", "dismiss_screen", "Cancel", show=False),
+        Binding("ctrl+s", "save", "Save", show=False, priority=True),
+    ]
+
+    DEFAULT_CSS = """
+    AlbumTagEditorScreen {
+        align: center middle;
+    }
+    AlbumTagEditorScreen Vertical#editor {
+        width: 70;
+        height: auto;
+        max-height: 90%;
+        background: $surface;
+        border: tall $primary;
+        padding: 1 2;
+    }
+    AlbumTagEditorScreen #title-bar {
+        text-align: center;
+        text-style: bold;
+        margin-bottom: 1;
+    }
+    AlbumTagEditorScreen #path-line {
+        color: $text-muted;
+        margin-bottom: 1;
+        text-align: center;
+    }
+    AlbumTagEditorScreen #scope-line {
+        color: $text-muted;
+        margin-bottom: 1;
+        text-align: center;
+    }
+    AlbumTagEditorScreen .field-row {
+        height: auto;
+        margin-bottom: 0;
+    }
+    AlbumTagEditorScreen .field-label {
+        width: 16;
+        padding: 1 1 0 0;
+        color: $text-muted;
+    }
+    AlbumTagEditorScreen Input {
+        width: 1fr;
+    }
+    AlbumTagEditorScreen Input.short {
+        width: 12;
+    }
+    AlbumTagEditorScreen #status {
+        height: 1;
+        margin-top: 1;
+        text-align: center;
+    }
+    AlbumTagEditorScreen #help {
+        margin-top: 1;
+        text-align: center;
+        color: $text-muted;
+    }
+    """
+
+    def __init__(self, app_ref: MusickitApp, album: LibraryAlbum) -> None:
+        super().__init__()
+        self._app_ref = app_ref
+        self._album = album
+        self._orig = {
+            "album": album.tag_album or "",
+            "album_artist": album.tag_album_artist or "",
+            "year": album.tag_year or "",
+            "genre": album.tag_genre or "",
+        }
+
+    def compose(self) -> ComposeResult:  # noqa: D102
+        with Vertical(id="editor"):
+            yield Label("Edit Album Tags", id="title-bar")
+            yield Label(str(self._album.path), id="path-line")
+            yield Label(f"applies to all {len(self._album.tracks)} track(s)", id="scope-line")
+            yield from self._field_row("Album", "album", self._orig["album"])
+            yield from self._field_row("Album Artist", "album_artist", self._orig["album_artist"])
+            yield from self._field_row("Year", "year", self._orig["year"], short=True)
+            yield from self._field_row("Genre", "genre", self._orig["genre"])
+            yield Label("", id="status")
+            yield Label("Ctrl+S Save  ·  Esc Cancel", id="help")
+
+    def _field_row(self, label: str, field_id: str, value: str, *, short: bool = False) -> ComposeResult:
+        with Horizontal(classes="field-row"):
+            yield Label(f"{label}:", classes="field-label")
+            yield Input(value=value, id=f"f-{field_id}", classes="short" if short else "")
+
+    def on_mount(self) -> None:  # noqa: D102
+        self.query_one("#f-album", Input).focus()
+
+    def action_save(self) -> None:
+        """Validate, write to every track, patch the in-memory album."""
+        from musickit.metadata import apply_tag_overrides
+
+        try:
+            overrides = self._build_overrides()
+        except _ValidationError as exc:
+            self._set_status(f"[red]{exc}[/]")
+            return
+        if overrides.is_empty():
+            self.dismiss(None)
+            return
+        failures: list[tuple[str, str]] = []
+        for track in self._album.tracks:
+            try:
+                apply_tag_overrides(track.path, overrides)
+            except Exception as exc:
+                failures.append((track.path.name, str(exc)))
+        if failures:
+            first_name, first_err = failures[0]
+            n = len(failures)
+            self._set_status(f"[red]{n} file(s) failed (e.g. {first_name}: {first_err})[/]")
+            return
+        self._patch_album_in_memory(overrides)
+        self._app_ref.notify_album_tags_updated(self._album)
+        self.dismiss(None)
+
+    def _build_overrides(self) -> TagOverrides:
+        from musickit.metadata import TagOverrides
+
+        kwargs: dict[str, object] = {}
+        for field in ("album", "album_artist", "year", "genre"):
+            new_value = self.query_one(f"#f-{field}", Input).value.strip()
+            if new_value != self._orig[field]:
+                kwargs[field] = new_value
+        year = kwargs.get("year")
+        if isinstance(year, str) and year and not (year.isdigit() and len(year) == 4):
+            raise _ValidationError("Year must be 4 digits (e.g. 2007).")
+        return TagOverrides(**kwargs)  # type: ignore[arg-type]
+
+    def _patch_album_in_memory(self, overrides: TagOverrides) -> None:
+        """Update LibraryAlbum + every LibraryTrack so the UI reflects new tags."""
+        if overrides.album is not None:
+            self._album.tag_album = overrides.album or None
+        if overrides.album_artist is not None:
+            self._album.tag_album_artist = overrides.album_artist or None
+        if overrides.year is not None:
+            self._album.tag_year = overrides.year or None
+        if overrides.genre is not None:
+            self._album.tag_genre = overrides.genre or None
+        for track in self._album.tracks:
+            if overrides.album is not None:
+                track.album = overrides.album or None
+            if overrides.album_artist is not None:
+                track.album_artist = overrides.album_artist or None
+            if overrides.year is not None:
+                track.year = overrides.year or None
+            if overrides.genre is not None:
+                track.genre = overrides.genre or None
 
     def _set_status(self, markup: str) -> None:
         self.query_one("#status", Label).update(markup)

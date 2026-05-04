@@ -930,24 +930,45 @@ class MusickitApp(App[None]):
         self.push_screen(AirPlayPickerScreen(self))
 
     def action_edit_tags(self) -> None:
-        """`e` opens the tag editor for the currently-highlighted tracklist row.
+        """`e` opens a tag editor for the currently-focused row.
 
-        Refused in Subsonic-client mode — the synthetic `/subsonic/...` path
-        isn't a real on-disk file. (Tags would have to be written via the
-        server's API, which Subsonic doesn't fully support; out of scope.)
-        Refused on the radio-stations view too — stations are config, not files.
+        - BrowserList focused on an album row → album-wide editor (album,
+          album-artist, year, genre across every track).
+        - TrackList focused on a track → per-track editor (title, artist,
+          track #, etc.).
+
+        Refused in Subsonic-client mode — the synthetic `/subsonic/...`
+        paths aren't real on-disk files.
         """
         if self._subsonic_client is not None:
             self.notify("Tag editing isn't available in Subsonic-client mode.", severity="warning")
             return
+        focused = self.focused
+        if isinstance(focused, BrowserList):
+            self._open_album_editor_from_browser(focused)
+            return
+        if isinstance(focused, TrackList):
+            self._open_track_editor_from_tracklist(focused)
+            return
+
+    def _open_album_editor_from_browser(self, browser: BrowserList) -> None:
+        from musickit.tui.tag_editor import AlbumTagEditorScreen
+
+        highlighted = browser.highlighted_child
+        if highlighted is None:
+            return
+        kind = getattr(highlighted, "entry_kind", None)
+        data = getattr(highlighted, "entry_data", None)
+        if kind != "album" or not isinstance(data, library_mod.LibraryAlbum):
+            self.notify("Highlight an album row to edit album-wide tags.", severity="warning")
+            return
+        self.push_screen(AlbumTagEditorScreen(self, data))
+
+    def _open_track_editor_from_tracklist(self, tracklist: TrackList) -> None:
         if self._in_radio_view:
             self.notify("Tag editing only applies to library tracks.", severity="warning")
             return
-        if self._current_album is None or self._current_track_idx is None:
-            return
-        try:
-            tracklist = self.query_one(TrackList)
-        except NoMatches:
+        if self._current_album is None:
             return
         highlighted = tracklist.highlighted_child
         if highlighted is None:
@@ -988,6 +1009,23 @@ class MusickitApp(App[None]):
         if idx == self._current_track_idx:
             self._refresh_status()
         self.notify(f"✓ Tags saved: {track.path.name}", severity="information")
+
+    def notify_album_tags_updated(self, album: LibraryAlbum) -> None:
+        """Called by the album editor after a successful album-wide save.
+
+        Repaints the tracklist (year/genre/album columns may have changed)
+        and the now-playing block if a track from this album is playing.
+        Doesn't trigger a full library rescan — the in-memory model has
+        already been patched by the editor.
+        """
+        if self._current_album is album:
+            self._repopulate_playlist()
+        if self._current_album is album and self._current_track_idx is not None:
+            self._refresh_status()
+        self.notify(
+            f"✓ Album tags saved across {len(album.tracks)} track(s): {album.album_dir}",
+            severity="information",
+        )
 
     def action_start_filter(self) -> None:
         """`/`: open a filter input above the focused pane (browser or tracklist)."""

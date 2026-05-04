@@ -176,6 +176,44 @@ async def test_track_editor_year_validation(silent_flac_template: Path, tmp_path
 
 
 @pytest.mark.asyncio
+async def test_e_opens_album_editor_from_browser_before_playback(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Regression: `e` used to silently no-op until a song was playing.
+    Now it opens the album editor based on the focused row, regardless of
+    whether anything is playing.
+    """
+    from musickit.tui.app import BrowserList, MusickitApp
+    from musickit.tui.tag_editor import AlbumTagEditorScreen
+
+    root = tmp_path / "lib"
+    _make_track(
+        root / "Beck" / "2002 - Sea Change",
+        silent_flac_template,
+        filename="01 - Lost Cause.m4a",
+        title="Lost Cause",
+        artist="Beck",
+    )
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        # Drill into the artist so the browser shows an album row.
+        browser = pilot.app.query_one(BrowserList)
+        a = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        pilot.app._handle_browser_selection(a)  # type: ignore[attr-defined]
+        await pilot.pause()
+        # Highlight the album row + focus the browser.
+        browser.focus()
+        album_idx = next(i for i, c in enumerate(browser.children) if getattr(c, "entry_kind", None) == "album")
+        browser.index = album_idx
+        await pilot.pause()
+        # `e` while NO playback is in progress.
+        assert pilot.app._current_track_idx is None  # type: ignore[attr-defined]
+        await pilot.press("e")
+        await pilot.pause()
+        # The album editor should be on top of the screen stack.
+        assert any(isinstance(s, AlbumTagEditorScreen) for s in pilot.app.screen_stack)
+
+
+@pytest.mark.asyncio
 async def test_e_keybinding_does_nothing_in_subsonic_mode(tmp_path: Path) -> None:
     """`e` is a no-op when Subsonic-client mode is active (synthetic paths)."""
     from unittest.mock import MagicMock
