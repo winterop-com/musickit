@@ -15,7 +15,7 @@ Useful when:
 - Spot-checking a single file from a problematic rip before running `library --audit` over the whole library.
 
 ```bash
-$ uv run musickit inspect ./output/ABBA/1976\ -\ Arrival/01\ -\ When\ I\ Kissed\ The\ Teacher.m4a
+$ uvx musickit inspect ./output/ABBA/1976\ -\ Arrival/01\ -\ When\ I\ Kissed\ The\ Teacher.m4a
 
 Title:         When I Kissed The Teacher
 Artist:        ABBA

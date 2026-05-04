@@ -34,13 +34,12 @@ Then on top of that:
 ## Quickstart
 
 ```bash
-uv sync
-uv run musickit convert ./input ./output
+uvx musickit convert ./input ./output
 ```
 
-That's it. New here? Two starting points depending on what you want:
+That's it — `uvx` downloads the latest `musickit` from PyPI, caches it, and runs it. (For persistent install: `uv tool install musickit`.) New here? Two starting points depending on what you want:
 
-- **[Tutorial: 0 to iPhone streaming](guides/tutorial.md)** — concrete step-by-step from `git clone` to playing a track on Amperfy. Covers Tailscale, server credentials, Amperfy connection setup. ~30 minutes.
+- **[Tutorial: 0 to iPhone streaming](guides/tutorial.md)** — concrete step-by-step from `pip install` to playing a track on Amperfy. Covers Tailscale, server credentials, Amperfy connection setup. ~30 minutes.
 - **[Architecture](architecture.md)** — how all the pieces fit together: process model, data flow, the audio engine subprocess, the SQLite library index, the FFT visualizer. Read this first if you want a mental model before diving in.
 
 Or for specific features: [Quickstart](guides/quickstart.md), [Convert](guides/convert.md), [Library](guides/library.md), [TUI](guides/tui.md), [Serve](guides/serve.md).

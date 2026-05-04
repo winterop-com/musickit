@@ -20,10 +20,16 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.tabs
+    # Left-side nav (no top tabs). `navigation.sections` groups top-level
+    # entries; `navigation.expand` keeps the tree expanded by default so
+    # everything is one click away. `navigation.indexes` lets a folder's
+    # index.md act as the section landing page.
     - navigation.sections
+    - navigation.expand
+    - navigation.indexes
     - navigation.top
     - navigation.tracking
+    - toc.follow
     - search.highlight
     - search.share
     - content.code.copy

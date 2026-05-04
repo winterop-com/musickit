@@ -23,15 +23,17 @@ you're on the same Wi-Fi or somewhere else.
 
 ### Install musickit
 
+The published package on [PyPI](https://pypi.org/project/musickit/) is the recommended install:
+
 ```bash
-git clone https://github.com/winterop-com/musickit
-cd musickit
-uv sync
+uv tool install musickit       # recommended (uv-managed, isolated venv on PATH)
+pipx install musickit          # equivalent for pipx users
+pip install musickit           # plain pip into current env
 ```
 
-`uv sync` creates `.venv/` and pulls every Python dep, including the bundled
-FFmpeg + PortAudio wheels for the TUI / serve audio paths. From this point
-the canonical entry point is `uv run musickit ...`.
+This pulls every Python dep, including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The canonical entry point is the `musickit` command.
+
+If you want to hack on musickit itself, see [Development](development.md) for the `git clone` + `uv sync` flow.
 
 ### Install system ffmpeg
 
@@ -68,7 +70,7 @@ hostname -f                               # local hostname
 ### Sanity-check musickit
 
 ```bash
-uv run musickit --help
+uvx musickit --help
 ```
 
 You should see `convert / library / inspect / tui / serve` listed.
@@ -80,7 +82,7 @@ handles `Artist/Album/`, `Artist/Album/CD1/CD2/`, scene-tagged dirs, and
 flat dumps. For a tutorial run a sample of 5–20 albums is enough.
 
 ```bash
-uv run musickit convert ./input ./output
+uvx musickit convert ./input ./output
 ```
 
 Default output is `output/<Artist>/<YYYY> - <Album>/NN - <Title>.m4a` at
@@ -94,7 +96,7 @@ tutorial points at that directory.
 ## 3. Audit + fix
 
 ```bash
-uv run musickit library audit ./output --issues-only
+uvx musickit library audit ./output --issues-only
 ```
 
 Shows a table of every album with at least one warning: missing cover,
@@ -103,8 +105,8 @@ track gaps. You can ignore most of these for a first run; the deterministic
 ones get fixed by:
 
 ```bash
-uv run musickit library fix ./output --dry-run        # preview
-uv run musickit library fix ./output                  # apply
+uvx musickit library fix ./output --dry-run        # preview
+uvx musickit library fix ./output                  # apply
 ```
 
 The fixer makes one MusicBrainz HTTP call per flagged album to backfill
@@ -115,7 +117,7 @@ for clean albums means there's nothing to fix.
 For the cover-art warnings, the semi-automated path is:
 
 ```bash
-uv run musickit library cover-pick ./output
+uvx musickit library cover-pick ./output
 ```
 
 Per album, this:
@@ -137,7 +139,7 @@ dropped.
 ## 4. Start the server
 
 ```bash
-uv run musickit serve ./output
+uvx musickit serve ./output
 ```
 
 By default this:
@@ -265,7 +267,7 @@ If the Mac has AirPlay devices on the same network (HomePod, AirPort
 Express, AirPlay-2 Sonos), `musickit tui` can route playback to them:
 
 ```bash
-uv run musickit tui ./output
+uvx musickit tui ./output
 ```
 
 Press `a` for the AirPlay picker, pick a device, music plays through
@@ -322,7 +324,7 @@ filesystem walk + tag read. After that, the SQLite index at
 are re-scanned. If a launch ever feels mysteriously slow, run:
 
 ```bash
-uv run musickit library index status ./output
+uvx musickit library index status ./output
 ```
 
 to inspect the DB and confirm it exists. `--full-rescan` (on `tree` or
