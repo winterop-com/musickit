@@ -328,3 +328,42 @@ async def test_pop_browser_restores_correct_artist_cursor(silent_flac_template: 
         highlighted = browser.highlighted_child
         assert highlighted is not None
         assert getattr(highlighted, "entry_data", None) == "Radiohead"
+
+
+@pytest.mark.asyncio
+async def test_fullscreen_toggle_restores_focus_to_tracklist(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Entering fullscreen and back must put focus back on the TrackList, not BrowserList."""
+    from musickit.tui.app import MusickitApp
+    from musickit.tui.widgets import TrackList
+
+    root = tmp_path / "lib"
+    album = root / "A" / "2020 - One"
+    _make_track(album, silent_flac_template, filename="01 - T.m4a", title="T", artist="A")
+
+    async with MusickitApp(root).run_test() as pilot:
+        await pilot.pause()
+        # Drill into the album so the TrackList is populated.
+        from musickit.tui.app import BrowserList
+
+        browser = pilot.app.query_one(BrowserList)
+        artist_row = next(c for c in browser.children if getattr(c, "entry_data", None) == "A")
+        pilot.app._handle_browser_selection(artist_row)  # type: ignore[attr-defined]
+        await pilot.pause()
+        album_row = browser.children[1]  # row 0 = back, row 1 = album
+        pilot.app._handle_browser_selection(album_row)  # type: ignore[attr-defined]
+        await pilot.pause()
+
+        tracklist = pilot.app.query_one(TrackList)
+        tracklist.focus()
+        await pilot.pause()
+        assert pilot.app.focused is tracklist
+
+        # Toggle into fullscreen and back.
+        app = pilot.app
+        assert isinstance(app, MusickitApp)
+        app.action_toggle_fullscreen()
+        await pilot.pause()
+        app.action_toggle_fullscreen()
+        await pilot.pause()
+
+        assert pilot.app.focused is tracklist

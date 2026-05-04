@@ -62,6 +62,8 @@ from musickit.tui.widgets import (
 )
 
 if TYPE_CHECKING:
+    from textual.widget import Widget
+
     from musickit.library import LibraryAlbum, LibraryIndex, LibraryTrack
     from musickit.radio import RadioStation
     from musickit.tui.airplay import AirPlayController, AirPlayDevice
@@ -185,6 +187,12 @@ class MusickitApp(App[None]):
         # Debounce timer for `on_resize` — reflowing track rows on every
         # resize-burst event holds the GIL long enough to click the audio.
         self._resize_reflow_timer: Timer | None = None
+        # Snapshot of self.focused saved when entering fullscreen so we can
+        # put it back on exit. Without this, hiding the focused widget via
+        # CSS `display: none` drops focus, and Textual lands it on whatever
+        # focusable widget remains (BrowserList) — surprising for users who
+        # were last interacting with the TrackList.
+        self._focus_before_fullscreen: Widget | None = None
 
     def on_resize(self, event: events.Resize) -> None:
         """Schedule a debounced row reflow after the user stops resizing.
@@ -1059,7 +1067,19 @@ class MusickitApp(App[None]):
             # missed previously — it stayed at the old 6 after the
             # visualizer panel grew to 12, leaving a weird gap.
             self.query_one(Visualizer).styles.height = 12
+            # Hiding the focused widget via CSS drops focus; put it back
+            # where it was before fullscreen so the user lands on the
+            # TrackList they were last interacting with, not on whatever
+            # focusable widget Textual fell back to (BrowserList).
+            saved = self._focus_before_fullscreen
+            self._focus_before_fullscreen = None
+            if saved is not None:
+                try:
+                    saved.focus()
+                except Exception:  # pragma: no cover — widget may have been removed
+                    pass
         else:
+            self._focus_before_fullscreen = self.focused
             self.screen.add_class("fullscreen")
             self.query_one(Visualizer).styles.height = "1fr"
 
@@ -1185,8 +1205,6 @@ class MusickitApp(App[None]):
 
     def action_start_filter(self) -> None:
         """`/`: open a filter input above the focused pane (browser or tracklist)."""
-        from textual.widget import Widget
-
         focused = self.focused
         anchor: Widget
         if isinstance(focused, BrowserList):
