@@ -49,6 +49,20 @@ def tui(
             help="Route playback to this AirPlay device (substring match against name or address).",
         ),
     ] = None,
+    no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--no-cache",
+            help="Skip the persistent index DB at `<DIR>/.musickit/index.db`; in-memory scan only.",
+        ),
+    ] = False,
+    full_rescan: Annotated[
+        bool,
+        typer.Option(
+            "--full-rescan",
+            help="Rebuild the index DB from scratch on launch (ignores any cached rows).",
+        ),
+    ] = False,
 ) -> None:
     """Browse and play the converted library, internet radio, or any Subsonic server.
 
@@ -118,6 +132,8 @@ def tui(
     MusickitApp(
         target_dir.resolve() if target_dir is not None else None,
         airplay=airplay_controller,
+        use_cache=not no_cache,
+        force_rescan=full_rescan,
     ).run()
 
 

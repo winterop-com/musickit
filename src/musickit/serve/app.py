@@ -52,8 +52,12 @@ def error_envelope(code: int, message: str) -> dict[str, Any]:
     }
 
 
-def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
-    """Build the FastAPI app for `root` with the given credentials."""
+def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastAPI:
+    """Build the FastAPI app for `root` with the given credentials.
+
+    `use_cache=False` disables the persistent `<root>/.musickit/index.db`
+    and falls back to in-memory scan on every rebuild.
+    """
     app = FastAPI(
         title="musickit",
         description="Subsonic-compatible API server for a converted musickit library.",
@@ -63,7 +67,7 @@ def create_app(*, root: Path, cfg: ServeConfig) -> FastAPI:
     )
     app.state.root = root
     app.state.cfg = cfg
-    app.state.cache = IndexCache(root)
+    app.state.cache = IndexCache(root, use_cache=use_cache)
 
     # Spec default is XML; clients opt into JSON via `?f=json`. Convert here
     # so endpoints stay simple (return dicts; the middleware emits the right
