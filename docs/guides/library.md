@@ -159,4 +159,4 @@ Schema changes don't run migrations — `db.py` defines a `SCHEMA_VERSION` const
 2. If the DB has no `albums` rows → `scan_full(root, conn)` runs a fresh filesystem walk + audit and writes everything.
 3. Otherwise → `load(root, conn)` hydrates the Pydantic graph, then `validate(root, conn)` walks the filesystem, compares per-album `dir_mtime` and per-file `(file_mtime, file_size)` to detect deltas, and re-scans only the affected album dirs via `rescan_albums`.
 
-For the `serve` watcher, `--full-rescan` is what the Subsonic `startScan` endpoint triggers (per-file incremental updates land in a follow-up).
+For the `serve` watcher: filesystem events are batched during a debounce window, then dispatched to `IndexCache.rescan_paths` which re-reads only the touched album dirs (handles adds, removes, and tag edits). Full rebuilds remain available via `musickit library index rebuild` and the Subsonic `startScan` endpoint.

@@ -9,7 +9,6 @@ What's open, organized by what it would feel like.
 
 ## Tier 2 — bigger directions (~3-5 sessions)
 
-- **Watcher per-album incremental updates** — the SQLite library index landed with cold-start cache + delta-validate on launch, but the filesystem watcher still triggers full rebuilds. Next: collect changed paths during the debounce window, dispatch to `library.rescan_albums` so only the touched albums get re-read.
 - **Web UI** — small Vue/htmx frontend mounted at `/` (replacing the JSON probe response). Same Subsonic backend; lets you play from any browser without installing an app.
 - **Podcast support** — Subsonic spec already defines `getPodcasts` / `getPodcastEpisode` / `createPodcastChannel`. Add an RSS feed list, fetch episodes on schedule, store position. Symfonium has decent podcast UX out of the box.
 - **iTunes / Apple Music import** — read the local Apple Music database to import play counts, ratings, and playlists. One-shot migration tool.
@@ -65,7 +64,8 @@ Things that would be interesting if anyone ever asked for them, but not pursued 
 - Per-track recording MBIDs (one MB `release/<mbid>?inc=recordings` lookup at enrich time)
 - mDNS / Bonjour autodiscovery (server advertises, TUI auto-detects)
 - Filesystem watcher with debounced auto-rescan
-- Persistent SQLite library index — `<root>/.musickit/index.db` removes the cold-start filesystem walk + tag read; `library.load_or_scan` hydrates from rows then runs a delta-validate pass to pick up filesystem changes (added / removed / tag-edited albums); `musickit library --full-rescan` / `--drop-index` / `--index-status` for management
+- Persistent SQLite library index — `<root>/.musickit/index.db` removes the cold-start filesystem walk + tag read; `library.load_or_scan` hydrates from rows then runs a delta-validate pass to pick up filesystem changes (added / removed / tag-edited albums); `musickit library index status|drop|rebuild` for management
+- Watcher per-album incremental updates — `IndexCache.rescan_paths` re-reads only the album dirs touched during the debounce window instead of rebuilding the whole library
 - Genre indexing (model + scan + `getGenres` + `byGenre`)
 - cover-pick semi-automated workflow
 - Folder-name edition-annotation strip
