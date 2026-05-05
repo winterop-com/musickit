@@ -371,3 +371,55 @@ async def test_fullscreen_toggle_restores_focus_to_tracklist(silent_flac_templat
         await pilot.pause()
 
         assert pilot.app.focused is tracklist
+
+
+@pytest.mark.asyncio
+async def test_fullscreen_actually_expands_visualizer_height(silent_flac_template: Path, tmp_path: Path) -> None:
+    """`f` must defeat the base `max-height: 14` cap and grow the meter past 14 rows.
+
+    Regression for the bug where `Screen.fullscreen Visualizer { max-height: 200; }`
+    declared inside `Visualizer.DEFAULT_CSS` failed to override the base
+    `max-height: 14` rule — the panel hid sidebar / tracklist correctly but
+    the visualizer stayed capped at 14, leaving the bottom of the screen
+    empty. Lifting the override to the app-level stylesheet (targeting
+    `#visualizer` by id) is what makes the cascade actually win.
+    """
+    from musickit.tui.app import MusickitApp
+    from musickit.tui.widgets import Visualizer
+
+    root = tmp_path / "lib"
+    _make_track(
+        root / "A" / "2020 - One",
+        silent_flac_template,
+        filename="01 - T.m4a",
+        title="T",
+        artist="A",
+    )
+
+    # 60-row terminal so the fullscreen viz has somewhere to grow into.
+    async with MusickitApp(root).run_test(size=(120, 60)) as pilot:
+        await pilot.pause()
+        app = pilot.app
+        assert isinstance(app, MusickitApp)
+        viz = app.query_one(Visualizer)
+
+        # Pre-fullscreen: max-height honours the base 14-row cap.
+        assert viz.size.height <= 14
+
+        app.action_toggle_fullscreen()
+        await pilot.pause()
+
+        # Fullscreen: max-height must be lifted so the panel fills the column.
+        # Effective ceiling is the new `max-height: 200` from app CSS; actual
+        # height tracks the viewport (60 rows minus topbar/keybar/now-playing/
+        # progress chrome ~ low 40s). Anything strictly above the old 14-cap
+        # proves the override took effect.
+        assert viz.size.height > 14, (
+            f"fullscreen visualizer should be > 14 rows tall on a 60-row terminal; "
+            f"got height={viz.size.height}, max_height={viz.styles.max_height}"
+        )
+
+        # Exit fullscreen — cap snaps back to 14.
+        app.action_toggle_fullscreen()
+        await pilot.pause()
+        assert viz.size.height <= 14

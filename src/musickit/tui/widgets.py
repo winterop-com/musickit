@@ -165,22 +165,23 @@ class Visualizer(Static):
         /* Share the main column with the tracklist proportionally
            instead of grabbing a fixed 12 lines: when the terminal is
            short, the tracklist needs room too. min-height keeps the bars
-           legible; max-height stops it from ballooning on tall windows. */
+           legible; max-height stops it from ballooning on tall windows.
+
+           The fullscreen-mode override (`Screen.fullscreen #visualizer`)
+           lives in `MusickitApp.CSS`, NOT here. Textual applies a
+           widget's own DEFAULT_CSS but does not reliably propagate
+           descendant-combinator rules from one widget's stylesheet to
+           another widget's selector match — `Screen.fullscreen
+           Visualizer { ... }` declared here was getting overridden by
+           the base `Visualizer { max-height: 14; }` in the cascade
+           even with strictly higher specificity. Lifting the override
+           into the app-level stylesheet (where Screen-class rules
+           naturally live) fixes it. */
         height: 1fr;
         min-height: 6;
         max-height: 14;
         padding: 0 2;
         border: round $primary 30%;
-    }
-    Screen.fullscreen Visualizer {
-        height: 1fr;
-        /* Defeat the base `max-height: 14` so fullscreen actually fills
-           the viewport. Textual CSS rejects `none`; 200 cells is more
-           than any reasonable terminal is tall, so this is effectively
-           uncapped. (`100vh` was tried first but interacted oddly with
-           the base rule's max-height in some layouts, leaving the bars
-           stuck at 14 rows even with the fullscreen class applied.) */
-        max-height: 200;
     }
     """
 
