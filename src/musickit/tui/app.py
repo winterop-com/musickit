@@ -1191,8 +1191,11 @@ class MusickitApp(App[None]):
             self.screen.remove_class("fullscreen")
             # Clear the inline `1fr` we set on entering fullscreen so
             # the visualizer falls back to its CSS default
-            # (`1fr; min-height: 6; max-height: 14`).
-            del self.query_one(Visualizer).styles.height
+            # (`1fr; min-height: 6; max-height: 14`). Textual's Styles
+            # API uses `clear_rule()` for this; `del styles.height`
+            # raises AttributeError because the descriptor has no
+            # __delete__.
+            self.query_one(Visualizer).styles.clear_rule("height")
             # Hiding the focused widget via CSS drops focus; put it back
             # where it was before fullscreen so the user lands on the
             # TrackList they were last interacting with, not on whatever
