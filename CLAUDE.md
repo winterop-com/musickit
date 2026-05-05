@@ -82,3 +82,18 @@ Never manually edit `pyproject.toml` for dependency changes.
 ## Git Workflow
 
 Ask the user before creating branches or pull requests.
+
+## Releases — bump AND tag
+
+A version bump in `pyproject.toml` alone does NOT publish anything.
+`release.yml` only runs when a tag matching `v*` is pushed. After
+merging a PR that bumps the patch:
+
+1. `git checkout main && git pull --ff-only`
+2. `git tag -a vX.Y.Z <merge-sha> -m "vX.Y.Z - <one-line summary>"`
+3. `git push origin vX.Y.Z`
+
+The tag's commit must have the matching version in `pyproject.toml`
+(the workflow asserts this and fails otherwise). If multiple PRs
+landed without tags, tag each merge commit at its own version so the
+PyPI history stays in lockstep with the GitHub releases page.
