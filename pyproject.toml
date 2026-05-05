@@ -75,6 +75,7 @@ dev = [
   "mkdocs>=1.6.1",
   "mkdocs-material>=9.7.6",
   "mkdocstrings[python]>=1.0.4",
+  "mkdocs-claude-theme",
 ]
 
 [build-system]
@@ -157,3 +158,6 @@ reportMissingTypeStubs = false
 reportUnknownLambdaType = false
 reportMissingImports = "warning"
 reportMissingModuleSource = false
+
+[tool.uv.sources]
+mkdocs-claude-theme = { git = "https://github.com/mortenoh/mkdocs-claude-theme.git" }

@@ -40,7 +40,6 @@ nav:
   - Architecture: architecture.md
   - Guides:
       - Quickstart: guides/quickstart.md
-      - 'Tutorial: 0 to iPhone streaming': guides/tutorial.md
       - musickit convert: guides/convert.md
       - musickit library: guides/library.md
       - musickit inspect: guides/inspect.md
@@ -80,6 +79,7 @@ markdown_extensions:
 
 plugins:
   - search
+  - claude-theme
   - mkdocstrings:
       handlers:
         python:

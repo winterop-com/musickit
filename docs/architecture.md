@@ -494,5 +494,5 @@ on-the-fly transcoding. Optional: `chromaprint` (`fpcalc`) for AcoustID.
 - [Library](guides/library.md) — audit rules + the SQLite index.
 - [TUI](guides/tui.md) — keybindings + AirPlay + Subsonic-client mode.
 - [Serve](guides/serve.md) — Subsonic API + Tailscale + client setup.
-- [Tutorial: 0 to iPhone streaming](guides/tutorial.md) — end-to-end walkthrough.
+- [Quickstart](guides/quickstart.md) — end-to-end walkthrough including iPhone streaming.
 - [Development](guides/development.md) — directory layout + test patterns.

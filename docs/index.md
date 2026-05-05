@@ -39,8 +39,7 @@ uvx musickit convert ./input ./output
 
 `uvx` downloads the latest `musickit` from PyPI, caches it, runs it. For persistent install: `uv tool install musickit`. New here?
 
-- **[Quickstart](guides/quickstart.md)** — two-minute walkthrough: install, convert, audit, play locally.
-- **[Tutorial](guides/tutorial.md)** — full end-to-end including iPhone + Tailscale + Amperfy. ~30 minutes.
+- **[Quickstart](guides/quickstart.md)** — full end-to-end walkthrough including iPhone + Tailscale + Amperfy. ~30 minutes.
 - **[Architecture](architecture.md)** — how the pieces fit together: process model, data flow, audio engine subprocess, SQLite index, FFT visualizer. Read this first if you want a mental model before diving in.
 
 Per-command guides: [Convert](guides/convert.md) · [Library](guides/library.md) · [TUI](guides/tui.md) · [Serve](guides/serve.md) · [Inspect](guides/inspect.md).
