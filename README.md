@@ -33,10 +33,11 @@ sudo apt install ffmpeg        # Debian / Ubuntu
 ## Quickstart
 
 ```bash
-uvx musickit convert ./input ./output       # convert
-uvx musickit library audit ./output         # audit
-uvx musickit tui ./output                   # TUI
-uvx musickit serve ./output                 # Subsonic server
+uvx musickit convert ./input ./output                          # convert
+uvx musickit library audit ./output                            # audit
+uvx musickit tui ./output                                      # TUI
+uvx musickit serve ./output                                    # Subsonic server
+uvx musickit playlist gen ./output --seed <track> --minutes 60 # auto-generate a mix
 ```
 
 ## Screenshots
@@ -67,13 +68,14 @@ Or jump straight to:
 - [musickit library](docs/guides/library.md) — audit rules + auto-fix + SQLite index
 - [musickit tui](docs/guides/tui.md) — TUI: local + radio + Subsonic-client + AirPlay
 - [musickit serve](docs/guides/serve.md) — Subsonic API + Tailscale + clients
+- [musickit playlist](docs/guides/playlist.md) — auto-generated `.m3u8` mixes anchored to a seed track
 - [Edge cases](docs/edge-cases.md) — every weirdness encountered on real rips
 - [Roadmap](docs/roadmap.md) — what's next
 - [Development](docs/guides/development.md) — directory layout + test patterns + commit style
 
 ## Status
 
-v0.5.0 · ruff + mypy + pyright clean, full pytest suite green. Five top-level commands — `convert`, `library`, `inspect`, `tui`, `serve` — with `library` carrying the read / mutate / manage subcommands (`tree`, `audit`, `fix`, `cover`, `cover-pick`, `retag`, `index`). The TUI ships local-library playback, internet radio, Subsonic-client mode, AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, an incremental `/`-filter, in-place tag editing (`e` for track / album-wide), a 48-band FFT visualiser, and click-to-seek on the progress bar. Audio decoder + sounddevice callback run in a separate process so UI work in the main interpreter can't stall playback. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions) and tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop. A persistent SQLite library index at `<root>/.musickit/index.db` makes cold starts skip the filesystem walk + tag read; the filesystem watcher does per-album incremental rescans.
+v0.6.2 · ruff + mypy + pyright clean, full pytest suite green. Six top-level commands — `convert`, `library`, `inspect`, `tui`, `serve`, `playlist` — with `library` carrying the read / mutate / manage subcommands (`tree`, `audit`, `fix`, `cover`, `cover-pick`, `retag`, `index`) and `playlist` carrying `gen` / `list` / `show`. The TUI ships local-library playback, internet radio, Subsonic-client mode, AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, an incremental `/`-filter, in-place tag editing (`e` for track / album-wide), a 48-band FFT visualiser, and click-to-seek on the progress bar. Audio decoder + sounddevice callback run in a separate process so UI work in the main interpreter can't stall playback. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions) and tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop. A persistent SQLite library index at `<root>/.musickit/index.db` makes cold starts skip the filesystem walk + tag read; the filesystem watcher does per-album incremental rescans.
 
 ## License
 

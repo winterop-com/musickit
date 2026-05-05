@@ -27,8 +27,9 @@ Then on top of that:
   - `library tree DIR` / `library audit DIR` / `library fix DIR` — render, audit, auto-fix
   - `library cover IMAGE DIR` / `library cover-pick DIR` / `library retag DIR` — in-place tag and cover edits; semi-automated cover selection via [musichoarders.xyz](https://covers.musichoarders.xyz/)
   - `library index status|drop|rebuild DIR` — manage the persistent SQLite index at `<DIR>/.musickit/index.db`
-- **`musickit tui`** — Textual UI: artist/album browser, now-playing visualizer, internet radio, and a Subsonic-client mode that connects to your own `serve` over Tailscale.
+- **`musickit tui`** — Textual UI: artist/album browser, now-playing visualizer, internet radio, saved Mixes view, and a Subsonic-client mode that connects to your own `serve` over Tailscale. Press `g` on any track to generate a 60-min mix anchored to it.
 - **`musickit serve`** — Subsonic-compatible HTTP server. Any Subsonic client (Symfonium, Amperfy, play:Sub, Feishin) can browse + stream + control via the standard API. mDNS / Bonjour for autodiscovery, ffmpeg-on-the-fly for transcoding, filesystem watcher for auto-rescan when you drop new albums in.
+- **`musickit playlist`** — auto-generate `.m3u8` playlists anchored to a seed track using tag-based similarity (artist / genre / year). `gen` writes a mix; `list` / `show` browse what's saved. Output is plain extended M3U so VLC, Subsonic clients, and the TUI's Mixes view all play it.
 - **`musickit inspect`** — quick tag dump for a single file.
 
 ## Quickstart
@@ -42,7 +43,7 @@ uvx musickit convert ./input ./output
 - **[Quickstart](guides/quickstart.md)** — full end-to-end walkthrough including iPhone + Tailscale + Amperfy. ~30 minutes.
 - **[Architecture](architecture.md)** — how the pieces fit together: process model, data flow, audio engine subprocess, SQLite index, FFT visualizer. Read this first if you want a mental model before diving in.
 
-Per-command guides: [Convert](guides/convert.md) · [Library](guides/library.md) · [TUI](guides/tui.md) · [Serve](guides/serve.md) · [Inspect](guides/inspect.md).
+Per-command guides: [Convert](guides/convert.md) · [Library](guides/library.md) · [TUI](guides/tui.md) · [Serve](guides/serve.md) · [Playlist](guides/playlist.md) · [Inspect](guides/inspect.md).
 
 ## Why this exists
 

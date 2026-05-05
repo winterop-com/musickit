@@ -50,6 +50,8 @@ Fullscreen visualizer (`f`):
 | `s` | Toggle shuffle |
 | `r` | Cycle repeat (off → album → track) |
 | `f` | Toggle fullscreen visualizer |
+| `v` | Show / hide visualizer panel (frees space for the tracklist) |
+| `g` | Generate a 60-min mix anchored to the highlighted track |
 | `/` | Filter the focused pane (artists / albums / tracks) |
 | `e` | Edit tags — track-level on track list, album-wide on album row |
 | `Tab` | Cycle focus across browser / track list |
@@ -110,6 +112,19 @@ Defaults baked into code + user TOML are merged at runtime (deduped by URL, user
 ICY metadata polling: while a stream is playing, the decoder thread polls `container.metadata` per packet for `StreamTitle` updates. The "now playing" pane updates with the live song name as the radio station broadcasts it.
 
 Radio launches as a first-class mode — `musickit tui` with no DIR drops directly into station picking (skipping the library scan entirely).
+
+## Mixes — auto-generated playlists
+
+Press `g` on a TrackList row to generate a 60-min mix anchored to that track. The action:
+
+1. Resolves the seed (highlighted row, falls back to currently-playing track).
+2. Calls `playlist.generate(index, seed, target_minutes=60)` — same builder as the [`musickit playlist gen`](playlist.md) CLI.
+3. Persists the result to `<root>/.musickit/playlists/<slug>.m3u8` for cross-tool reuse (VLC, Subsonic clients).
+4. Wraps the result as a virtual `LibraryAlbum` (`artist_dir = "Mix"`) and starts playback. Next / prev / shuffle / repeat all work on the mix as if it were a regular album.
+
+Saved mixes are browseable: select **Mixes** in the sidebar (sits next to **Radio**) and the right pane shows one row per `.m3u8` under `<root>/.musickit/playlists/`. Enter on a row replays it. Tracks whose paths no longer resolve are silently skipped, so a saved mix degrades gracefully if you've reorganised the library since.
+
+The on-disk format is the standard extended M3U with `#EXTINF` lines — every audio player understands it. See the [playlist guide](playlist.md) for the similarity scoring details and CLI surface.
 
 ## Subsonic-client mode
 

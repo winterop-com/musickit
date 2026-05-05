@@ -83,6 +83,25 @@ Never manually edit `pyproject.toml` for dependency changes.
 
 Ask the user before creating branches or pull requests.
 
+## Docs — update them in the same PR
+
+Any user-facing change ships its docs. Don't queue doc updates for "later."
+The reader is the user opening the mkdocs site or the README, and a
+feature that exists only in code with no documentation may as well not
+exist. For each PR, ask: which of these reflects this change?
+
+- `README.md` — feature list / quickstart snippet
+- `docs/index.md` — home-page feature blurbs
+- `docs/guides/<command>.md` — the canonical reference for that subcommand
+- `docs/guides/tui.md` — keybind table + view descriptions
+- `docs/architecture.md` — only if a system-level shape changes
+- `docs/roadmap.md` — strike completed items
+- `mkdocs.yml` — `nav:` if a new doc page lands
+
+If a PR adds a new subcommand or TUI keybind / view, the answer is
+"at least one of guides/, plus the README and home-page feature lists."
+A docs-skipping PR is incomplete; treat it the same as missing tests.
+
 ## Releases — bump AND tag
 
 A version bump in `pyproject.toml` alone does NOT publish anything.
