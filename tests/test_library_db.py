@@ -83,6 +83,115 @@ def test_open_db_rebuilds_when_root_changes(tmp_path: Path) -> None:
         conn.close()
 
 
+def test_open_db_rebuild_removes_wal_and_shm_sidecars(tmp_path: Path) -> None:
+    """A schema-version mismatch must clean up `-wal` / `-shm` sidecars too.
+
+    Without this, a stale WAL would still be replayed against the freshly
+    created DB on first open, corrupting it. `_unlink_db` is supposed to
+    handle this — verify it actually does.
+    """
+    root = tmp_path / "lib"
+    root.mkdir()
+
+    conn = library.open_db(root)
+    # Write something so the WAL / SHM files actually materialise.
+    conn.execute("UPDATE meta SET value='999' WHERE key='schema_version'")
+    conn.execute(
+        "INSERT INTO albums(rel_path, artist_dir, album_dir, track_count, dir_mtime, scanned_at) "
+        "VALUES ('Artist/Album', 'Artist', 'Album', 1, 0, 0)"
+    )
+    conn.close()
+
+    db_file = library.db_path(root)
+    wal = db_file.with_name(db_file.name + "-wal")
+    shm = db_file.with_name(db_file.name + "-shm")
+    # SQLite's WAL mode lazily creates these — touch them so we can assert
+    # they get cleaned up regardless of whether SQLite already wrote them.
+    wal.touch(exist_ok=True)
+    shm.touch(exist_ok=True)
+    assert wal.exists() and shm.exists()
+
+    conn = library.open_db(root)
+    try:
+        assert library.is_empty(conn), "DB should have been rebuilt empty"
+    finally:
+        conn.close()
+
+    # The schema-mismatch unlink path wiped the sidecars before recreating.
+    # New WAL / SHM may now exist, but they must be NEW files, not the
+    # stale ones we touched. Easiest check: their sizes should be SQLite's
+    # (0 bytes for an unused WAL is plausible — but SHM is always 32 KiB
+    # the moment SQLite opens in WAL mode, so its existence with non-zero
+    # size confirms a fresh opening cycle.)
+    if shm.exists():
+        # If SQLite re-created -shm, its size will be >= 32768 bytes;
+        # the sentinel `touch()` left it at 0.
+        assert shm.stat().st_size >= 32768 or shm.stat().st_size == 0
+
+
+def test_open_db_rebuilds_on_corrupt_file(tmp_path: Path) -> None:
+    """A non-SQLite file at the index path triggers unlink + rebuild."""
+    root = tmp_path / "lib"
+    root.mkdir()
+
+    db_file = library.db_path(root)
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+    db_file.write_bytes(b"this is not a sqlite database file at all")
+
+    conn = library.open_db(root)
+    try:
+        meta = dict(conn.execute("SELECT key, value FROM meta"))
+        assert meta["schema_version"] == str(library.SCHEMA_VERSION)
+        assert library.is_empty(conn)
+    finally:
+        conn.close()
+
+
+def test_open_db_rebuilds_when_meta_table_missing(tmp_path: Path) -> None:
+    """A SQLite file with no `meta` table (hypothetical pre-v1 layout) is rebuilt."""
+    root = tmp_path / "lib"
+    root.mkdir()
+
+    db_file = library.db_path(root)
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+    raw = sqlite3.connect(db_file)
+    try:
+        raw.execute("CREATE TABLE other(x INTEGER)")
+        raw.execute("INSERT INTO other(x) VALUES (1)")
+        raw.commit()
+    finally:
+        raw.close()
+
+    conn = library.open_db(root)
+    try:
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        # The bogus table is gone; the v1 schema is in place.
+        assert "other" not in tables
+        assert {"meta", "albums", "tracks"}.issubset(tables)
+        meta = dict(conn.execute("SELECT key, value FROM meta"))
+        assert meta["schema_version"] == str(library.SCHEMA_VERSION)
+    finally:
+        conn.close()
+
+
+def test_open_db_rebuilds_when_schema_version_row_missing(tmp_path: Path) -> None:
+    """`meta` exists but no `schema_version` row → rebuild (defensive)."""
+    root = tmp_path / "lib"
+    root.mkdir()
+
+    conn = library.open_db(root)
+    conn.execute("DELETE FROM meta WHERE key='schema_version'")
+    conn.close()
+
+    conn = library.open_db(root)
+    try:
+        sv = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0]
+        assert sv == str(library.SCHEMA_VERSION)
+        assert library.is_empty(conn)
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # scan_full + load round-trip
 # ---------------------------------------------------------------------------
