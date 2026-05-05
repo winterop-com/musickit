@@ -27,6 +27,7 @@ from musickit import library as library_mod
 from musickit import radio as radio_mod
 from musickit.tui.advance import compute_next_track_idx
 from musickit.tui.commands import MusickitCommands
+from musickit.tui.filter import fold as _fold_for_match
 from musickit.tui.formatters import format_station_row, format_track_row
 from musickit.tui.player import AudioPlayer
 from musickit.tui.state import load_state, save_state
@@ -536,10 +537,10 @@ class MusickitApp(App[None]):
         for album in self._index.albums:
             by_artist.setdefault(album.artist_dir, []).append(album)
         max_name = _TREE_MAX_WIDTH - _BROWSER_DECORATION_PAD
-        needle = self._browser_filter.casefold()
+        needle = _fold_for_match(self._browser_filter)
         matched = 0
         for artist in sorted(by_artist, key=str.lower):
-            if needle and needle not in artist.casefold():
+            if needle and needle not in _fold_for_match(artist):
                 continue
             count = len(by_artist[artist])
             name = _truncate(artist, max_name)
@@ -564,10 +565,10 @@ class MusickitApp(App[None]):
             key=lambda a: a.album_dir.lower(),
         )
         max_name = _TREE_MAX_WIDTH - _BROWSER_DECORATION_PAD
-        needle = self._browser_filter.casefold()
+        needle = _fold_for_match(self._browser_filter)
         matched = 0
         for album in artist_albums:
-            if needle and needle not in album.album_dir.casefold():
+            if needle and needle not in _fold_for_match(album.album_dir):
                 continue
             warn = f" [{C_PEAK}]⚠[/]" if album.warnings else ""
             name = _truncate(album.album_dir, max_name)
@@ -877,12 +878,12 @@ class MusickitApp(App[None]):
         # after browsing somewhere else and back.
         playing_idx = self._playing_track_idx_in(album)
         self._current_track_idx = playing_idx
-        needle = self._tracklist_filter.casefold()
+        needle = _fold_for_match(self._tracklist_filter)
         title_width = compute_title_width(tracklist.size.width, header_padding=2)
         matched = 0
         for i, track in enumerate(album.tracks):
             if needle:
-                hay = f"{track.title or ''} {track.artist or ''}".casefold()
+                hay = _fold_for_match(f"{track.title or ''} {track.artist or ''}")
                 if needle not in hay:
                     continue
             label = format_track_row(i, track, album, marker=(i == playing_idx), title_width=title_width)
@@ -936,11 +937,11 @@ class MusickitApp(App[None]):
         if not self._radio_stations:
             tracklist.append(ListItem(Static("[dim]No stations configured. Edit `~/.config/musickit/radio.toml`.[/]")))
             return
-        needle = self._tracklist_filter.casefold()
+        needle = _fold_for_match(self._tracklist_filter)
         title_width = compute_title_width(tracklist.size.width, header_padding=2)
         matched = 0
         for i, station in enumerate(self._radio_stations):
-            if needle and needle not in station.name.casefold():
+            if needle and needle not in _fold_for_match(station.name):
                 continue
             label = format_station_row(i, station, marker=False, title_width=title_width)
             item = ListItem(Static(label, id=f"track-row-{i}"))
