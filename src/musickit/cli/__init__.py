@@ -95,6 +95,7 @@ from musickit.cli import cover as _cover_cmd  # noqa: E402
 from musickit.cli import cover_pick as _cover_pick_cmd  # noqa: E402
 from musickit.cli import inspect as _inspect_cmd  # noqa: E402
 from musickit.cli import library as _library_cmd  # noqa: E402
+from musickit.cli import playlist as _playlist_cmd  # noqa: E402
 from musickit.cli import retag as _retag_cmd  # noqa: E402
 from musickit.cli import serve as _serve_cmd  # noqa: E402
 from musickit.cli import tui as _tui_cmd  # noqa: E402
@@ -105,6 +106,7 @@ _ = (
     _cover_pick_cmd,
     _inspect_cmd,
     _library_cmd,
+    _playlist_cmd,
     _retag_cmd,
     _serve_cmd,
     _tui_cmd,
