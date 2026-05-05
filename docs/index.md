@@ -25,7 +25,7 @@ Then on top of that:
 
 - **`musickit library`** — read, audit, fix, retag, cover, and manage the converted library. Subcommands:
   - `library tree DIR` / `library audit DIR` / `library fix DIR` — render, audit, auto-fix
-  - `library cover DIR IMAGE` / `library cover-pick DIR` / `library retag DIR` — in-place tag and cover edits; semi-automated cover selection via [musichoarders.xyz](https://covers.musichoarders.xyz/)
+  - `library cover IMAGE DIR` / `library cover-pick DIR` / `library retag DIR` — in-place tag and cover edits; semi-automated cover selection via [musichoarders.xyz](https://covers.musichoarders.xyz/)
   - `library index status|drop|rebuild DIR` — manage the persistent SQLite index at `<DIR>/.musickit/index.db`
 - **`musickit tui`** — Textual UI: artist/album browser, now-playing visualizer, internet radio, and a Subsonic-client mode that connects to your own `serve` over Tailscale.
 - **`musickit serve`** — Subsonic-compatible HTTP server. Any Subsonic client (Symfonium, Amperfy, play:Sub, Feishin) can browse + stream + control via the standard API. mDNS / Bonjour for autodiscovery, ffmpeg-on-the-fly for transcoding, filesystem watcher for auto-rescan when you drop new albums in.
@@ -37,12 +37,13 @@ Then on top of that:
 uvx musickit convert ./input ./output
 ```
 
-That's it — `uvx` downloads the latest `musickit` from PyPI, caches it, and runs it. (For persistent install: `uv tool install musickit`.) New here? Two starting points depending on what you want:
+`uvx` downloads the latest `musickit` from PyPI, caches it, runs it. For persistent install: `uv tool install musickit`. New here?
 
-- **[Tutorial: 0 to iPhone streaming](guides/tutorial.md)** — concrete step-by-step from `pip install` to playing a track on Amperfy. Covers Tailscale, server credentials, Amperfy connection setup. ~30 minutes.
-- **[Architecture](architecture.md)** — how all the pieces fit together: process model, data flow, the audio engine subprocess, the SQLite library index, the FFT visualizer. Read this first if you want a mental model before diving in.
+- **[Quickstart](guides/quickstart.md)** — two-minute walkthrough: install, convert, audit, play locally.
+- **[Tutorial](guides/tutorial.md)** — full end-to-end including iPhone + Tailscale + Amperfy. ~30 minutes.
+- **[Architecture](architecture.md)** — how the pieces fit together: process model, data flow, audio engine subprocess, SQLite index, FFT visualizer. Read this first if you want a mental model before diving in.
 
-Or for specific features: [Quickstart](guides/quickstart.md), [Convert](guides/convert.md), [Library](guides/library.md), [TUI](guides/tui.md), [Serve](guides/serve.md).
+Per-command guides: [Convert](guides/convert.md) · [Library](guides/library.md) · [TUI](guides/tui.md) · [Serve](guides/serve.md) · [Inspect](guides/inspect.md).
 
 ## Why this exists
 

@@ -231,6 +231,7 @@ async def _capture(name: str, root: Path, out_dir: Path, keys: list[str], note: 
 
 
 async def main() -> None:
+    """Build the fixture library and capture every TUI screen as an SVG."""
     out_dir = Path("docs/screenshots")
     out_dir.mkdir(parents=True, exist_ok=True)
 

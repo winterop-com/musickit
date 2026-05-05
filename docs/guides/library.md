@@ -6,7 +6,7 @@ Every operation that reads, mutates, or manages the converted library lives unde
 uvx musickit library tree DIR              # rich.Tree of artists / albums / tracks
 uvx musickit library audit DIR             # audit table with per-album warnings
 uvx musickit library fix DIR               # apply deterministic fixes
-uvx musickit library cover DIR IMAGE       # embed an image into every audio file
+uvx musickit library cover IMAGE DIR       # embed an image into every audio file
 uvx musickit library cover-pick DIR        # semi-automated cover sourcing via musichoarders
 uvx musickit library retag DIR             # in-place tag overrides
 uvx musickit library index status DIR      # show index DB metadata + counts
@@ -79,7 +79,7 @@ Fixes that are NOT auto-applied:
 ## `cover` — embed an image
 
 ```bash
-uvx musickit library cover DIR IMAGE [--cover-max-edge PX] [--recursive/--no-recursive]
+uvx musickit library cover IMAGE DIR [--cover-max-edge PX] [--recursive/--no-recursive]
 ```
 
 Embeds `IMAGE` (JPG/PNG) into every audio file under `DIR`. The image is normalised once (downscaled to fit the long-edge cap, JPEG-encoded for non-PNG sources) and then written to every supported audio file. Other tags are preserved — only the cover is replaced.
