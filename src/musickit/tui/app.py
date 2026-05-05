@@ -193,6 +193,10 @@ class MusickitApp(App[None]):
         # Radio state.
         self._radio_stations: list[RadioStation] = []
         self._in_radio_view: bool = False
+        # Mixes (saved auto-generated playlists) — drilled-into when the
+        # user selects the "Mixes" entry in the browser. Mutually
+        # exclusive with `_in_radio_view`.
+        self._in_mixes_view: bool = False
         # Set by AudioPlayer.on_metadata_change (worker thread). Drained in
         # the UI tick so the `Now Playing` block updates with new ICY title.
         self._stream_metadata_dirty: bool = False
@@ -516,13 +520,18 @@ class MusickitApp(App[None]):
 
     def _populate_browser_artists(self, browser: BrowserList) -> None:
         assert self._index is not None
-        # Hide Radio while a filter is active — the user is searching for an
-        # artist, surfacing Radio is just noise.
+        # Hide Radio + Mixes while a filter is active — the user is searching
+        # for an artist, surfacing those entries is just noise.
         if not self._browser_filter:
             radio_item = ListItem(Static(f" [{C_ACCENT}]📻[/] [bold]Radio[/]  [dim]({len(self._radio_stations)})[/]"))
             radio_item.entry_kind = "radio"  # type: ignore[attr-defined]
             radio_item.entry_data = None  # type: ignore[attr-defined]
             browser.append(radio_item)
+            n_mixes = self._count_mixes()
+            mixes_item = ListItem(Static(f" [{C_ACCENT}]♫[/] [bold]Mixes[/]  [dim]({n_mixes})[/]"))
+            mixes_item.entry_kind = "mixes"  # type: ignore[attr-defined]
+            mixes_item.entry_data = None  # type: ignore[attr-defined]
+            browser.append(mixes_item)
         by_artist: dict[str, list[LibraryAlbum]] = {}
         for album in self._index.albums:
             by_artist.setdefault(album.artist_dir, []).append(album)
@@ -585,6 +594,10 @@ class MusickitApp(App[None]):
             if isinstance(station, radio_mod.RadioStation):
                 self._play_station(station)
                 return
+            mix_path = getattr(event.item, "mix_path", None)
+            if isinstance(mix_path, Path):
+                self._play_mix(mix_path)
+                return
             idx = getattr(event.item, "track_index", None)
             if isinstance(idx, int):
                 self._current_track_idx = idx
@@ -635,16 +648,123 @@ class MusickitApp(App[None]):
             self._open_radio_view()
             self.query_one(TrackList).focus()
             return
+        if kind_first == "mixes":
+            self._open_mixes_view()
+            self.query_one(TrackList).focus()
+            return
         return self._handle_browser_selection_default(item)
 
     def _open_radio_view(self) -> None:
         """Populate the right-pane track list with the curated radio stations."""
         self._clear_tracklist_filter()
         self._in_radio_view = True
+        self._in_mixes_view = False
         self._current_album = None
         self._current_track_idx = None
         self._marker_idx = None
         self._repopulate_radio_playlist()
+
+    def _open_mixes_view(self) -> None:
+        """Populate the right-pane track list with the saved .m3u8 playlists.
+
+        Each row carries the source path on `entry_data`; selection
+        resolves the playlist into a virtual `LibraryAlbum` (same shape
+        as `g`) and starts playback.
+        """
+        self._clear_tracklist_filter()
+        self._in_mixes_view = True
+        self._in_radio_view = False
+        self._current_album = None
+        self._current_track_idx = None
+        self._marker_idx = None
+        self._repopulate_mixes_playlist()
+
+    def _count_mixes(self) -> int:
+        """Number of saved .m3u8 files; cheap glob, called from browser paint."""
+        if self._root is None:
+            return 0
+        pdir = self._root / library_mod.INDEX_DIR_NAME / "playlists"
+        if not pdir.is_dir():
+            return 0
+        return len(list(pdir.glob("*.m3u8")))
+
+    def _list_mix_files(self) -> list[Path]:
+        """Sorted list of saved playlist files."""
+        if self._root is None:
+            return []
+        pdir = self._root / library_mod.INDEX_DIR_NAME / "playlists"
+        if not pdir.is_dir():
+            return []
+        return sorted(pdir.glob("*.m3u8"))
+
+    def _repopulate_mixes_playlist(self) -> None:
+        """Render saved mixes as TrackList rows; each carries `entry_data=Path`."""
+        tracklist = self.query_one(TrackList)
+        tracklist.index = None
+        tracklist.clear()
+        files = self._list_mix_files()
+        if not files:
+            tracklist.append(
+                ListItem(Static("[dim]No saved mixes yet — press [bold]g[/] on a track to create one.[/]"))
+            )
+            return
+        for i, f in enumerate(files):
+            try:
+                track_count = sum(
+                    1 for line in f.read_text(encoding="utf-8").splitlines() if line and not line.startswith("#")
+                )
+            except OSError:
+                track_count = 0
+            label = f" [{C_ACCENT}]♫[/]  {f.stem}  [dim]({track_count} tracks)[/]"
+            item = ListItem(Static(label, id=f"mix-row-{i}"))
+            item.track_index = i  # type: ignore[attr-defined]
+            item.mix_path = f  # type: ignore[attr-defined]
+            tracklist.append(item)
+        self.call_after_refresh(self._set_tracklist_cursor, 0)
+
+    def _load_mix(self, m3u8_path: Path) -> LibraryAlbum | None:
+        """Read a saved .m3u8 and resolve its tracks against the live index.
+
+        Tracks whose paths no longer exist (file moved / deleted /
+        renamed since the mix was generated) are silently skipped so a
+        stale mix degrades gracefully instead of crashing playback.
+        Returns None if no track survives the resolution.
+        """
+        if self._index is None:
+            return None
+        from musickit.library import LibraryAlbum as _LibraryAlbum
+        from musickit.library import LibraryTrack as _LibraryTrack
+        from musickit.playlist.io import read_m3u8
+
+        try:
+            paths = read_m3u8(m3u8_path)
+        except OSError:
+            return None
+        # Build a path → LibraryTrack lookup once. resolve() to normalise
+        # any `..`-using relative entries from the .m3u8.
+        by_path: dict[Path, _LibraryTrack] = {}
+        for album in self._index.albums:
+            for t in album.tracks:
+                by_path[t.path.resolve()] = t
+        resolved: list[_LibraryTrack] = []
+        for p in paths:
+            try:
+                rp = p.resolve()
+            except OSError:
+                continue
+            if rp in by_path:
+                resolved.append(by_path[rp])
+        if not resolved:
+            return None
+        return _LibraryAlbum(
+            path=m3u8_path.parent,
+            artist_dir="Mix",
+            album_dir=m3u8_path.stem,
+            tag_album=m3u8_path.stem,
+            tag_album_artist="Mix",
+            track_count=len(resolved),
+            tracks=resolved,
+        )
 
     def _handle_browser_selection_default(self, item: ListItem) -> None:
         kind = getattr(item, "entry_kind", None)
@@ -832,6 +952,20 @@ class MusickitApp(App[None]):
             tracklist.append(ListItem(Static("[dim](no matches)[/]")))
         self.call_after_refresh(self._set_tracklist_cursor, 0)
 
+    def _play_mix(self, m3u8_path: Path) -> None:
+        """Resolve a saved .m3u8 to a virtual album and start playing it."""
+        virtual = self._load_mix(m3u8_path)
+        if virtual is None:
+            self.notify(
+                f"Couldn't load mix from {m3u8_path.name}: no resolvable tracks left.",
+                severity="warning",
+            )
+            return
+        self._in_mixes_view = False
+        self._set_current_album(virtual, track_idx=0)
+        self._repopulate_playlist()
+        self._play_current()
+
     def _play_station(self, station: RadioStation) -> None:
         from musickit.tui.formatters import compute_title_width
 
@@ -1016,10 +1150,15 @@ class MusickitApp(App[None]):
             # Radio rows carry both `station` and `track_index`. The station
             # check has to come first — falling through to `_play_current`
             # in radio view would no-op (no `_current_album`) and the user's
-            # Enter press would be silently swallowed.
+            # Enter press would be silently swallowed. Mixes follow the
+            # same routing rule (mix_path takes precedence over track_index).
             station = getattr(tracklist.highlighted_child, "station", None)
             if isinstance(station, radio_mod.RadioStation):
                 self._play_station(station)
+                return
+            mix_path = getattr(tracklist.highlighted_child, "mix_path", None)
+            if isinstance(mix_path, Path):
+                self._play_mix(mix_path)
                 return
             idx = getattr(tracklist.highlighted_child, "track_index", None)
             if isinstance(idx, int):
@@ -1083,12 +1222,13 @@ class MusickitApp(App[None]):
         if prior_artist is None or self._index is None:
             return
         # Compute prior-artist row index from the data model — `browser.children`
-        # can still report stale items mid clear+append. Row 0 is the Radio
-        # entry that `_populate_browser_artists` always prepends, so the
-        # artist's row is `data_index + 1`.
+        # can still report stale items mid clear+append. Rows 0 and 1 are the
+        # Radio + Mixes entries that `_populate_browser_artists` always
+        # prepends (when no filter is active), so the artist's row is
+        # `data_index + 2`.
         artist_names = sorted({a.artist_dir for a in self._index.albums}, key=str.lower)
         try:
-            prior_idx = artist_names.index(prior_artist) + 1
+            prior_idx = artist_names.index(prior_artist) + 2
         except ValueError:
             return
         self.call_after_refresh(self._set_browser_cursor, prior_idx)
