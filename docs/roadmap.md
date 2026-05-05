@@ -18,7 +18,7 @@ What's open, organized by what it would feel like.
 - **systemd / launchd plist** — for users wanting `serve` to autostart on boot.
 - **MQTT / webhook scrobble forwarding** — push play events to Home Assistant / Last.fm / external systems.
 - **Bigger `getCoverArt` cache** — currently it's recomputed per request; an LRU keyed on `(album_id, size)` would help on slow disks.
-- **FTS5 search backed by the library index** — `/search3` and the TUI `/` filter currently do casefolded substring matching in Python over every row. With the SQLite index now in place, an FTS5 virtual table over `tracks(title, artist, album)` plus triggers would be a small win for medium libraries and a big one for very large ones.
+- **TUI `/`-bar filter on top of FTS5** — `/search3` is FTS5-backed (see Done); the TUI's incremental `/` filter is still in-memory casefold substring. Wiring it through the same in-memory FTS5 index would give ranked / prefix-matching results in the TUI.
 
 ## Tier 4 — convert-pipeline polish
 
@@ -74,3 +74,4 @@ Things that would be interesting if anyone ever asked for them, but not pursued 
 - TUI `g` keybind — generate-and-play a 60-min mix from the highlighted or currently-playing track
 - TUI Mixes browser entry — saved `.m3u8` files appear in the right pane; selecting one resolves paths against the live index and plays it as a virtual album with stale-path graceful degradation
 - Persistent stars / favourites — Subsonic clients' heart buttons are now real. `/star`, `/unstar`, `/getStarred`, `/getStarred2` backed by `<root>/.musickit/stars.toml` (TOML, hand-editable, survives index rebuilds).
+- FTS5 search backend — `/search3` and `/search2` use an in-memory SQLite FTS5 index built fresh on every cache reindex. Sub-ms ranked results with prefix matching (`bey` matches `Beyoncé`), diacritic folding (`unicode61 remove_diacritics 2`), bm25 ordering, and multi-token AND across title + album_artist + year body text. Falls back to casefolded substring scan when SQLite was compiled without FTS5.
