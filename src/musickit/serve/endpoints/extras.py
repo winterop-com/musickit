@@ -22,13 +22,18 @@ from fastapi import APIRouter, Query, Request
 
 from musickit.serve.app import envelope, error_envelope
 from musickit.serve.index import IndexCache
-from musickit.serve.payloads import album_payload, song_payload
+from musickit.serve.payloads import album_payload, artist_summary, song_payload
+from musickit.serve.stars import StarStore
 
 router = APIRouter()
 
 
 def _get_cache(request: Request) -> IndexCache:
     return request.app.state.cache  # type: ignore[no-any-return]
+
+
+def _get_stars(request: Request) -> StarStore:
+    return request.app.state.stars  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -144,32 +149,119 @@ async def get_random_songs(
 # ---------------------------------------------------------------------------
 
 
+def _build_starred_payload(cache: IndexCache, stars: StarStore) -> dict[str, Any]:
+    """Categorised lists of currently-starred entries.
+
+    Resolves each starred ID against the cache and silently filters out
+    "ghost" entries (file deleted / renamed since starring) — the
+    client should never see broken rows. To clean up the underlying
+    file, call `stars.prune(...)` separately.
+    """
+    artists: list[dict[str, Any]] = []
+    albums: list[dict[str, Any]] = []
+    songs: list[dict[str, Any]] = []
+
+    for sid, ts in stars.all_ids().items():
+        if sid.startswith("ar_") and sid in cache.artists_by_id:
+            entry = artist_summary(cache, sid)
+            entry["starred"] = ts
+            artists.append(entry)
+        elif sid.startswith("al_") and sid in cache.albums_by_id:
+            entry = album_payload(cache.albums_by_id[sid], with_songs=False)
+            entry["starred"] = ts
+            albums.append(entry)
+        elif sid.startswith("tr_") and sid in cache.tracks_by_id:
+            album, track = cache.tracks_by_id[sid]
+            entry = song_payload(album, track)
+            entry["starred"] = ts
+            songs.append(entry)
+
+    # Sort within each kind by `starred` desc so the most-recent show up first.
+    # Clients (Symfonium / Amperfy) don't sort the response themselves.
+    artists.sort(key=lambda d: d.get("starred", ""), reverse=True)
+    albums.sort(key=lambda d: d.get("starred", ""), reverse=True)
+    songs.sort(key=lambda d: d.get("starred", ""), reverse=True)
+    return {"artist": artists, "album": albums, "song": songs}
+
+
 @router.api_route("/getStarred", methods=["GET", "POST", "HEAD"])
 @router.api_route("/getStarred.view", methods=["GET", "POST", "HEAD"])
-async def get_starred() -> dict:
-    """No starring support — return an empty starred set."""
-    return envelope("starred", {"artist": [], "album": [], "song": []})
+async def get_starred(request: Request) -> dict:
+    """Return artists / albums / songs currently starred by the user."""
+    return envelope("starred", _build_starred_payload(_get_cache(request), _get_stars(request)))
 
 
 @router.api_route("/getStarred2", methods=["GET", "POST", "HEAD"])
 @router.api_route("/getStarred2.view", methods=["GET", "POST", "HEAD"])
-async def get_starred2() -> dict:
-    """No starring support (v2)."""
-    return envelope("starred2", {"artist": [], "album": [], "song": []})
+async def get_starred2(request: Request) -> dict:
+    """v2 of getStarred — same payload shape; the wrapper key differs."""
+    return envelope("starred2", _build_starred_payload(_get_cache(request), _get_stars(request)))
 
 
 @router.api_route("/star", methods=["GET", "POST", "HEAD"])
 @router.api_route("/star.view", methods=["GET", "POST", "HEAD"])
-async def star() -> dict:
-    """No-op: starring not persisted."""
+async def star(
+    request: Request,
+    id: str | None = Query(default=None),
+    albumId: str | None = Query(default=None),  # noqa: N803 — Subsonic spec uses camelCase
+    artistId: str | None = Query(default=None),  # noqa: N803
+) -> dict:
+    """Star one or more entities. Subsonic accepts any combination of `id`, `albumId`, `artistId`.
+
+    The `id` parameter accepts artist / album / track IDs (clients tend
+    to pass through whatever is currently selected); `albumId` and
+    `artistId` are explicit kind-typed variants. We star every ID
+    provided — unknown IDs are silently ignored so a stale client
+    request doesn't 500.
+    """
+    stars = _get_stars(request)
+    cache = _get_cache(request)
+    for sid in _collect_ids(id, albumId, artistId):
+        if _id_resolves(cache, sid):
+            stars.add(sid)
     return envelope()
 
 
 @router.api_route("/unstar", methods=["GET", "POST", "HEAD"])
 @router.api_route("/unstar.view", methods=["GET", "POST", "HEAD"])
-async def unstar() -> dict:
-    """No-op: unstarring not persisted (since nothing is ever starred)."""
+async def unstar(
+    request: Request,
+    id: str | None = Query(default=None),
+    albumId: str | None = Query(default=None),  # noqa: N803
+    artistId: str | None = Query(default=None),  # noqa: N803
+) -> dict:
+    """Unstar — symmetric with /star. Idempotent on already-unstarred IDs."""
+    stars = _get_stars(request)
+    for sid in _collect_ids(id, albumId, artistId):
+        stars.remove(sid)
     return envelope()
+
+
+def _collect_ids(*sources: str | None) -> list[str]:
+    """Collect Subsonic IDs from /star query params, dedup, drop blanks."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for src in sources:
+        if not src:
+            continue
+        # Subsonic clients sometimes send comma-separated lists for `id`.
+        for sid in src.split(","):
+            sid = sid.strip()
+            if sid and sid not in seen:
+                seen.add(sid)
+                out.append(sid)
+    return out
+
+
+def _id_resolves(cache: IndexCache, sid: str) -> bool:
+    """True iff `sid` matches a current artist / album / track in the cache."""
+    if sid.startswith("ar_"):
+        return sid in cache.artists_by_id
+    if sid.startswith("al_"):
+        return sid in cache.albums_by_id
+    if sid.startswith("tr_"):
+        return sid in cache.tracks_by_id
+    return False
 
 
 # ---------------------------------------------------------------------------

@@ -68,6 +68,12 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     app.state.root = root
     app.state.cfg = cfg
     app.state.cache = IndexCache(root, use_cache=use_cache)
+    # Stars / favourites — separate file from the index DB (which is
+    # fully derived and gets wiped on schema bumps). User data lives at
+    # `<root>/.musickit/stars.toml`; survives `library index drop`.
+    from musickit.serve.stars import StarStore
+
+    app.state.stars = StarStore.for_root(root)
 
     # Spec default is XML; clients opt into JSON via `?f=json`. Convert here
     # so endpoints stay simple (return dicts; the middleware emits the right
