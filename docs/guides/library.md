@@ -91,7 +91,7 @@ uvx musickit library cover ./output/Pink\ Floyd/1973\ -\ The\ Dark\ Side\ Of\ Th
 ## `cover-pick` — semi-automated cover sourcing
 
 ```bash
-uvx musickit library cover-pick DIR [--all] [--no-embed] [--cover-max-edge PX] [--no-browser] [--no-cache] [--full-rescan]
+uvx musickit library cover-pick DIR [--all] [--no-embed] [--cover-max-edge PX] [--no-browser]
 ```
 
 For each candidate album:
@@ -139,7 +139,7 @@ uvx musickit library index drop    DIR     # delete <DIR>/.musickit/
 uvx musickit library index rebuild DIR     # wipe + rebuild from scratch
 ```
 
-`--no-cache` (on `tree` / `audit` / `fix` / `cover-pick` / `tui` / `serve`) skips the DB entirely — useful for read-only mounts where `<DIR>/.musickit/` can't be created. `--full-rescan` (on the same set) rebuilds the index from scratch on this run.
+`--no-cache` (on `tree` / `audit` / `fix` / `tui` / `serve`) skips the DB entirely — useful for read-only mounts where `<DIR>/.musickit/` can't be created. `--full-rescan` (on the same set) rebuilds the index from scratch on this run. `cover-pick` uses the existing in-memory scan and doesn't expose either flag.
 
 ### Schema
 
