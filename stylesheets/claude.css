@@ -1,0 +1,519 @@
+/* Claude Code docs colorscheme for Material for MkDocs
+ *
+ * Matches code.claude.com/docs:
+ *   - near-black background (rgb 14 14 14)
+ *   - white body text, serif headings at weight 400
+ *   - JetBrains Mono for code with subtle white-tinted backgrounds
+ *   - warm coral accent
+ */
+
+:root {
+  --claude-bg:           rgb(14, 14, 14);
+  --claude-bg-elevated:  rgb(20, 20, 20);
+  --claude-bg-elevated2: rgb(28, 28, 28);
+  --claude-border:       rgba(255, 255, 255, 0.08);
+  --claude-border-soft:  rgba(255, 255, 255, 0.04);
+
+  --claude-text:    rgb(255, 255, 255);
+  --claude-text-2:  rgb(222, 222, 222);
+  --claude-text-3:  rgb(158, 158, 158);
+  --claude-text-4:  rgba(255, 255, 255, 0.4);
+
+  --claude-code-bg: rgba(255, 255, 255, 0.05);
+  --claude-code-fg: rgb(222, 222, 222);
+
+  --claude-accent:       #d4a27f;
+  --claude-accent-light: #e0b698;
+  --claude-accent-dark:  #cc785c;
+
+  --claude-serif: "Anthropic Serif Display", "Source Serif Pro", Georgia,
+                  "Times New Roman", Times, serif;
+  --claude-sans:  "Anthropic Sans", system-ui, -apple-system, "Segoe UI",
+                  Roboto, Helvetica, Arial, sans-serif;
+  --claude-mono:  "JetBrains Mono", "SF Mono", SFMono-Regular, Menlo, Monaco,
+                  "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+}
+
+[data-md-color-scheme="slate"] {
+  /* Background layers */
+  --md-default-bg-color:           var(--claude-bg);
+  --md-default-bg-color--light:    var(--claude-bg-elevated);
+  --md-default-bg-color--lighter:  var(--claude-bg-elevated2);
+  --md-default-bg-color--lightest: rgba(255, 255, 255, 0.06);
+
+  /* Foreground / text */
+  --md-default-fg-color:           var(--claude-text);
+  --md-default-fg-color--light:    var(--claude-text-2);
+  --md-default-fg-color--lighter:  var(--claude-text-3);
+  --md-default-fg-color--lightest: var(--claude-text-4);
+
+  /* Primary (header, nav background) */
+  --md-primary-fg-color:        var(--claude-bg);
+  --md-primary-fg-color--light: var(--claude-bg-elevated);
+  --md-primary-fg-color--dark:  rgb(8, 8, 8);
+  --md-primary-bg-color:        var(--claude-text);
+  --md-primary-bg-color--light: var(--claude-text-2);
+
+  /* Accent (links, focus rings, buttons) */
+  --md-accent-fg-color:              var(--claude-accent);
+  --md-accent-fg-color--transparent: rgba(212, 162, 127, 0.12);
+  --md-accent-bg-color:              var(--claude-text);
+  --md-accent-bg-color--light:       var(--claude-text-2);
+
+  /* Code */
+  --md-code-fg-color: var(--claude-code-fg);
+  --md-code-bg-color: var(--claude-code-bg);
+  --md-code-hl-color: rgba(212, 162, 127, 0.18);
+
+  /* Tables */
+  --md-typeset-table-color:       var(--claude-border);
+  --md-typeset-table-color--light: var(--claude-border-soft);
+
+  /* Footer */
+  --md-footer-bg-color:        rgb(8, 8, 8);
+  --md-footer-bg-color--dark:  rgb(4, 4, 4);
+  --md-footer-fg-color:        var(--claude-text-2);
+  --md-footer-fg-color--light: var(--claude-text-3);
+  --md-footer-fg-color--lighter: var(--claude-text-4);
+
+  /* Admonitions */
+  --md-admonition-bg-color: rgba(255, 255, 255, 0.03);
+  --md-admonition-fg-color: var(--claude-text);
+}
+
+/* ----------------------------------------------------------------------
+ * Typography — sizes match code.claude.com/docs exactly
+ *
+ * Note: Material for MkDocs uses 20px as the root font-size, so 1rem = 20px.
+ * To avoid confusion, we use explicit px values throughout.
+ * -------------------------------------------------------------------- */
+
+body,
+.md-typeset {
+  font-family: var(--claude-sans);
+}
+
+/* Body paragraph and list text — 16px with generous line-height */
+.md-typeset {
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.md-typeset p,
+.md-typeset li {
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3,
+[data-md-color-scheme="slate"] .md-typeset h4,
+[data-md-color-scheme="slate"] .md-typeset h5,
+[data-md-color-scheme="slate"] .md-typeset h6 {
+  font-family: var(--claude-serif);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  color: var(--claude-text);
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1 {
+  font-size: 30px;
+  line-height: 36px;
+  color: var(--claude-text-2);
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h2 {
+  font-size: 24px;
+  line-height: 32px;
+  color: var(--claude-text);
+  margin-top: 48px;
+  margin-bottom: 16px;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  font-size: 20px;
+  line-height: 28px;
+  color: rgb(243, 243, 243);
+  margin-top: 32px;
+  margin-bottom: 12px;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h4 {
+  font-size: 18px;
+  line-height: 26px;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+/* ----------------------------------------------------------------------
+ * Header — top bar with logo, search, theme toggle
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-header {
+  background-color: var(--claude-bg);
+  border-bottom: none;
+  box-shadow: none;
+}
+
+[data-md-color-scheme="slate"] .md-header__title {
+  color: var(--claude-text);
+  margin-left: 8px;
+}
+
+/* Material wraps the site name in .md-header__topic — that's the actual
+ * text node we need to style. Setting it on the parent doesn't apply. */
+[data-md-color-scheme="slate"] .md-header__title .md-header__topic {
+  font-family: var(--claude-serif);
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+[data-md-color-scheme="slate"] .md-header__button {
+  color: var(--claude-text-3);
+}
+
+[data-md-color-scheme="slate"] .md-header__button:hover {
+  color: var(--claude-text);
+}
+
+/* Logo (Material's default book icon) — color it with the peach accent */
+[data-md-color-scheme="slate"] .md-header__button.md-logo,
+[data-md-color-scheme="slate"] .md-header__button.md-logo:hover {
+  color: var(--claude-accent);
+}
+
+[data-md-color-scheme="slate"] .md-header__button.md-logo svg,
+[data-md-color-scheme="slate"] .md-header__button.md-logo img {
+  fill: var(--claude-accent);
+  color: var(--claude-accent);
+}
+
+/* ----------------------------------------------------------------------
+ * Tabs row — horizontal nav directly under the header
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-tabs {
+  background-color: var(--claude-bg);
+  border-bottom: 1px solid rgba(222, 222, 222, 0.1);
+  height: 48px;
+}
+
+[data-md-color-scheme="slate"] .md-tabs__list {
+  gap: 24px;
+}
+
+[data-md-color-scheme="slate"] .md-tabs__item {
+  height: 48px;
+  padding: 0;
+}
+
+[data-md-color-scheme="slate"] .md-tabs__link {
+  color: var(--claude-text-3);
+  opacity: 1;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  padding: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+[data-md-color-scheme="slate"] .md-tabs__link:hover {
+  color: var(--claude-text);
+}
+
+/* Active state — Material applies the active class to the parent <li>,
+ * not to the <a>, so we have to traverse from the item. */
+[data-md-color-scheme="slate"] .md-tabs__item--active .md-tabs__link {
+  color: var(--claude-text);
+  font-weight: 600;
+  /* 2px peach underline drawn with inset box-shadow so it overlaps the
+   * tab bar's bottom border cleanly. */
+  box-shadow: inset 0 -2px 0 0 var(--claude-accent-dark);
+}
+
+[data-md-color-scheme="slate"] .md-tabs__item--active .md-tabs__link:hover {
+  color: var(--claude-text);
+}
+
+/* ----------------------------------------------------------------------
+ * Sidebar / nav — pill-shaped boxes around each item
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-nav__link {
+  color: var(--claude-text-3);
+  padding: 6px 12px 6px 16px;
+  border-radius: 12px;
+  margin: 1px 4px;
+  font-size: 14px;
+  line-height: 24px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+[data-md-color-scheme="slate"] .md-nav__link:hover,
+[data-md-color-scheme="slate"] .md-nav__link:focus {
+  color: var(--claude-text);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* Active state only on the actual current page, not on parent sections */
+[data-md-color-scheme="slate"] .md-nav__link[aria-current="page"],
+[data-md-color-scheme="slate"] a.md-nav__link--active {
+  color: var(--claude-accent);
+  background-color: rgba(212, 162, 127, 0.1);
+  font-weight: 400;
+}
+
+[data-md-color-scheme="slate"] .md-nav__link[aria-current="page"]:hover,
+[data-md-color-scheme="slate"] a.md-nav__link--active:hover {
+  background-color: rgba(212, 162, 127, 0.14);
+  color: var(--claude-accent);
+}
+
+/* Section labels (Material renders nested sections as <label class="md-nav__link">)
+ * Style as semibold off-white headings, sentence case — matches the
+ * "Core concepts" / "Getting started" headers on code.claude.com/docs. */
+[data-md-color-scheme="slate"] label.md-nav__link {
+  color: var(--claude-text-2) !important;
+  font-family: var(--claude-sans);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 24px;
+  text-transform: none;
+  letter-spacing: normal;
+  background-color: transparent !important;
+  padding: 18px 16px 6px;
+  margin: 0;
+  border-radius: 0;
+  cursor: default;
+}
+
+[data-md-color-scheme="slate"] label.md-nav__link:hover {
+  background-color: transparent !important;
+  color: var(--claude-text-2) !important;
+}
+
+/* The top-level <nav> title (e.g. "Claude Code") — same treatment */
+[data-md-color-scheme="slate"] .md-nav__title {
+  color: var(--claude-text-2);
+  font-family: var(--claude-sans);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 24px;
+  padding: 16px 16px 8px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* Strip the default Material list border-left on nested nav items
+ * so the pills sit cleanly without a vertical rule cutting through them. */
+[data-md-color-scheme="slate"] .md-nav--secondary .md-nav__list,
+[data-md-color-scheme="slate"] .md-nav--lifted > .md-nav__list,
+[data-md-color-scheme="slate"] .md-nav__list {
+  border-left: none;
+}
+
+/* Tighten spacing between sidebar items so the pills feel grouped */
+[data-md-color-scheme="slate"] .md-nav__item {
+  padding: 0;
+}
+
+/* ----------------------------------------------------------------------
+ * Code blocks — outer container has the border and background,
+ * the inner <pre> is transparent. Filename (when present via
+ * `title="..."`) becomes a header bar with a hairline separator.
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-typeset code,
+[data-md-color-scheme="slate"] .md-typeset pre {
+  font-family: var(--claude-mono);
+}
+
+/* Inline code — small pill */
+[data-md-color-scheme="slate"] .md-typeset code {
+  background-color: var(--claude-code-bg);
+  color: var(--claude-code-fg);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 14px;
+}
+
+/* Outer container — the "card" that holds the code block */
+[data-md-color-scheme="slate"] .md-typeset .highlight {
+  background-color: var(--claude-bg-elevated);
+  border: 1px solid var(--claude-border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 1.5em 0;
+  position: relative;
+}
+
+/* Filename header bar — shown when the code block has `title="..."` */
+[data-md-color-scheme="slate"] .md-typeset .highlight > .filename {
+  background-color: var(--claude-bg-elevated);
+  color: var(--claude-text-2);
+  font-family: var(--claude-mono);
+  font-size: 13px;
+  font-weight: 400;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--claude-border);
+  display: block;
+  border-radius: 0;
+}
+
+/* Pre block inside — transparent, no border, just padding */
+[data-md-color-scheme="slate"] .md-typeset .highlight > pre {
+  background-color: transparent;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .highlight pre > code,
+[data-md-color-scheme="slate"] .md-typeset .highlight code {
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  display: block;
+}
+
+/* Inline code inside a code block stays inline (don't trigger block padding) */
+[data-md-color-scheme="slate"] .md-typeset .highlight pre code .nx,
+[data-md-color-scheme="slate"] .md-typeset .highlight pre code .o,
+[data-md-color-scheme="slate"] .md-typeset .highlight pre code .k {
+  padding: 0;
+}
+
+/* Copy button — Material's built-in clipboard icon, restyled to match */
+[data-md-color-scheme="slate"] .md-clipboard {
+  color: var(--claude-text-3);
+  top: 8px;
+  right: 8px;
+  border-radius: 6px;
+  padding: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+[data-md-color-scheme="slate"] .md-clipboard:hover {
+  color: var(--claude-text);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Code blocks WITHOUT a filename — copy button stays in top right */
+[data-md-color-scheme="slate"] .md-typeset .highlight:not(:has(> .filename)) .md-clipboard {
+  top: 8px;
+}
+
+/* Code blocks WITH a filename — copy button sits in the header bar */
+[data-md-color-scheme="slate"] .md-typeset .highlight:has(> .filename) .md-clipboard {
+  top: 6px;
+}
+
+/* ----------------------------------------------------------------------
+ * Links
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-typeset a {
+  color: var(--claude-text);
+  text-decoration: underline;
+  text-decoration-color: var(--claude-text-3);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+}
+
+[data-md-color-scheme="slate"] .md-typeset a:hover {
+  color: var(--claude-accent-light);
+  text-decoration-color: var(--claude-accent);
+}
+
+/* ----------------------------------------------------------------------
+ * Tables
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) {
+  background-color: transparent;
+  border: 1px solid var(--claude-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--claude-text);
+  font-weight: 500;
+  font-size: 14px;
+  border-bottom: 1px solid var(--claude-border);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
+  border-top: 1px solid var(--claude-border-soft);
+  color: var(--claude-text-2);
+  font-size: 14px;
+}
+
+/* ----------------------------------------------------------------------
+ * Admonitions
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-typeset .admonition,
+[data-md-color-scheme="slate"] .md-typeset details {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-left-color: var(--claude-accent);
+  border-radius: 8px;
+}
+
+/* ----------------------------------------------------------------------
+ * Search
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] .md-search__form {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+[data-md-color-scheme="slate"] .md-search__form:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-md-color-scheme="slate"] .md-search__input {
+  color: var(--claude-text);
+}
+
+[data-md-color-scheme="slate"] .md-search__input::placeholder {
+  color: var(--claude-text-4);
+}
+
+/* ----------------------------------------------------------------------
+ * Misc polish
+ * -------------------------------------------------------------------- */
+
+[data-md-color-scheme="slate"] hr,
+[data-md-color-scheme="slate"] .md-typeset hr {
+  border-color: var(--claude-border);
+}
+
+[data-md-color-scheme="slate"] .md-typeset blockquote {
+  border-left-color: var(--claude-accent);
+  color: var(--claude-text-2);
+}
+
+[data-md-color-scheme="slate"] .md-typeset kbd {
+  background-color: var(--claude-bg-elevated2);
+  color: var(--claude-text);
+  border: 1px solid var(--claude-border);
+  border-radius: 6px;
+  font-family: var(--claude-mono);
+  font-size: 0.85em;
+}

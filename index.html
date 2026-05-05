@@ -53,6 +53,8 @@
     
       <link rel="stylesheet" href="assets/_mkdocstrings.css">
     
+      <link rel="stylesheet" href="stylesheets/claude.css">
+    
     <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -426,8 +428,6 @@
       
         
       
-        
-      
     
     
     
@@ -490,34 +490,6 @@
     
   
     Quickstart
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="guides/tutorial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Tutorial: 0 to iPhone streaming
   
 
     
@@ -910,8 +882,7 @@
 </code></pre></div>
 <p><code>uvx</code> downloads the latest <code>musickit</code> from PyPI, caches it, runs it. For persistent install: <code>uv tool install musickit</code>. New here?</p>
 <ul>
-<li><strong><a href="guides/quickstart/">Quickstart</a></strong> — two-minute walkthrough: install, convert, audit, play locally.</li>
-<li><strong><a href="guides/tutorial/">Tutorial</a></strong> — full end-to-end including iPhone + Tailscale + Amperfy. ~30 minutes.</li>
+<li><strong><a href="guides/quickstart/">Quickstart</a></strong> — full end-to-end walkthrough including iPhone + Tailscale + Amperfy. ~30 minutes.</li>
 <li><strong><a href="architecture/">Architecture</a></strong> — how the pieces fit together: process model, data flow, audio engine subprocess, SQLite index, FFT visualizer. Read this first if you want a mental model before diving in.</li>
 </ul>
 <p>Per-command guides: <a href="guides/convert/">Convert</a> · <a href="guides/library/">Library</a> · <a href="guides/tui/">TUI</a> · <a href="guides/serve/">Serve</a> · <a href="guides/inspect/">Inspect</a>.</p>

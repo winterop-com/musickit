@@ -16,7 +16,7 @@
         <link rel="prev" href="../../architecture/">
       
       
-        <link rel="next" href="../tutorial/">
+        <link rel="next" href="../convert/">
       
       
         
@@ -54,6 +54,8 @@
     
     
       <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/claude.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -339,8 +341,6 @@
       
         
       
-        
-      
     
     
     
@@ -453,10 +453,71 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#install" class="md-nav__link">
+  <a href="#1-mac-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install
+        1. Mac setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Mac setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install-musickit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install musickit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-system-ffmpeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install system ffmpeg
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-tailscale-on-the-mac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Tailscale on the Mac
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sanity-check-musickit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sanity-check musickit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-convert-a-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Convert a library
       
     </span>
   </a>
@@ -464,10 +525,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#convert-audit-play" class="md-nav__link">
+  <a href="#3-audit-fix" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Convert + audit + play
+        3. Audit + fix
       
     </span>
   </a>
@@ -475,10 +536,165 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#where-to-next" class="md-nav__link">
+  <a href="#4-start-the-server" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where to next
+        4. Start the server
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-iphone-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. iPhone setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. iPhone setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install-tailscale-on-the-iphone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Tailscale on the iPhone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-amperfy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Amperfy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connect-amperfy-to-musickit-serve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect Amperfy to musickit serve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#play-a-track" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Play a track
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-optional-browse-play-locally-on-the-mac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Optional: browse + play locally on the Mac
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-day-to-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Day-to-day
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#amperfy-says-server-unreachable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amperfy says "Server unreachable"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#symfonium-playsub-feishin-instead-of-amperfy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symfonium / play:Sub / Feishin instead of Amperfy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slow-library-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Slow" library scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-want-to-expose-the-server-to-the-open-internet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I want to expose the server to the open internet
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-read-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to read next
       
     </span>
   </a>
@@ -489,34 +705,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorial/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Tutorial: 0 to iPhone streaming
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -805,10 +993,71 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#install" class="md-nav__link">
+  <a href="#1-mac-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install
+        1. Mac setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Mac setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install-musickit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install musickit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-system-ffmpeg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install system ffmpeg
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-tailscale-on-the-mac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Tailscale on the Mac
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sanity-check-musickit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sanity-check musickit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-convert-a-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Convert a library
       
     </span>
   </a>
@@ -816,10 +1065,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#convert-audit-play" class="md-nav__link">
+  <a href="#3-audit-fix" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Convert + audit + play
+        3. Audit + fix
       
     </span>
   </a>
@@ -827,10 +1076,165 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#where-to-next" class="md-nav__link">
+  <a href="#4-start-the-server" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where to next
+        4. Start the server
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-iphone-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. iPhone setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. iPhone setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#install-tailscale-on-the-iphone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Tailscale on the iPhone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-amperfy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Amperfy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connect-amperfy-to-musickit-serve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect Amperfy to musickit serve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#play-a-track" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Play a track
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-optional-browse-play-locally-on-the-mac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Optional: browse + play locally on the Mac
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-day-to-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Day-to-day
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#amperfy-says-server-unreachable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amperfy says "Server unreachable"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#symfonium-playsub-feishin-instead-of-amperfy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symfonium / play:Sub / Feishin instead of Amperfy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slow-library-scan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Slow" library scan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-want-to-expose-the-server-to-the-open-internet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I want to expose the server to the open internet
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-read-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to read next
       
     </span>
   </a>
@@ -858,28 +1262,272 @@
 
 
 <h1 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">&para;</a></h1>
-<p>Two minutes from zero to "music playing in the TUI". For the full end-to-end including iPhone + Tailscale + Amperfy, see the <a href="../tutorial/">Tutorial</a>.</p>
-<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>--help<span class="w">                  </span><span class="c1"># zero-install run; auto-fetches latest</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">             </span><span class="c1"># for daily use (PATH-installed)</span>
+<p>End-to-end walkthrough — from <code>uvx musickit</code> to playing a track on Amperfy from
+across the room. Roughly 30 minutes of wall-clock time on a 200-album library;
+most of it is the convert pipeline and the cover-pick loop.</p>
+<p>The route this guide takes:</p>
+<ol>
+<li>Set up the Mac (musickit + ffmpeg + Tailscale)</li>
+<li>Convert a sample library</li>
+<li>Audit + auto-fix the warnings</li>
+<li>Pick covers for the flagged albums</li>
+<li>Start <code>musickit serve</code></li>
+<li>Set up the iPhone (Tailscale + Amperfy)</li>
+<li>Connect Amperfy to the server and play a track</li>
+</ol>
+<p>If you're new to Tailscale: it's a zero-config VPN that gives every device of
+yours a permanent address (<code>yourname.tail-something.ts.net</code>) reachable from
+anywhere with internet. We use it so the iPhone can reach the Mac whether
+you're on the same Wi-Fi or somewhere else.</p>
+<h2 id="1-mac-setup">1. Mac setup<a class="headerlink" href="#1-mac-setup" title="Permanent link">&para;</a></h2>
+<h3 id="install-musickit">Install musickit<a class="headerlink" href="#install-musickit" title="Permanent link">&para;</a></h3>
+<p>The lowest-friction way is <a href="https://docs.astral.sh/uv/"><code>uvx</code></a> — it downloads the latest published <code>musickit</code> from <a href="https://pypi.org/project/musickit/">PyPI</a>, caches it, and runs it in one step. No install step required:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>--help
 </code></pre></div>
-<p>You'll also need <code>ffmpeg</code> + <code>ffprobe</code> for the convert pipeline:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>brew<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">                  </span><span class="c1"># macOS</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">              </span><span class="c1"># Debian / Ubuntu</span>
+<p>For daily / persistent use (PATH-installed, no per-run network check):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">       </span><span class="c1"># recommended (uv-managed, isolated venv on PATH)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pipx<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">          </span><span class="c1"># equivalent for pipx users</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pip<span class="w"> </span>install<span class="w"> </span>musickit<span class="w">           </span><span class="c1"># plain pip into current env</span>
 </code></pre></div>
-<h2 id="convert-audit-play">Convert + audit + play<a class="headerlink" href="#convert-audit-play" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output<span class="w">       </span><span class="c1"># rip dirs → clean library</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>audit<span class="w"> </span>./output<span class="w">         </span><span class="c1"># flag missing covers, gaps, etc.</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w">                   </span><span class="c1"># browse + play locally</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>./output<span class="w">                 </span><span class="c1"># Subsonic API for clients</span>
+<p>Either route pulls every Python dep, including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The rest of this guide uses <code>uvx musickit ...</code> for examples — substitute <code>musickit ...</code> if you went the persistent-install route.</p>
+<p>If you want to hack on musickit itself, see <a href="../development/">Development</a> for the <code>git clone</code> + <code>uv sync</code> flow.</p>
+<h3 id="install-system-ffmpeg">Install system ffmpeg<a class="headerlink" href="#install-system-ffmpeg" title="Permanent link">&para;</a></h3>
+<p>The bundled FFmpeg wheels handle audio decoding for the TUI and the on-the-fly
+transcoding inside <code>serve</code>. The <code>convert</code> pipeline itself shells out to a
+system <code>ffmpeg</code> / <code>ffprobe</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>brew<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">          </span><span class="c1"># macOS</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ffmpeg<span class="w">      </span><span class="c1"># Debian / Ubuntu</span>
 </code></pre></div>
-<p>The convert step writes <code>output/&lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.m4a</code> at 256 kbps AAC by default; pass <code>--format alac</code> for archival lossless.</p>
-<h2 id="where-to-next">Where to next<a class="headerlink" href="#where-to-next" title="Permanent link">&para;</a></h2>
+<p>Verify:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ffmpeg<span class="w"> </span>-version<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>ffprobe<span class="w"> </span>-version<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1
+</code></pre></div>
+<h3 id="install-tailscale-on-the-mac">Install Tailscale on the Mac<a class="headerlink" href="#install-tailscale-on-the-mac" title="Permanent link">&para;</a></h3>
+<p>Download the Mac client from <a href="https://tailscale.com/download/mac">https://tailscale.com/download/mac</a>. Open the
+installer, sign in with whichever identity you like (Google / GitHub / email
++ password). After login, the menu-bar Tailscale icon shows your tailnet
+hostname — looks like <code>mlaptop.tail4a4b9a.ts.net</code>. Note that hostname; the
+iPhone will use it later.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tailscale<span class="w"> </span>status<span class="w">                          </span><span class="c1"># confirm the daemon is up</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tailscale<span class="w"> </span>ip<span class="w"> </span>-4<span class="w">                           </span><span class="c1"># your Tailscale IPv4</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>hostname<span class="w"> </span>-f<span class="w">                               </span><span class="c1"># local hostname</span>
+</code></pre></div>
+<h3 id="sanity-check-musickit">Sanity-check musickit<a class="headerlink" href="#sanity-check-musickit" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>--help
+</code></pre></div>
+<p>You should see <code>convert / library / inspect / tui / serve</code> listed.</p>
+<h2 id="2-convert-a-library">2. Convert a library<a class="headerlink" href="#2-convert-a-library" title="Permanent link">&para;</a></h2>
+<p>Drop a few albums into <code>./input/</code>. Any layout works — the convert pipeline
+handles <code>Artist/Album/</code>, <code>Artist/Album/CD1/CD2/</code>, scene-tagged dirs, and
+flat dumps. For a quickstart run a sample of 5–20 albums is enough.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>convert<span class="w"> </span>./input<span class="w"> </span>./output
+</code></pre></div>
+<p>Default output is <code>output/&lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.m4a</code> at
+256 kbps AAC. A 200-album library on an SSD takes 5–10 minutes; an
+external USB drive or a network mount takes longer. Run with <code>--verbose</code>
+if you want a per-track log line; <code>--dry-run</code> plans without writing.</p>
+<p>When it finishes you have a clean library at <code>./output/</code>. The rest of the
+guide points at that directory.</p>
+<h2 id="3-audit-fix">3. Audit + fix<a class="headerlink" href="#3-audit-fix" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>audit<span class="w"> </span>./output<span class="w"> </span>--issues-only
+</code></pre></div>
+<p>Shows a table of every album with at least one warning: missing cover,
+missing year, mixed years, scene-residue dirnames, tag/path mismatch,
+track gaps. You can ignore most of these for a first run; the deterministic
+ones get fixed by:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>fix<span class="w"> </span>./output<span class="w"> </span>--dry-run<span class="w">        </span><span class="c1"># preview</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>fix<span class="w"> </span>./output<span class="w">                  </span><span class="c1"># apply</span>
+</code></pre></div>
+<p>The fixer makes one MusicBrainz HTTP call per flagged album to backfill
+missing years, then renames directories to match the canonical
+<code>YYYY - Album</code> form. A progress bar shows what it's doing — a quiet pass
+for clean albums means there's nothing to fix.</p>
+<p>For the cover-art warnings, the semi-automated path is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>cover-pick<span class="w"> </span>./output
+</code></pre></div>
+<p>Per album, this:</p>
+<ol>
+<li>Prints <code>Artist — Album (no cover)</code>.</li>
+<li>Opens
+   <code>https://covers.musichoarders.xyz/?artist=...&amp;album=...</code>
+   in your browser, pre-filled.</li>
+<li>Click any cover on that page; musichoarders' UI puts the image URL
+   on your clipboard.</li>
+<li>Paste it back into the terminal. <code>s</code> to skip, <code>q</code> to quit.</li>
+<li>musickit downloads, validates with Pillow, resizes to fit
+   <code>--cover-max-edge</code> (default 1000 px), saves as <code>cover.jpg</code>, embeds
+   into every track.</li>
+</ol>
+<p>Run <code>library audit --issues-only</code> again to confirm the warning count
+dropped.</p>
+<h2 id="4-start-the-server">4. Start the server<a class="headerlink" href="#4-start-the-server" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>./output
+</code></pre></div>
+<p>By default this:</p>
 <ul>
-<li><strong><a href="../tutorial/">Tutorial</a></strong> — full walkthrough including iPhone + Tailscale + Amperfy.</li>
-<li><strong><a href="../../architecture/">Architecture</a></strong> — how the pieces fit together (audio subprocess, SQLite index, FFT visualizer).</li>
-<li>Per-command guides: <a href="../convert/">convert</a> · <a href="../library/">library</a> · <a href="../tui/">tui</a> · <a href="../serve/">serve</a> · <a href="../inspect/">inspect</a>.</li>
-<li><strong><a href="../development/">Development</a></strong> — for working on musickit itself (<code>git clone</code> + <code>uv sync</code>).</li>
+<li>binds <code>0.0.0.0:4533</code> (LAN + Tailscale)</li>
+<li>starts a filesystem watcher for auto-rescan (drops new albums in →
+  visible to clients within seconds)</li>
+<li>advertises itself on mDNS as <code>_subsonic._tcp.local</code></li>
+<li>uses default credentials <code>admin / admin</code> with a yellow warning</li>
+</ul>
+<p>You'll see a startup banner like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>musickit serve — Subsonic API for /Volumes/T9/Music
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  bind: 0.0.0.0:4533
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>  LAN:  http://192.168.1.42:4533
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>  Tailscale: http://mlaptop.tail4a4b9a.ts.net:4533
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>scanning library…
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>   142 artists, 318 albums, 4521 tracks
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>  mDNS: advertising as musickit-mlaptop._subsonic._tcp.local
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>  watching /Volumes/T9/Music for changes (auto-rescan on add/remove/rename)
+</code></pre></div>
+<p>Note the <strong>Tailscale</strong> URL — that's what the iPhone will use.</p>
+<p>For anything beyond a private LAN, set proper credentials. The simplest path:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/musickit
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/musickit/serve.toml<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="s">[auth]</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="s">user = &quot;your-username&quot;</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="s">password = &quot;your-strong-password&quot;</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="s">EOF</span>
+</code></pre></div>
+<p>Restart <code>musickit serve</code> — the yellow warning is gone.</p>
+<p>Leave the server running. You can also run it as a background process via
+launchd / systemd; see <a href="../serve/">Serve</a> for examples.</p>
+<h2 id="5-iphone-setup">5. iPhone setup<a class="headerlink" href="#5-iphone-setup" title="Permanent link">&para;</a></h2>
+<h3 id="install-tailscale-on-the-iphone">Install Tailscale on the iPhone<a class="headerlink" href="#install-tailscale-on-the-iphone" title="Permanent link">&para;</a></h3>
+<p>App Store → "Tailscale" → install. Sign in with the same identity you
+used on the Mac. Once connected, the Tailscale app shows the same tailnet
+as on the Mac, with <code>mlaptop</code> (or whatever your Mac's hostname is) listed
+under Devices.</p>
+<p>In Tailscale settings, enable <strong>Use Tailscale DNS</strong> so the
+<code>*.tail-...ts.net</code> hostnames resolve from any Wi-Fi.</p>
+<p>Quick check from a browser on the iPhone:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>http://mlaptop.tail4a4b9a.ts.net:4533/
+</code></pre></div>
+<p>You should see a JSON probe response like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.1.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;subsonic-compatible&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">  </span><span class="nt">&quot;api&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/rest/&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="nt">&quot;spec&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://opensubsonic.netlify.app/docs/api-reference/&quot;</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="p">}</span>
+</code></pre></div>
+<p>If that loads, the iPhone can reach the server.</p>
+<h3 id="install-amperfy">Install Amperfy<a class="headerlink" href="#install-amperfy" title="Permanent link">&para;</a></h3>
+<p>App Store → "Amperfy" → install. (Amperfy is the Subsonic client we
+recommend for iOS. play:Sub, iSub, Substreamer all work too — Amperfy
+is the most feature-complete, including OpenSubsonic extensions and
+synced lyrics.)</p>
+<h3 id="connect-amperfy-to-musickit-serve">Connect Amperfy to musickit serve<a class="headerlink" href="#connect-amperfy-to-musickit-serve" title="Permanent link">&para;</a></h3>
+<p>Open Amperfy → first-launch screen prompts for a server. Fill in:</p>
+<ul>
+<li><strong>Server URL</strong>: <code>http://mlaptop.tail4a4b9a.ts.net:4533</code> (your Mac's
+  Tailscale URL — no trailing slash, no <code>/rest</code>).</li>
+<li><strong>Username</strong>: <code>admin</code> (or whatever you put in <code>serve.toml</code>).</li>
+<li><strong>Password</strong>: <code>admin</code> (or whatever you put in <code>serve.toml</code>).</li>
+</ul>
+<p>Tap <strong>Login</strong>. Amperfy probes <code>/rest/ping</code>, then <code>/rest/getMusicFolders</code>
+and <code>/rest/getArtists</code> to populate the library. On first connect with a
+~300-album library this takes 2-5 seconds.</p>
+<p>If login fails, the most common causes are:</p>
+<ul>
+<li>Tailscale not connected on the iPhone (check the menu icon).</li>
+<li>Wrong port (musickit serve uses 4533 by default; some other Subsonic
+  servers use 4040).</li>
+<li>HTTPS expected but not configured. Default <code>serve</code> is plain HTTP. If
+  Amperfy asks for HTTPS, leave the URL as <code>http://</code> and accept the
+  insecure-warning toggle in Amperfy's settings — fine over Tailscale,
+  which encrypts the underlying connection.</li>
+</ul>
+<h3 id="play-a-track">Play a track<a class="headerlink" href="#play-a-track" title="Permanent link">&para;</a></h3>
+<p>Browse → Artists → pick one → pick an album → tap a track. Amperfy
+starts streaming. The first few seconds may be a fraction slower than a
+local file (HTTP buffer fill), then steady-state is real-time.</p>
+<p>Try the things you'd expect from a Subsonic client:</p>
+<ul>
+<li><strong>Background play</strong> — start a track, lock the iPhone, the audio keeps
+  going.</li>
+<li><strong>Lock-screen controls</strong> — pause / next / prev work.</li>
+<li><strong>Seek scrubber</strong> — Amperfy uses the Subsonic <code>transcodeOffset</code>
+  extension (which musickit advertises) for accurate mid-track resume.</li>
+<li><strong>Search</strong> — <code>/rest/search3</code> matches against artist, album, and track
+  titles.</li>
+</ul>
+<h2 id="6-optional-browse-play-locally-on-the-mac">6. Optional: browse + play locally on the Mac<a class="headerlink" href="#6-optional-browse-play-locally-on-the-mac" title="Permanent link">&para;</a></h2>
+<p>If you also want to browse the same library on the Mac itself:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output
+</code></pre></div>
+<p>This is the TUI — three-pane Textual app, library browser on the left, now-playing card + 48-band visualizer + tracklist on the right.</p>
+<p><img alt="musickit TUI — drilled into an album" src="../../screenshots/album-tracks.svg" /></p>
+<p>Press <code>?</code> for the full keybindings panel; the most useful ones to know are <code>Enter</code> (play), <code>Space</code> (pause), <code>n</code>/<code>p</code> (next/prev), <code>&lt;</code>/<code>&gt;</code> (±5s seek), <code>9</code>/<code>0</code> (volume), <code>/</code> (filter the focused pane), <code>f</code> (fullscreen visualizer), <code>q</code> (quit). Click anywhere on the progress bar to seek to that position.</p>
+<p>If the Mac has AirPlay devices on the same network (HomePod, AirPort
+Express, AirPlay-2 Sonos), the TUI can route playback to them.
+Press <code>a</code> for the AirPlay picker, pick a device, music plays through
+the speaker instead of the laptop. Iterate with <code>--airplay 'HomePod'</code>
+on the CLI for headless / scripted use.</p>
+<p>This is unrelated to the iPhone setup — it's about playback on the Mac
+itself. The Subsonic-client mode in <code>musickit tui --subsonic ...</code> lets
+you also use the TUI as a Subsonic client to a remote <code>musickit serve</code>.</p>
+<h2 id="7-day-to-day">7. Day-to-day<a class="headerlink" href="#7-day-to-day" title="Permanent link">&para;</a></h2>
+<p>Once it's running:</p>
+<ul>
+<li><strong>Add albums</strong> — drop new dirs into <code>./output/</code> (or wherever you
+  pointed <code>serve</code>). The watcher picks them up within ~5 seconds. New
+  album appears in Amperfy's library on next pull-to-refresh.</li>
+<li><strong>Edit tags</strong> — <code>musickit library retag &lt;album-dir&gt; --year 2020</code>,
+  <code>--album-artist 'New Name'</code>, etc. The watcher catches the file mtime
+  changes and re-reads only that album.</li>
+<li><strong>Replace covers</strong> — <code>musickit library cover &lt;album-dir&gt; new.jpg</code>
+  embeds the new cover into every track.</li>
+<li><strong>Audit periodically</strong> — <code>musickit library audit ./output --issues-only</code>
+  surfaces newly-introduced warnings (a recent rip might have
+  unexpected scene tags).</li>
+<li><strong>Inspect a single track</strong> — <code>musickit inspect path/to/track.m4a</code>
+  pretty-prints its tags, embedded picture, ReplayGain.</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="amperfy-says-server-unreachable">Amperfy says "Server unreachable"<a class="headerlink" href="#amperfy-says-server-unreachable" title="Permanent link">&para;</a></h3>
+<p>Check, in order:</p>
+<ol>
+<li>Is <code>musickit serve</code> still running? Restart if not.</li>
+<li>Is Tailscale connected on the iPhone? Open the app and confirm.</li>
+<li>Can you load the JSON probe URL in Mobile Safari? If yes, the
+   transport works — the issue is in Amperfy's auth / URL setup.</li>
+<li>Did you put the URL in correctly (no trailing slash, no <code>/rest</code>)?</li>
+</ol>
+<h3 id="symfonium-playsub-feishin-instead-of-amperfy">Symfonium / play:Sub / Feishin instead of Amperfy<a class="headerlink" href="#symfonium-playsub-feishin-instead-of-amperfy" title="Permanent link">&para;</a></h3>
+<p>The Subsonic API is identical — only the client UI changes. URL +
+credentials work the same. musickit specifically advertises the
+<code>formPost</code>, <code>transcodeOffset</code>, <code>multipleGenres</code>, <code>songLyrics</code>
+OpenSubsonic extensions; Amperfy and Symfonium are the two clients
+that exercise all of them, so they get the most polished UX.</p>
+<h3 id="slow-library-scan">"Slow" library scan<a class="headerlink" href="#slow-library-scan" title="Permanent link">&para;</a></h3>
+<p>The first launch of <code>serve</code> against a fresh library does a full
+filesystem walk + tag read. After that, the SQLite index at
+<code>&lt;output&gt;/.musickit/index.db</code> is hydrated and only filesystem deltas
+are re-scanned. If a launch ever feels mysteriously slow, run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>status<span class="w"> </span>./output
+</code></pre></div>
+<p>to inspect the DB and confirm it exists. <code>--full-rescan</code> (on <code>tree</code> or
+any other library subcommand) wipes + rebuilds the cache.</p>
+<h3 id="i-want-to-expose-the-server-to-the-open-internet">I want to expose the server to the open internet<a class="headerlink" href="#i-want-to-expose-the-server-to-the-open-internet" title="Permanent link">&para;</a></h3>
+<p>Don't, for v1 — the auth is HTTP Basic over plain HTTP. Wrap it in a
+reverse proxy (Caddy / nginx) with HTTPS termination, or stick with
+the Tailscale-only model where Tailscale's WireGuard tunnel does the
+encryption + access control for you.</p>
+<h2 id="where-to-read-next">Where to read next<a class="headerlink" href="#where-to-read-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../architecture/">Architecture</a> — how all the pieces fit together,
+  including the audio engine subprocess and the SQLite index lifecycle.</li>
+<li><a href="../library/">Library</a> — every audit rule, every fix, every index
+  management command.</li>
+<li><a href="../serve/">Serve</a> — full Subsonic endpoint list, transcoding, mDNS,
+  watcher behavior, client compatibility matrix.</li>
+<li><a href="../tui/">TUI</a> — local + radio + Subsonic-client + AirPlay modes,
+  keybindings, layout.</li>
 </ul>
 
 
