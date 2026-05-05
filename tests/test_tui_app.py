@@ -53,8 +53,8 @@ async def test_app_populates_browser_with_artists(silent_flac_template: Path, tm
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
-        # Radio is pinned at the top — artists follow.
-        assert kinds == ["radio", "artist", "artist"]
+        # Radio + Mixes are pinned at the top — artists follow.
+        assert kinds == ["radio", "mixes", "artist", "artist"]
         artist_names = sorted(
             str(getattr(c, "entry_data", "")) for c in browser.children if getattr(c, "entry_kind", None) == "artist"
         )
@@ -270,8 +270,8 @@ async def test_browser_drills_into_artist_and_back(silent_flac_template: Path, t
         pilot.app._handle_browser_selection(browser.children[0])  # type: ignore[attr-defined]
         await pilot.pause()
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
-        # Back at root: radio + the one artist.
-        assert kinds == ["radio", "artist"]
+        # Back at root: radio + mixes + the one artist.
+        assert kinds == ["radio", "mixes", "artist"]
 
 
 @pytest.mark.asyncio
