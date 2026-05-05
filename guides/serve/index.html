@@ -1386,7 +1386,7 @@
 <tbody>
 <tr>
 <td><code>search3?query=&amp;artistCount=&amp;albumCount=&amp;songCount=</code></td>
-<td>Multi-token AND, case-insensitive substring across artists / albums / titles. Pagination via <code>*Offset</code>.</td>
+<td>FTS5-backed multi-token AND with prefix matching, diacritic folding, and bm25 ranking. Sub-ms on 23k-track libraries. <code>bey</code> matches <code>Beyoncé</code>; <code>abba 1976</code> matches the 1976 ABBA album by combining the title + album_artist + year body text. Pagination via <code>*Offset</code>. Falls back to a casefolded substring scan if SQLite was built without FTS5 (rare).</td>
 </tr>
 <tr>
 <td><code>search2?query=...</code></td>

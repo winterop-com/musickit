@@ -916,7 +916,7 @@
 <li><strong>systemd / launchd plist</strong> — for users wanting <code>serve</code> to autostart on boot.</li>
 <li><strong>MQTT / webhook scrobble forwarding</strong> — push play events to Home Assistant / Last.fm / external systems.</li>
 <li><strong>Bigger <code>getCoverArt</code> cache</strong> — currently it's recomputed per request; an LRU keyed on <code>(album_id, size)</code> would help on slow disks.</li>
-<li><strong>FTS5 search backed by the library index</strong> — <code>/search3</code> and the TUI <code>/</code> filter currently do casefolded substring matching in Python over every row. With the SQLite index now in place, an FTS5 virtual table over <code>tracks(title, artist, album)</code> plus triggers would be a small win for medium libraries and a big one for very large ones.</li>
+<li><strong>TUI <code>/</code>-bar filter on top of FTS5</strong> — <code>/search3</code> is FTS5-backed (see Done); the TUI's incremental <code>/</code> filter is still in-memory casefold substring. Wiring it through the same in-memory FTS5 index would give ranked / prefix-matching results in the TUI.</li>
 </ul>
 <h2 id="tier-4-convert-pipeline-polish">Tier 4 — convert-pipeline polish<a class="headerlink" href="#tier-4-convert-pipeline-polish" title="Permanent link">&para;</a></h2>
 <ul>
@@ -971,6 +971,7 @@
 <li>TUI <code>g</code> keybind — generate-and-play a 60-min mix from the highlighted or currently-playing track</li>
 <li>TUI Mixes browser entry — saved <code>.m3u8</code> files appear in the right pane; selecting one resolves paths against the live index and plays it as a virtual album with stale-path graceful degradation</li>
 <li>Persistent stars / favourites — Subsonic clients' heart buttons are now real. <code>/star</code>, <code>/unstar</code>, <code>/getStarred</code>, <code>/getStarred2</code> backed by <code>&lt;root&gt;/.musickit/stars.toml</code> (TOML, hand-editable, survives index rebuilds).</li>
+<li>FTS5 search backend — <code>/search3</code> and <code>/search2</code> use an in-memory SQLite FTS5 index built fresh on every cache reindex. Sub-ms ranked results with prefix matching (<code>bey</code> matches <code>Beyoncé</code>), diacritic folding (<code>unicode61 remove_diacritics 2</code>), bm25 ordering, and multi-token AND across title + album_artist + year body text. Falls back to casefolded substring scan when SQLite was compiled without FTS5.</li>
 </ul>
 
 
