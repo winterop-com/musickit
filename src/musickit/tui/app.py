@@ -1430,15 +1430,24 @@ class MusickitApp(App[None]):
         return None
 
     def action_toggle_fullscreen(self) -> None:
+        """`f` — toggle the fullscreen visualizer.
+
+        Sizing is governed entirely by the CSS class rule
+        (`Screen.fullscreen Visualizer { height: 1fr; max-height: 100vh; }`)
+        — no inline-style overrides. The previous belt-and-suspenders
+        approach set `styles.height = '1fr'` inline, which won the
+        height race but left the base `max-height: 14` cap in place
+        because the inline didn't touch max-height. Net effect: pressing
+        `f` hid the sidebar / tracklist but the visualizer stayed at
+        14 lines, leaving the bottom of the screen empty.
+        """
+        viz = self.query_one(Visualizer)
+        # Defensive cleanup of any inline override left by an older
+        # build that may have stamped one on. Lets the CSS rule win.
+        viz.styles.clear_rule("height")
+        viz.styles.clear_rule("max_height")
         if self.screen.has_class("fullscreen"):
             self.screen.remove_class("fullscreen")
-            # Clear the inline `1fr` we set on entering fullscreen so
-            # the visualizer falls back to its CSS default
-            # (`1fr; min-height: 6; max-height: 14`). Textual's Styles
-            # API uses `clear_rule()` for this; `del styles.height`
-            # raises AttributeError because the descriptor has no
-            # __delete__.
-            self.query_one(Visualizer).styles.clear_rule("height")
             # Hiding the focused widget via CSS drops focus; put it back
             # where it was before fullscreen so the user lands on the
             # TrackList they were last interacting with, not on whatever
@@ -1453,7 +1462,6 @@ class MusickitApp(App[None]):
         else:
             self._focus_before_fullscreen = self.focused
             self.screen.add_class("fullscreen")
-            self.query_one(Visualizer).styles.height = "1fr"
 
     def action_toggle_help(self) -> None:
         """`?` shows / hides Textual's full keybindings help panel."""

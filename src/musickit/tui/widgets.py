@@ -175,9 +175,12 @@ class Visualizer(Static):
     Screen.fullscreen Visualizer {
         height: 1fr;
         /* Defeat the base `max-height: 14` so fullscreen actually fills
-           the viewport. Textual CSS rejects `none`; 100vh is "as much
-           as the screen has". */
-        max-height: 100vh;
+           the viewport. Textual CSS rejects `none`; 200 cells is more
+           than any reasonable terminal is tall, so this is effectively
+           uncapped. (`100vh` was tried first but interacted oddly with
+           the base rule's max-height in some layouts, leaving the bars
+           stuck at 14 rows even with the fullscreen class applied.) */
+        max-height: 200;
     }
     """
 
