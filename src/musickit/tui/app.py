@@ -1027,17 +1027,35 @@ class MusickitApp(App[None]):
         30×/sec and adds GIL pressure on top of Textual's layout reflow.
         Letting the bars freeze for a few hundred milliseconds during a
         drag is invisible; preventing audio clicks is not.
+
+        When paused, the engine stops publishing new band data, so the
+        shared-memory levels stay frozen at whatever the last audio
+        chunk rendered. Apply a per-frame decay locally so the bars
+        gracefully fade to zero over ~1s instead of looking dead. Same
+        treatment when stopped (no track loaded). Resumes pass-through
+        the moment playback starts again.
         """
         if self._resize_reflow_timer is not None:
             return
-        self._player.update_band_levels()
         try:
             visualizer = self.query_one(Visualizer)
         except NoMatches:
             # Tick fired after the DOM was torn down (e.g. mid-shutdown
             # in tests). Bail; the timer will be reaped along with the app.
             return
-        visualizer.levels = self._player.band_levels
+        if self._player.is_playing:
+            self._player.update_band_levels()
+            visualizer.levels = self._player.band_levels
+        else:
+            # Paused / stopped: decay the previously-shown levels toward 0.
+            # 0.858 ≈ 0.01 ** (1/30) → bars reach ~1% in ~1s at 30 FPS,
+            # matching the visualizer's natural release feel.
+            current = list(visualizer.levels)
+            decayed = [v * 0.858 if v > 0.005 else 0.0 for v in current]
+            # Avoid the cost of a no-op reactive write once everything's
+            # already at the floor — the visualizer redraw isn't free.
+            if any(v > 0.0 for v in decayed) or any(v > 0.0 for v in current):
+                visualizer.levels = decayed
 
     def _refresh_status(self) -> None:
         try:
