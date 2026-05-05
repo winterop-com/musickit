@@ -38,6 +38,7 @@ nav:
       - musickit inspect: guides/inspect.md
       - musickit tui: guides/tui.md
       - musickit serve: guides/serve.md
+      - musickit playlist: guides/playlist.md
       - Development: guides/development.md
   - Edge cases: edge-cases.md
   - Roadmap: roadmap.md

@@ -32,8 +32,8 @@ What's open, organized by what it would feel like.
 
 Things that would be interesting if anyone ever asked for them, but not pursued speculatively:
 
-- AI-generated playlists / mood tagging
 - BPM / key analysis (needs `librosa`, big dep weight)
+- AI-generated playlists with audio-feature similarity (current `musickit playlist gen` is tag-based; an audio-feature pass would need fingerprinting / `librosa`)
 - Multi-user serve (right now: single-user)
 - Sonos / Chromecast / DLNA output (AirPlay covers the Apple-ecosystem case)
 - Cross-fade between tracks
@@ -70,3 +70,6 @@ Things that would be interesting if anyone ever asked for them, but not pursued 
 - Real-world tested against Amperfy / Symfonium / play:Sub / Feishin
 - Push to GitHub + CI (`make check && make test` on push/PR)
 - This documentation site (mkdocs + Material)
+- `musickit playlist gen|list|show` — tag-based auto-generated `.m3u8` mixes anchored to a seed track (similarity scorer over artist / genre / year / compilation flag, per-album + per-artist caps; output is standard extended M3U)
+- TUI `g` keybind — generate-and-play a 60-min mix from the highlighted or currently-playing track
+- TUI Mixes browser entry — saved `.m3u8` files appear in the right pane; selecting one resolves paths against the live index and plays it as a virtual album with stale-path graceful degradation
