@@ -588,6 +588,7 @@ class KeyBar(Static):
             ("/", "Filter"),
             ("e", "Edit"),
             ("a", "AirPlay"),
+            ("v", "Viz"),
             ("f", "Full"),
             ("?", "Help"),
             ("q", "Quit"),
