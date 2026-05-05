@@ -412,11 +412,52 @@ on first connect.
 
 ### Subsonic-ID stability
 
-`serve/ids.py` builds opaque Subsonic IDs from album/track paths via a
-hash. The IDs are stable across rescans for unchanged albums (rebuild
-recomputes from the same input) and across server restarts. Symfonium
-caches IDs per-server, so rolling the IDs on every restart would force
-re-downloads on every client.
+`serve/ids.py` builds opaque Subsonic IDs from each entity's identity:
+
+```python
+def artist_id(artist_dir: str) -> str:
+    return "ar_" + hashlib.sha1(artist_dir.encode("utf-8")).hexdigest()[:16]
+
+def album_id(album: LibraryAlbum) -> str:
+    return "al_" + hashlib.sha1(str(album.path).encode("utf-8")).hexdigest()[:16]
+
+def track_id(track: LibraryTrack) -> str:
+    return "tr_" + hashlib.sha1(str(track.path).encode("utf-8")).hexdigest()[:16]
+```
+
+The 2-char prefixes (`ar_` / `al_` / `tr_`) prevent cross-type collisions
+and make IDs visually classifiable in logs / debugging. Hashing path
+strings means IDs are stable across rescans for unchanged entities
+(rebuild recomputes from the same input) and across server restarts.
+Symfonium / Amperfy / play:Sub cache IDs per-server, so any churn would
+force re-downloads on every client. Reverse lookup is O(1) via the
+`albums_by_id` / `tracks_by_id` / `artists_by_id` dicts on
+`IndexCache`, populated by `_reindex`.
+
+If the user renames an album dir or moves a file, the hash changes and
+clients see it as a new entity. That's the right behavior — moved
+content really is logically different — but it's worth knowing if you
+plan a directory reorganisation, since clients will lose any
+"recently played" / "starred" state tied to the old IDs.
+
+### IndexCache rebuild atomicity
+
+`IndexCache._reindex` does NOT take a lock around its writes — it
+mutates `self.index`, `self.albums_by_id`, `self.tracks_by_id`,
+`self.artists_by_id`, `self.artist_name_by_id` in sequence. The
+guarantee callers rely on is **per-attribute atomicity** from CPython's
+GIL: an endpoint reading `self.albums_by_id[album_id]` either sees the
+old dict reference or the new one, never a half-mutated dict. It can,
+however, see a mix between old and new across attributes (a brand-new
+album in `albums_by_id` paired with the old `index.albums` list)
+during the ~microsecond window of `_reindex`.
+
+In practice this is fine because endpoints touch one or two attributes
+each and inconsistencies resolve on the next request. If we ever needed
+strict cross-attribute snapshot reads, we'd build a single replacement
+state object outside the lock and assign it via one rebind — but the
+current pattern is simpler and the inconsistency window is too short to
+ever observe in real Subsonic-client traffic.
 
 ## The watcher (`src/musickit/serve/watcher.py`)
 
