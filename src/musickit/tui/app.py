@@ -101,6 +101,10 @@ class MusickitApp(App[None]):
     Screen.fullscreen #track-header { display: none; }
     Screen.fullscreen #track-scroll { display: none; }
     Screen.fullscreen #status { display: none; }
+    /* `v` toggle: hide the visualizer + its progress line so the
+       tracklist gets all the leftover space. Useful for short albums
+       where the meter dominates the screen. */
+    Screen.no-viz #visualizer { display: none; }
     /* Scan-in-progress: hide the rest of the body so the centered scan
        overlay is the only thing visible. Avoids the awkward half-empty
        UI behind the scan card. */
@@ -145,6 +149,7 @@ class MusickitApp(App[None]):
         Binding("s", "toggle_shuffle", "Shuffle", show=True),
         Binding("r", "cycle_repeat", "Repeat mode", show=True),
         Binding("f", "toggle_fullscreen", "Fullscreen viz", show=True),
+        Binding("v", "toggle_visualizer", "Show / hide visualizer", show=True),
         Binding("tab", "focus_next", "Focus next pane", show=True),
         Binding("ctrl+left", "tree_narrower", "Sidebar narrower", show=True),
         Binding("ctrl+right", "tree_wider", "Sidebar wider", show=True),
@@ -1168,14 +1173,26 @@ class MusickitApp(App[None]):
         self._show_scan_overlay("[bold cyan]Force-rescanning library…[/]")
         self._scan_library_async(initial=False)
 
+    def action_toggle_visualizer(self) -> None:
+        """`v` — hide / show the visualizer panel.
+
+        On albums where the meter dominates the screen (a 2-track album
+        on a typical-height window) the user often just wants the
+        tracklist. Toggling adds / removes the `no-viz` class on the
+        screen; CSS does the rest.
+        """
+        if self.screen.has_class("no-viz"):
+            self.screen.remove_class("no-viz")
+        else:
+            self.screen.add_class("no-viz")
+
     def action_toggle_fullscreen(self) -> None:
         if self.screen.has_class("fullscreen"):
             self.screen.remove_class("fullscreen")
-            # Restore default panel height (matches the CSS height in
-            # `widgets.Visualizer.DEFAULT_CSS`). Bumping this had been
-            # missed previously — it stayed at the old 6 after the
-            # visualizer panel grew to 12, leaving a weird gap.
-            self.query_one(Visualizer).styles.height = 12
+            # Clear the inline `1fr` we set on entering fullscreen so
+            # the visualizer falls back to its CSS default
+            # (`1fr; min-height: 6; max-height: 14`).
+            del self.query_one(Visualizer).styles.height
             # Hiding the focused widget via CSS drops focus; put it back
             # where it was before fullscreen so the user lands on the
             # TrackList they were last interacting with, not on whatever
