@@ -1,0 +1,62 @@
+name: Docs
+
+# Build + deploy the mkdocs site to GitHub Pages whenever docs / README /
+# mkdocs config / referenced screenshots / repo metadata change on main.
+# Manual `mkdocs gh-deploy` from a workstation still works as an escape
+# hatch but is no longer required.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "README.md"
+      - ".github/workflows/docs.yml"
+  # `workflow_dispatch` lets you redeploy from the Actions tab without
+  # needing a no-op commit (e.g. to pick up a manually-bumped Pages
+  # config).
+  workflow_dispatch:
+
+# Allow only one concurrent deploy; cancel any in-flight run if a newer
+# commit lands while we're building.
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write  # `mkdocs gh-deploy` pushes to the gh-pages branch.
+
+jobs:
+  deploy:
+    name: Build + deploy site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout (full history so gh-deploy's commit graph is intact)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies (mkdocs + plugins)
+        run: uv sync --all-extras --dev
+
+      - name: Configure git author for the gh-pages commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Build + deploy to gh-pages
+        # `--force` overwrites any unrelated history on gh-pages. Safe
+        # because the branch is owned exclusively by this workflow.
+        run: uv run mkdocs gh-deploy --force --message "Deploy ${GITHUB_SHA::7} via Actions"
