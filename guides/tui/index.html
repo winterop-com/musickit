@@ -1121,7 +1121,7 @@
 <p>Click semantics on the track list mirror Spotify / iTunes: single click moves the cursor only (no playback), double click within ~400ms plays the track. Click anywhere on the progress bar to seek to that position.</p>
 <p><code>?</code> opens the full HelpPanel with every binding:</p>
 <p><img alt="Help panel" src="../../screenshots/help-panel.svg" /></p>
-<p><code>/</code> opens an inline filter that narrows the focused pane to a case-insensitive substring match — useful for jumping to an artist on a 1000+ album library:</p>
+<p><code>/</code> opens an inline filter that narrows the focused pane to a case-insensitive, <strong>diacritic-folded</strong> substring match — <code>beyonce</code> finds <code>Beyoncé</code>, <code>sigur ros</code> finds <code>Sigur Rós</code>. Useful for jumping to an artist on a 1000+ album library:</p>
 <p><img alt="Filter active on the artist pane" src="../../screenshots/filter-active.svg" /></p>
 <h2 id="local-library-mode">Local library mode<a class="headerlink" href="#local-library-mode" title="Permanent link">&para;</a></h2>
 <p><code>musickit tui ./output</code> hydrates the persistent SQLite index at <code>&lt;DIR&gt;/.musickit/index.db</code> if present (a delta-validate pass picks up filesystem changes since the last run); otherwise it walks the directory via <code>library.scan</code> + <code>library.audit</code>. Initial scan shows a centred progress overlay with album-by-album feedback; subsequent rescans (<code>Ctrl+R</code>) re-validate against the filesystem.</p>
