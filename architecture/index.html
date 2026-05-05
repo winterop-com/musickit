@@ -544,6 +544,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#indexcache-rebuild-atomicity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IndexCache rebuild atomicity
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1204,6 +1215,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#indexcache-rebuild-atomicity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IndexCache rebuild atomicity
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1646,11 +1668,45 @@ is requested) or pipes through ffmpeg-on-the-fly when the client asks for
 auto-negotiate this via <code>getMusicFolders</code> / <code>getOpenSubsonicExtensions</code>
 on first connect.</p>
 <h3 id="subsonic-id-stability">Subsonic-ID stability<a class="headerlink" href="#subsonic-id-stability" title="Permanent link">&para;</a></h3>
-<p><code>serve/ids.py</code> builds opaque Subsonic IDs from album/track paths via a
-hash. The IDs are stable across rescans for unchanged albums (rebuild
-recomputes from the same input) and across server restarts. Symfonium
-caches IDs per-server, so rolling the IDs on every restart would force
-re-downloads on every client.</p>
+<p><code>serve/ids.py</code> builds opaque Subsonic IDs from each entity's identity:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">artist_id</span><span class="p">(</span><span class="n">artist_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="k">return</span> <span class="s2">&quot;ar_&quot;</span> <span class="o">+</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span><span class="n">artist_dir</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="mi">16</span><span class="p">]</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">album_id</span><span class="p">(</span><span class="n">album</span><span class="p">:</span> <span class="n">LibraryAlbum</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="k">return</span> <span class="s2">&quot;al_&quot;</span> <span class="o">+</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">album</span><span class="o">.</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="mi">16</span><span class="p">]</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">track_id</span><span class="p">(</span><span class="n">track</span><span class="p">:</span> <span class="n">LibraryTrack</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="k">return</span> <span class="s2">&quot;tr_&quot;</span> <span class="o">+</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">track</span><span class="o">.</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="mi">16</span><span class="p">]</span>
+</code></pre></div>
+<p>The 2-char prefixes (<code>ar_</code> / <code>al_</code> / <code>tr_</code>) prevent cross-type collisions
+and make IDs visually classifiable in logs / debugging. Hashing path
+strings means IDs are stable across rescans for unchanged entities
+(rebuild recomputes from the same input) and across server restarts.
+Symfonium / Amperfy / play:Sub cache IDs per-server, so any churn would
+force re-downloads on every client. Reverse lookup is O(1) via the
+<code>albums_by_id</code> / <code>tracks_by_id</code> / <code>artists_by_id</code> dicts on
+<code>IndexCache</code>, populated by <code>_reindex</code>.</p>
+<p>If the user renames an album dir or moves a file, the hash changes and
+clients see it as a new entity. That's the right behavior — moved
+content really is logically different — but it's worth knowing if you
+plan a directory reorganisation, since clients will lose any
+"recently played" / "starred" state tied to the old IDs.</p>
+<h3 id="indexcache-rebuild-atomicity">IndexCache rebuild atomicity<a class="headerlink" href="#indexcache-rebuild-atomicity" title="Permanent link">&para;</a></h3>
+<p><code>IndexCache._reindex</code> does NOT take a lock around its writes — it
+mutates <code>self.index</code>, <code>self.albums_by_id</code>, <code>self.tracks_by_id</code>,
+<code>self.artists_by_id</code>, <code>self.artist_name_by_id</code> in sequence. The
+guarantee callers rely on is <strong>per-attribute atomicity</strong> from CPython's
+GIL: an endpoint reading <code>self.albums_by_id[album_id]</code> either sees the
+old dict reference or the new one, never a half-mutated dict. It can,
+however, see a mix between old and new across attributes (a brand-new
+album in <code>albums_by_id</code> paired with the old <code>index.albums</code> list)
+during the ~microsecond window of <code>_reindex</code>.</p>
+<p>In practice this is fine because endpoints touch one or two attributes
+each and inconsistencies resolve on the next request. If we ever needed
+strict cross-attribute snapshot reads, we'd build a single replacement
+state object outside the lock and assign it via one rebind — but the
+current pattern is simpler and the inconsistency window is too short to
+ever observe in real Subsonic-client traffic.</p>
 <h2 id="the-watcher-srcmusickitservewatcherpy">The watcher (<code>src/musickit/serve/watcher.py</code>)<a class="headerlink" href="#the-watcher-srcmusickitservewatcherpy" title="Permanent link">&para;</a></h2>
 <p><code>watchdog</code> <code>Observer</code> watches the library root recursively. The handler
 filters by extension (audio files only — skip <code>.DS_Store</code>, <code>cover.jpg</code>)
