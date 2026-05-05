@@ -211,8 +211,63 @@ async def _wait_for_scan(pilot: object, timeout: float = 10.0) -> None:
         await pilot.pause(0.05)  # type: ignore[attr-defined]
 
 
-async def _capture(name: str, root: Path, out_dir: Path, keys: list[str], note: str) -> None:
-    """Drive a fresh `MusickitApp`, press `keys`, save the SVG screenshot."""
+def _fake_spectrum(n_bands: int = 48) -> list[float]:
+    """Return plausible-looking visualizer band heights.
+
+    No real playback needed for the docs screenshots — we just inject
+    these values into the Visualizer widget's `levels` reactive so the
+    bars render as if music were playing. Faster than driving the audio
+    engine, and works on CI hosts without an audio device.
+
+    Shape: bass-heavy left side (deep bass + kick energy), gentle slope
+    through mids, sharp drop into the top octaves with a few small
+    peaks (cymbals / sibilance) for visual interest.
+    """
+    import math
+
+    levels: list[float] = []
+    # Hand-tuned anchor points; intermediate bands interpolated in log-x.
+    # Each tuple is (band_index, height).
+    anchors = [(0, 0.92), (3, 0.86), (8, 0.74), (16, 0.58), (24, 0.46), (32, 0.30), (40, 0.18), (47, 0.06)]
+    # Decorative little peaks scattered across the higher bands so the
+    # right side doesn't decay into a flat slope.
+    peaks = {6: 0.95, 14: 0.82, 21: 0.72, 27: 0.58, 35: 0.42}
+    for i in range(n_bands):
+        # Find the two anchors bracketing band i.
+        for j in range(len(anchors) - 1):
+            a_idx, a_h = anchors[j]
+            b_idx, b_h = anchors[j + 1]
+            if a_idx <= i <= b_idx:
+                # Linear interp between anchors.
+                t = (i - a_idx) / max(1, b_idx - a_idx)
+                base = a_h + (b_h - a_h) * t
+                break
+        else:  # pragma: no cover
+            base = 0.0
+        # Tiny smooth ripple so adjacent bars aren't perfectly monotonic.
+        base += 0.03 * math.sin(i * 0.7)
+        if i in peaks:
+            base = peaks[i]
+        levels.append(max(0.0, min(1.0, base)))
+    return levels
+
+
+async def _capture(
+    name: str,
+    root: Path,
+    out_dir: Path,
+    keys: list[str],
+    note: str,
+    *,
+    show_viz: bool = False,
+) -> None:
+    """Drive a fresh `MusickitApp`, press `keys`, save the SVG screenshot.
+
+    `show_viz=True` injects fake band levels into the Visualizer widget
+    after the keypresses so the screenshot shows the bars at musical
+    heights instead of all-zero (which is what real playback of the
+    silent fixture tracks produces).
+    """
     from musickit.tui.app import MusickitApp
 
     print(f"  [{name}] {note}")
@@ -221,6 +276,31 @@ async def _capture(name: str, root: Path, out_dir: Path, keys: list[str], note: 
         await _wait_for_scan(pilot)
         for key in keys:
             await pilot.press(key)
+            await pilot.pause()
+        if show_viz:
+            # Inject fake band levels into the player's shared-memory
+            # array. The Visualizer's `levels` reactive is rewritten on
+            # every UI tick from `self._player.band_levels`, so setting
+            # the widget directly gets clobbered ~33ms later. Writing
+            # into the shared mem is the source of truth.
+            shared = app._player._state.band_levels  # type: ignore[attr-defined]
+            fake = _fake_spectrum()
+            with shared.get_lock():
+                for i, v in enumerate(fake):
+                    shared[i] = v
+            # Also pin the playing-track marker / progress bar so the
+            # `▶ 02:14 ━━━━━━━━━━━━━━━━━━━━━━━━ 04:30` line shows live
+            # values instead of `■ 00:00 ░░░░ 00:00`. These all live in
+            # the same shared mem block.
+            state = app._player._state  # type: ignore[attr-defined]
+            with state.duration_s.get_lock():
+                state.duration_s.value = 270.0  # 4:30
+            with state.position_frames.get_lock():
+                state.position_frames.value = 134 * 44100  # 2:14
+            with state.stopped.get_lock():
+                state.stopped.value = 0
+            with state.paused.get_lock():
+                state.paused.value = 0
             await pilot.pause()
         # Two extra pauses give the visualizer / progress / etc. one render
         # cycle to settle on whatever final state the keypresses produced.
@@ -255,22 +335,26 @@ async def main() -> None:
         #    cursor: Bee Gees(0) → Imagine Dragons(1) → Lauryn Hill(2)
         #    → Pink Floyd(3). Down 4 from the Radio (row 0), enter to
         #    drill, enter to open the (sole) album, focus moves to
-        #    tracklist.
+        #    tracklist. show_viz injects fake band levels so the
+        #    screenshot shows musical bars instead of silence.
         await _capture(
             "album-tracks",
             root,
             out_dir,
             keys=["down", "down", "down", "down", "enter", "enter"],
-            note="Drilled-in album view",
+            note="Drilled-in album view (with viz)",
+            show_viz=True,
         )
 
-        # 3. Fullscreen visualizer — same as #2 plus `f`.
+        # 3. Fullscreen visualizer — same as #2 plus `f`. show_viz on so
+        #    the giant bars actually have heights.
         await _capture(
             "fullscreen-viz",
             root,
             out_dir,
             keys=["down", "down", "down", "down", "enter", "enter", "f"],
             note="Fullscreen visualizer",
+            show_viz=True,
         )
 
         # 4. Filter active — `/` to open the filter, type `pink`. Cursor
