@@ -8,13 +8,16 @@ A Textual TUI for browsing + playing the converted library, plus a curated radio
 uvx musickit tui ./output                                # local library + radio
 uvx musickit tui                                         # radio-only
 uvx musickit tui --subsonic URL --user U --password P    # Subsonic client mode
+uvx musickit tui --subsonic URL --user U --password P --save-subsonic
+uvx musickit tui --saved-subsonic                        # reconnect with saved creds (no flags)
+uvx musickit tui --forget-subsonic                       # wipe saved creds + exit
 uvx musickit tui --discover                              # list LAN Subsonic servers + AirPlay devices, exit
 uvx musickit tui --airplay 'HomePod'                     # route playback to an AirPlay device
 uvx musickit tui ./output --no-cache                     # skip the index DB (in-memory scan only)
 uvx musickit tui ./output --full-rescan                  # rebuild the index DB from scratch on launch
 ```
 
-Subsonic credentials are NEVER persisted — pass `--subsonic` / `--user` / `--password` explicitly each session. With no arguments the TUI drops directly into radio-only mode.
+Subsonic credentials are saved as a token + salt pair — never the raw password. Authentication on the wire uses the same Subsonic-spec `t` / `s` token mode, so the password never travels in a query string regardless of `--save-subsonic`. The saved block lives in `~/.config/musickit/state.toml` (mode 0600); `--forget-subsonic` removes it.
 
 Local-library mode reuses the persistent SQLite index at `<DIR>/.musickit/index.db` so the second launch skips the filesystem walk and tag read. See [`musickit library index`](library.md#index-manage-the-persistent-sqlite-cache) for management commands and details.
 
@@ -137,7 +140,23 @@ uvx musickit tui --subsonic http://mlaptop.tail4a4b9a.ts.net:4533 \
              --user mort --password secret
 ```
 
-Credentials are not persisted — pass `--subsonic` / `--user` / `--password` every time you want client mode.
+### Saving credentials
+
+Add `--save-subsonic` on first connect to persist the (host, user, token, salt) tuple to `~/.config/musickit/state.toml`. The TUI derives a token + salt from your password (per the Subsonic spec) and saves THAT — your raw password is never written to disk.
+
+```bash
+# first time — saves on successful connect
+uvx musickit tui --subsonic http://mlaptop.tail4a4b9a.ts.net:4533 \
+             --user mort --password secret --save-subsonic
+
+# every time after — no flags needed
+uvx musickit tui --saved-subsonic
+
+# wipe the saved block when done
+uvx musickit tui --forget-subsonic
+```
+
+The same token-auth path is used on the wire for ALL Subsonic-client traffic regardless of `--save-subsonic` — the password isn't put in query strings end-to-end. If state.toml leaks, an attacker gets a usable Subsonic auth pair (until you change the password) but NOT the raw password (so reuse on other services is safe). The file is mode 0600.
 
 How it works:
 
