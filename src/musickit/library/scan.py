@@ -317,6 +317,13 @@ def rescan_albums(
         conn.execute("ROLLBACK")
         raise
 
+    # Reclaim pages freed by the per-album DELETE+INSERT cycle. Cheap
+    # when there's nothing to free; matters across many rescans.
+    if removed or updated:
+        from musickit.library.db import reclaim_freelist
+
+        reclaim_freelist(conn)
+
     return ValidationResult(added=added, removed=removed, updated=updated)
 
 
@@ -379,6 +386,13 @@ def write_index(conn: sqlite3.Connection, root: Path, index: LibraryIndex) -> No
     except Exception:
         conn.execute("ROLLBACK")
         raise
+    # Reclaim pages freed by the wipe-and-rewrite — `auto_vacuum =
+    # INCREMENTAL` allows the manual `PRAGMA incremental_vacuum` to
+    # release them; without this, fragmented pages accumulate across
+    # rescans and the file grows 2-3× over time.
+    from musickit.library.db import reclaim_freelist
+
+    reclaim_freelist(conn)
 
 
 def _insert_album(conn: sqlite3.Connection, root_abs: Path, album: LibraryAlbum, now: float) -> int:

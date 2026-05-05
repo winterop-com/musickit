@@ -1,0 +1,118 @@
+name: Release
+
+# Triggered when a tag matching `v*` is pushed (e.g. `v0.5.0`).
+# Workflow:
+#   1. Sanity-check: tag must match the version in pyproject.toml.
+#   2. Run the same lint + test gate as CI.
+#   3. Build sdist + wheel via `uv build`.
+#   4. Publish to PyPI using a Trusted Publisher token from repo secrets.
+#   5. Create the GitHub release with auto-generated notes (commits since
+#      the previous tag), attaching the built dist files.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Required for `gh release create` and PyPI Trusted Publishers (OIDC).
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    name: Build + publish ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout (full history so we can diff against the previous tag)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install ffmpeg + libportaudio (test runtime)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libportaudio2
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Confirm tag matches pyproject.toml version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PYPROJECT_VERSION="v$(uv run python -c 'import tomllib, pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          if [ "$TAG" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::Tag $TAG does not match pyproject.toml version $PYPROJECT_VERSION"
+            exit 1
+          fi
+          echo "Tag $TAG matches pyproject.toml ($PYPROJECT_VERSION)"
+
+      - name: make check
+        run: make check
+
+      - name: make test
+        run: make test
+
+      - name: Build sdist + wheel
+        run: uv build
+
+      - name: Publish to PyPI
+        # Uses PyPI Trusted Publishers (OIDC). Configure once in the
+        # PyPI project settings: https://docs.pypi.org/trusted-publishers/
+        # — owner: winterop-com, repo: musickit, workflow: release.yml,
+        # environment: (leave blank).
+        run: uv publish
+
+      - name: Compose release notes from commit log
+        id: notes
+        run: |
+          # Find the previous tag matching the same `v*` pattern. If this
+          # is the first release, fall back to the full history.
+          PREV_TAG=$(git tag --list 'v*' --sort=-v:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1 || true)
+          {
+            echo "## Install / upgrade"
+            echo ""
+            echo '```bash'
+            echo "uvx musickit              # one-off run; auto-fetches the latest version"
+            echo "uv tool upgrade musickit  # if previously installed via \`uv tool install\`"
+            echo "pipx upgrade musickit     # if installed via pipx"
+            echo '```'
+            echo ""
+            echo "## Changes"
+            echo ""
+            if [ -n "$PREV_TAG" ]; then
+              echo "Commits since [\`${PREV_TAG}\`](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${PREV_TAG}):"
+              echo ""
+              git log --pretty=format:'- %s ([\`%h\`](https://github.com/${GITHUB_REPOSITORY}/commit/%H))' "${PREV_TAG}..HEAD"
+            else
+              echo "Initial release."
+              echo ""
+              git log --pretty=format:'- %s ([\`%h\`](https://github.com/${GITHUB_REPOSITORY}/commit/%H))'
+            fi
+            echo ""
+            echo ""
+            echo "## Artifacts"
+            echo ""
+            echo "PyPI: <https://pypi.org/project/musickit/${GITHUB_REF_NAME#v}/>"
+          } > /tmp/release-notes.md
+          echo "notes_path=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file "${{ steps.notes.outputs.notes_path }}" \
+            dist/*.whl dist/*.tar.gz

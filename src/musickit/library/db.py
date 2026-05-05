@@ -128,7 +128,18 @@ def _apply_pragmas(conn: sqlite3.Connection) -> None:
 
 
 def _create_schema(conn: sqlite3.Connection, root: Path) -> None:
-    """Initialise an empty DB with the v1 schema and meta rows."""
+    """Initialise an empty DB with the v1 schema and meta rows.
+
+    `auto_vacuum = INCREMENTAL` is set BEFORE the schema is created — it
+    can only be applied to an empty database (or one followed by a full
+    `VACUUM`). With this setting, pages freed by `DELETE FROM albums`
+    (cascade-deletes tracks / track_genres / album_warnings) and by
+    per-album rescans become reclaimable via the cheap `PRAGMA
+    incremental_vacuum` we run after each big transaction. Without it,
+    fragmented pages just accumulate and the DB grows 2-3× across many
+    rescans on a real library.
+    """
+    conn.execute("PRAGMA auto_vacuum = INCREMENTAL")
     conn.executescript(_SCHEMA)
     conn.execute(
         "INSERT INTO meta(key, value) VALUES (?, ?)",
@@ -138,6 +149,20 @@ def _create_schema(conn: sqlite3.Connection, root: Path) -> None:
         "INSERT INTO meta(key, value) VALUES (?, ?)",
         ("library_root_abs", str(root.resolve())),
     )
+
+
+def reclaim_freelist(conn: sqlite3.Connection) -> None:
+    """Reclaim freed pages on an `auto_vacuum = INCREMENTAL` database.
+
+    Cheap (~ms) when there's nothing to free. Call this after a big
+    delete + insert transaction so the file size doesn't accumulate
+    fragmented pages over many rescans. Safe even if the DB was created
+    with `auto_vacuum = NONE` — incremental_vacuum is a no-op there.
+    """
+    try:
+        conn.execute("PRAGMA incremental_vacuum")
+    except sqlite3.DatabaseError:  # pragma: no cover — never raised in practice
+        pass
 
 
 def _can_use_existing(path: Path, root: Path) -> bool:
