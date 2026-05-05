@@ -25,8 +25,21 @@ def tui(
     ] = None,
     subsonic: Annotated[
         str | None,
-        typer.Option("--subsonic", help="Subsonic server URL — turns the TUI into a remote client."),
+        typer.Option(
+            "--subsonic",
+            help=(
+                "Subsonic server URL — turns the TUI into a remote client. "
+                "Pass `--subsonic` with no value to use the saved server (--save-subsonic)."
+            ),
+        ),
     ] = None,
+    use_saved_subsonic: Annotated[
+        bool,
+        typer.Option(
+            "--saved-subsonic",
+            help="Reconnect to the saved Subsonic server (no --subsonic / --user / --password needed).",
+        ),
+    ] = False,
     user: Annotated[
         str | None,
         typer.Option("--user", help="Subsonic username."),
@@ -35,6 +48,23 @@ def tui(
         str | None,
         typer.Option("--password", help="Subsonic password."),
     ] = None,
+    save_subsonic_creds: Annotated[
+        bool,
+        typer.Option(
+            "--save-subsonic",
+            help=(
+                "Persist (host, user, token, salt) to ~/.config/musickit/state.toml on successful "
+                "connect. Future launches use --saved-subsonic. Token-derived; raw password is NOT stored."
+            ),
+        ),
+    ] = False,
+    forget_subsonic: Annotated[
+        bool,
+        typer.Option(
+            "--forget-subsonic",
+            help="Remove the saved Subsonic auth block from state.toml and exit.",
+        ),
+    ] = False,
     discover: Annotated[
         bool,
         typer.Option(
@@ -78,7 +108,14 @@ def tui(
     those flags the TUI starts in local-library mode (with `DIR`) or
     radio-only mode (without).
     """
-    from musickit.tui.state import load_state
+    from musickit.tui.state import clear_subsonic, load_state, load_subsonic, save_subsonic
+
+    if forget_subsonic:
+        if clear_subsonic():
+            typer.echo("forgot saved Subsonic credentials.")
+        else:
+            typer.echo("no saved Subsonic credentials to forget.")
+        return
 
     if discover:
         _run_discover_and_exit()  # raises Exit
@@ -87,19 +124,45 @@ def tui(
     saved = load_state()
 
     from musickit.tui.app import MusickitApp
+    from musickit.tui.subsonic_client import SubsonicClient, SubsonicError
 
     connected_client = None
-    if subsonic is not None:
+    if use_saved_subsonic:
+        block = load_subsonic()
+        if block is None:
+            typer.echo(
+                "error: --saved-subsonic but no saved credentials. "
+                "Connect once with --subsonic / --user / --password / --save-subsonic first.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        client = SubsonicClient(
+            block["host"],
+            block["user"],
+            token=block["token"],
+            salt=block["salt"],
+            timeout=15.0,
+        )
+        try:
+            client.ping()
+        except SubsonicError as exc:
+            typer.echo(f"error: subsonic ping with saved creds failed: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        typer.echo(f"connected to {block['host']} as {block['user']} (saved creds)")
+        connected_client = client
+    elif subsonic is not None:
         if not (user and password):
             typer.echo(
-                "error: --subsonic requires --user and --password",
+                "error: --subsonic requires --user and --password (or use --saved-subsonic)",
                 err=True,
             )
             raise typer.Exit(code=1)
 
-        from musickit.tui.subsonic_client import SubsonicClient, SubsonicError
-
-        client = SubsonicClient(subsonic, user, password, timeout=15.0)
+        # Derive a token + salt up front. Even when not saving, the
+        # client uses token-auth on the wire — keeps password out of
+        # query strings end-to-end.
+        token, salt = SubsonicClient.derive_token(password)
+        client = SubsonicClient(subsonic, user, token=token, salt=salt, timeout=15.0)
         try:
             client.ping()
         except SubsonicError as exc:
@@ -107,6 +170,10 @@ def tui(
             raise typer.Exit(code=1) from exc
         typer.echo(f"connected to {subsonic} as {user}")
         connected_client = client
+
+        if save_subsonic_creds:
+            save_subsonic(host=subsonic.rstrip("/"), user=user, token=token, salt=salt)
+            typer.echo("saved Subsonic credentials to ~/.config/musickit/state.toml")
 
     airplay_controller = None
     if airplay:

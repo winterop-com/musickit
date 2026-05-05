@@ -9,7 +9,9 @@ when present.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import secrets
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -30,30 +32,84 @@ class SubsonicError(Exception):
 
 
 class SubsonicClient:
-    """Read-only Subsonic API client. Used by `musickit tui --subsonic`."""
+    """Read-only Subsonic API client. Used by `musickit tui --subsonic`.
+
+    Supports two auth shapes per the Subsonic spec:
+      - Password (`p=...`) — plaintext.
+      - Token (`t=md5(password+salt), s=salt`) — what `state.toml`-saved
+        sessions reuse. Avoids storing the raw password on disk; the
+        saved (salt, token) pair authenticates the same account but
+        can't be replayed against other services if leaked.
+
+    Construct with `password=...` or `token=..., salt=...` — never both.
+    """
 
     def __init__(
         self,
         base_url: str,
         user: str,
-        password: str,
+        password: str | None = None,
         *,
+        token: str | None = None,
+        salt: str | None = None,
         http: httpx.Client | None = None,
         timeout: float = 30.0,
     ) -> None:
+        if password is None and (token is None or salt is None):
+            msg = "SubsonicClient requires either `password` or both `token` and `salt`"
+            raise ValueError(msg)
+        if password is not None and (token is not None or salt is not None):
+            msg = "Pass either `password` OR (`token`, `salt`), not both"
+            raise ValueError(msg)
         self.base_url = base_url.rstrip("/")
         self.user = user
         self.password = password
+        self.token = token
+        self.salt = salt
         self.http = http or httpx.Client(timeout=timeout)
 
-    def _auth_params(self) -> dict[str, str]:
+    @classmethod
+    def derive_token(cls, password: str) -> tuple[str, str]:
+        """Return `(token, salt)` derived from `password` for token-auth saves.
+
+        `salt` is 16 random hex chars; `token` is `md5(password + salt)`.
+        Used by the CLI's `--save` path to convert a one-time password
+        into a persistable token + salt pair.
+        """
+        salt = secrets.token_hex(8)
+        token = hashlib.md5((password + salt).encode("utf-8"), usedforsecurity=False).hexdigest()
+        return token, salt
+
+    def auth_for_state(self) -> dict[str, str] | None:
+        """Return `(host, user, token, salt)` suitable for state.toml.
+
+        Returns None when the client was constructed with a plaintext
+        password (CLI must call `derive_token()` to produce a saveable
+        pair). Token-mode clients return their existing values directly.
+        """
+        if self.token is None or self.salt is None:
+            return None
         return {
+            "host": self.base_url,
+            "user": self.user,
+            "token": self.token,
+            "salt": self.salt,
+        }
+
+    def _auth_params(self) -> dict[str, str]:
+        base = {
             "u": self.user,
-            "p": self.password,
             "v": "1.16.1",
             "c": "musickit-tui",
             "f": "json",
         }
+        if self.token is not None and self.salt is not None:
+            base["t"] = self.token
+            base["s"] = self.salt
+        else:
+            assert self.password is not None  # __init__ enforced one of the two
+            base["p"] = self.password
+        return base
 
     def _get(self, endpoint: str, **extra: str | int) -> dict[str, Any]:
         params: Mapping[str, str | int] = {**self._auth_params(), **extra}

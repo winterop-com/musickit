@@ -54,11 +54,63 @@ def load_state() -> dict[str, Any]:
 
 
 def save_state(state: dict[str, Any]) -> None:
-    """Write the persisted UI state. Best-effort — silently ignores I/O errors."""
+    """Write the persisted UI state. Best-effort — silently ignores I/O errors.
+
+    Writes are mode-0600 so the file containing Subsonic auth tokens
+    isn't world-readable on a multi-user box.
+    """
     p = state_path()
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
         with p.open("wb") as f:
             tomli_w.dump(state, f)
+        # Tighten perms — best-effort. No-op on Windows / where chmod fails.
+        try:
+            p.chmod(0o600)
+        except OSError:  # pragma: no cover — Windows / read-only mounts
+            pass
     except OSError:  # pragma: no cover — read-only home etc.
         pass
+
+
+# ---------------------------------------------------------------------------
+# Subsonic-credential helpers — `<state>.subsonic = {host, user, token, salt}`
+# ---------------------------------------------------------------------------
+
+
+def load_subsonic() -> dict[str, str] | None:
+    """Read the saved Subsonic auth block, or None if absent / malformed.
+
+    Validates that all four required fields are present and non-empty;
+    a partial / corrupt block returns None so the caller asks for fresh
+    credentials instead of crashing on a missing `salt`.
+    """
+    state = load_state()
+    block = state.get("subsonic")
+    if not isinstance(block, dict):
+        return None
+    required = ("host", "user", "token", "salt")
+    out: dict[str, str] = {}
+    for k in required:
+        v = block.get(k)
+        if not isinstance(v, str) or not v:
+            return None
+        out[k] = v
+    return out
+
+
+def save_subsonic(*, host: str, user: str, token: str, salt: str) -> None:
+    """Persist a Subsonic auth pair. Overwrites any prior subsonic block."""
+    state = load_state()
+    state["subsonic"] = {"host": host, "user": user, "token": token, "salt": salt}
+    save_state(state)
+
+
+def clear_subsonic() -> bool:
+    """Remove the saved Subsonic block. Returns True iff something was removed."""
+    state = load_state()
+    if "subsonic" not in state:
+        return False
+    state.pop("subsonic", None)
+    save_state(state)
+    return True
