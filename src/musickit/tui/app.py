@@ -150,6 +150,7 @@ class MusickitApp(App[None]):
         Binding("r", "cycle_repeat", "Repeat mode", show=True),
         Binding("f", "toggle_fullscreen", "Fullscreen viz", show=True),
         Binding("v", "toggle_visualizer", "Show / hide visualizer", show=True),
+        Binding("g", "generate_playlist", "Generate mix from track", show=True),
         Binding("tab", "focus_next", "Focus next pane", show=True),
         Binding("ctrl+left", "tree_narrower", "Sidebar narrower", show=True),
         Binding("ctrl+right", "tree_wider", "Sidebar wider", show=True),
@@ -1185,6 +1186,89 @@ class MusickitApp(App[None]):
             self.screen.remove_class("no-viz")
         else:
             self.screen.add_class("no-viz")
+
+    def action_generate_playlist(self) -> None:
+        """`g` — seed an auto-generated mix from the highlighted track.
+
+        Builds a 60-min playlist anchored to the highlighted (or
+        currently-playing) track, writes it to
+        `<root>/.musickit/playlists/<slug>.m3u8` for cross-tool reuse,
+        wraps the result in a virtual `LibraryAlbum` so the existing
+        TrackList / playback flow can handle it, and starts playing.
+        """
+        if self._index is None:
+            self.notify("Library not loaded yet.", severity="warning")
+            return
+        if self._subsonic_client is not None:
+            self.notify(
+                "Mix generation isn't available in Subsonic-client mode.",
+                severity="warning",
+            )
+            return
+        seed = self._resolve_playlist_seed()
+        if seed is None:
+            self.notify(
+                "Highlight a track in the tracklist first.",
+                severity="warning",
+            )
+            return
+
+        from musickit import playlist as playlist_mod
+        from musickit.cli.playlist import _playlists_dir, _slug
+
+        try:
+            result = playlist_mod.generate(self._index, seed, target_minutes=60.0)
+        except ValueError as exc:
+            self.notify(f"Couldn't generate: {exc}", severity="error")
+            return
+
+        # Persist to disk so other tools (VLC, Subsonic clients) can use
+        # the same mix. Failure is non-fatal — playback still works.
+        if self._root is not None:
+            try:
+                out = _playlists_dir(self._root) / f"{_slug(result.name)}.m3u8"
+                playlist_mod.write_m3u8(result, out)
+            except OSError:
+                pass
+
+        # Wrap the result in a virtual album so TrackList / next/prev /
+        # repeat / shuffle all just work. The path is set to the
+        # playlists dir for any future "open the on-disk file" hooks.
+        from musickit.library import LibraryAlbum  # local import; module-level would cycle on type stubs
+
+        virtual_path = (
+            self._root / library_mod.INDEX_DIR_NAME / "playlists"
+            if self._root is not None
+            else Path("/tmp/musickit-mix")
+        )
+        virtual = LibraryAlbum(
+            path=virtual_path,
+            artist_dir="Mix",
+            album_dir=result.name,
+            tag_album=result.name,
+            tag_album_artist="Mix",
+            track_count=len(result.tracks),
+            tracks=list(result.tracks),
+        )
+        self._set_current_album(virtual, track_idx=0)
+        self._repopulate_playlist()
+        self._play_current()
+        self.notify(
+            f"Generated [bold]{result.name}[/]: {len(result.tracks)} tracks, {result.actual_seconds / 60:.0f} min",
+        )
+
+    def _resolve_playlist_seed(self) -> LibraryTrack | None:
+        """Return the highlighted-or-playing track for `g`."""
+        if self._current_album is None:
+            return None
+        tracklist = self.query_one(TrackList)
+        if tracklist.highlighted_child is not None:
+            idx = getattr(tracklist.highlighted_child, "track_index", None)
+            if isinstance(idx, int) and 0 <= idx < len(self._current_album.tracks):
+                return self._current_album.tracks[idx]
+        if self._current_track_idx is not None and 0 <= self._current_track_idx < len(self._current_album.tracks):
+            return self._current_album.tracks[self._current_track_idx]
+        return None
 
     def action_toggle_fullscreen(self) -> None:
         if self.screen.has_class("fullscreen"):
