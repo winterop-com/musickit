@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import click.exceptions
 import pytest
 
 from musickit.tui.airplay import AirPlayController, AirPlayDevice, discover_airplay_devices
@@ -231,3 +232,112 @@ def test_controller_detach_keeps_loop_alive_for_reuse() -> None:
                 assert controller.discover(timeout=0.1) == []
     finally:
         controller.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# `_connect_airplay_or_exit` — the `--airplay <substring>` CLI flow
+# ---------------------------------------------------------------------------
+
+
+def test_connect_airplay_exits_when_no_match() -> None:
+    """A substring that matches nothing → SystemExit(1) with a clear message."""
+    from pyatv.const import Protocol
+
+    from musickit.cli.tui import _connect_airplay_or_exit
+
+    cfg = _FakeConfig("HomePod", "10.0.0.5", "hp", [Protocol.RAOP])
+
+    with patch(
+        "musickit.tui.airplay.pyatv.scan",
+        new_callable=AsyncMock,
+    ) as scan_mock:
+        scan_mock.return_value = [cfg]
+        with pytest.raises(click.exceptions.Exit) as ei:
+            _connect_airplay_or_exit("Sonos")
+    assert ei.value.exit_code == 1
+
+
+def test_connect_airplay_exits_when_multiple_match() -> None:
+    """An ambiguous substring → SystemExit(1), forces user to be specific."""
+    from pyatv.const import Protocol
+
+    from musickit.cli.tui import _connect_airplay_or_exit
+
+    cfgs = [
+        _FakeConfig("HomePod", "10.0.0.5", "hp1", [Protocol.RAOP]),
+        _FakeConfig("HomePod mini", "10.0.0.6", "hp2", [Protocol.RAOP]),
+    ]
+
+    with patch("musickit.tui.airplay.pyatv.scan", new_callable=AsyncMock) as scan_mock:
+        scan_mock.return_value = cfgs
+        with pytest.raises(click.exceptions.Exit) as ei:
+            _connect_airplay_or_exit("HomePod")
+    assert ei.value.exit_code == 1
+
+
+def test_connect_airplay_matches_unique_device_and_connects() -> None:
+    """A unique substring → connects to that device and returns the controller."""
+    from pyatv.const import Protocol
+
+    from musickit.cli.tui import _connect_airplay_or_exit
+
+    cfg = _FakeConfig("HomePod Living Room", "10.0.0.5", "hp", [Protocol.RAOP])
+
+    with (
+        patch("musickit.tui.airplay.pyatv.scan", new_callable=AsyncMock) as scan_mock,
+        patch("musickit.tui.airplay.pyatv.connect", new_callable=AsyncMock) as connect_mock,
+    ):
+        scan_mock.return_value = [cfg]
+        connect_mock.return_value = MagicMock()
+        controller = _connect_airplay_or_exit("Living")
+        try:
+            assert controller.device is not None
+            assert controller.device.name == "HomePod Living Room"
+        finally:
+            controller.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# `_try_resume_airplay` — saved-device resume on launch
+# ---------------------------------------------------------------------------
+
+
+def test_try_resume_airplay_returns_none_for_empty_saved_state() -> None:
+    """No saved id/name → returns None silently, no discovery attempted."""
+    from musickit.cli.tui import _try_resume_airplay
+
+    assert _try_resume_airplay({}) is None
+    assert _try_resume_airplay({"identifier": "", "name": ""}) is None
+
+
+def test_try_resume_airplay_matches_saved_identifier() -> None:
+    """A saved identifier wins even if the name doesn't match — IDs are stabler."""
+    from pyatv.const import Protocol
+
+    from musickit.cli.tui import _try_resume_airplay
+
+    cfg = _FakeConfig("HomePod (renamed)", "10.0.0.5", "abc-id", [Protocol.RAOP])
+
+    with (
+        patch("musickit.tui.airplay.pyatv.scan", new_callable=AsyncMock) as scan_mock,
+        patch("musickit.tui.airplay.pyatv.connect", new_callable=AsyncMock) as connect_mock,
+    ):
+        scan_mock.return_value = [cfg]
+        connect_mock.return_value = MagicMock()
+        controller = _try_resume_airplay({"identifier": "abc-id", "name": "Old Name"})
+        try:
+            assert controller is not None
+            assert controller.device is not None
+            assert controller.device.identifier == "abc-id"
+        finally:
+            if controller is not None:
+                controller.disconnect()
+
+
+def test_try_resume_airplay_returns_none_when_device_offline() -> None:
+    """Saved device not on the LAN → returns None, no error logged."""
+    from musickit.cli.tui import _try_resume_airplay
+
+    with patch("musickit.tui.airplay.pyatv.scan", new_callable=AsyncMock) as scan_mock:
+        scan_mock.return_value = []  # no devices visible
+        assert _try_resume_airplay({"identifier": "abc-id", "name": "Old Name"}) is None
