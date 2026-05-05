@@ -162,12 +162,22 @@ class Visualizer(Static):
     DEFAULT_CSS = """
     Visualizer {
         width: 1fr;
-        height: 12;
+        /* Share the main column with the tracklist proportionally
+           instead of grabbing a fixed 12 lines: when the terminal is
+           short, the tracklist needs room too. min-height keeps the bars
+           legible; max-height stops it from ballooning on tall windows. */
+        height: 1fr;
+        min-height: 6;
+        max-height: 14;
         padding: 0 2;
         border: round $primary 30%;
     }
     Screen.fullscreen Visualizer {
         height: 1fr;
+        /* Defeat the base `max-height: 14` so fullscreen actually fills
+           the viewport. Textual CSS rejects `none`; 100vh is "as much
+           as the screen has". */
+        max-height: 100vh;
     }
     """
 
@@ -360,6 +370,8 @@ class TrackList(ListView):
     DEFAULT_CSS = """
     TrackList {
         padding: 0 1;
+        /* Fill the parent VerticalScroll container; the scroll container
+           itself gets a 2fr share of the main column (see App CSS). */
         height: 1fr;
     }
     TrackList > ListItem {
