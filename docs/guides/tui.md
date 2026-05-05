@@ -95,6 +95,8 @@ Inside the audio engine:
 
 PortAudio buffer latency is 200ms — small enough that the visualizer (which FFTs the chunk being sent to PortAudio) doesn't run noticeably ahead of what the user hears, and large enough to absorb decoder hiccups inside the engine process.
 
+When playback pauses or stops, the engine stops publishing new band levels. The UI tick applies a per-frame decay (~0.86 multiplier at 30 FPS) to the bars so they fade to zero over ~1 second instead of freezing at the last decoded frame. On resume, pass-through from shared memory takes over again.
+
 ## Internet radio
 
 When you select the **Radio** entry in the sidebar, the right pane shows a curated list of stations. Default ones are baked into the code (NRK mP3 / P3 / P3 Musikk / Nyheter); you can add your own via `~/.config/musickit/radio.toml`:
