@@ -10,12 +10,14 @@ the index from scratch.
 
 from __future__ import annotations
 
+import sqlite3
 import threading
 from collections.abc import Callable
 from pathlib import Path
 
 from musickit import library as library_mod
 from musickit.library.models import LibraryAlbum, LibraryIndex, LibraryTrack
+from musickit.serve import search_index
 from musickit.serve.ids import album_id, artist_id, track_id
 
 
@@ -32,6 +34,10 @@ class IndexCache:
         # multiple `LibraryAlbum`s — that IS the point).
         self.artists_by_id: dict[str, list[LibraryAlbum]] = {}
         self.artist_name_by_id: dict[str, str] = {}
+        # In-memory FTS5 search index. Built fresh on every reindex; None
+        # when SQLite was compiled without FTS5 (search falls back to the
+        # original substring scan).
+        self.fts: sqlite3.Connection | None = None
         self.scan_in_progress: bool = False
         # `_scan_lock` guards `scan_in_progress` flips so two threads can't
         # both think they're the "first" rescan and double-walk the disk.
@@ -121,6 +127,16 @@ class IndexCache:
         self.tracks_by_id = tracks_by_id
         self.artists_by_id = artists_by_id
         self.artist_name_by_id = artist_name_by_id
+        # Close the previous FTS connection before swapping it out so we
+        # don't leak the old in-memory DB across rebuilds. `build()`
+        # returns None if SQLite was compiled without FTS5; that's the
+        # signal for `/search3` to fall back to the substring scan.
+        if self.fts is not None:
+            try:
+                self.fts.close()
+            except sqlite3.Error:  # pragma: no cover — defensive
+                pass
+        self.fts = search_index.build(self)
 
     @property
     def album_count(self) -> int:

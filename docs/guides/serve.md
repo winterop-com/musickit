@@ -106,7 +106,7 @@ All under `/rest/`. Every endpoint accepts both `GET` and `POST` (some clients p
 
 | Endpoint | Returns |
 |---|---|
-| `search3?query=&artistCount=&albumCount=&songCount=` | Multi-token AND, case-insensitive substring across artists / albums / titles. Pagination via `*Offset`. |
+| `search3?query=&artistCount=&albumCount=&songCount=` | FTS5-backed multi-token AND with prefix matching, diacritic folding, and bm25 ranking. Sub-ms on 23k-track libraries. `bey` matches `Beyoncé`; `abba 1976` matches the 1976 ABBA album by combining the title + album_artist + year body text. Pagination via `*Offset`. Falls back to a casefolded substring scan if SQLite was built without FTS5 (rare). |
 | `search2?query=...` | Same matching, legacy `searchResult2` envelope key |
 
 ### Media
