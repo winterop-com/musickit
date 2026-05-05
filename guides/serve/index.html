@@ -710,6 +710,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#persistent-stars-since-v070" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistent stars (since v0.7.0)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1115,6 +1126,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#persistent-stars-since-v070" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistent stars (since v0.7.0)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1465,11 +1487,11 @@
 </tr>
 <tr>
 <td><code>getStarred</code> / <code>getStarred2</code></td>
-<td>Empty starred set</td>
+<td><strong>Real.</strong> Backed by <code>&lt;root&gt;/.musickit/stars.toml</code>. Returns artists / albums / songs flagged via <code>/star</code>, sorted most-recent-first. Stale IDs (file deleted since starring) are silently filtered out — call <code>StarStore.prune(...)</code> to remove them from the file.</td>
 </tr>
 <tr>
 <td><code>star</code> / <code>unstar</code></td>
-<td>No-op ok</td>
+<td><strong>Real.</strong> Adds / removes IDs in <code>stars.toml</code>. Accepts any combination of <code>id=</code>, <code>albumId=</code>, <code>artistId=</code>. Unknown IDs are silently dropped.</td>
 </tr>
 <tr>
 <td><code>getPlaylists</code> / <code>getPlaylist</code></td>
@@ -1481,6 +1503,14 @@
 </tr>
 </tbody>
 </table>
+<h3 id="persistent-stars-since-v070">Persistent stars (since v0.7.0)<a class="headerlink" href="#persistent-stars-since-v070" title="Permanent link">&para;</a></h3>
+<p>Heart / star buttons in Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) are now real — toggling one persists in <code>&lt;root&gt;/.musickit/stars.toml</code> and survives server restarts, schema bumps, and <code>library index drop</code>. The file is plain TOML, hand-editable:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[items]</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="s2">&quot;tr_xxxxxxxxxxxxxxxx&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2026-05-05T10:30:00Z&quot;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="s2">&quot;al_yyyyyyyyyyyyyyyy&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2026-05-05T10:31:15Z&quot;</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="s2">&quot;ar_zzzzzzzzzzzzzzzz&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2026-05-05T10:32:42Z&quot;</span>
+</code></pre></div>
+<p>Stars live OUTSIDE the SQLite library index because the index is fully derived from the filesystem (delete / rebuild = safe), but stars are real user data. Both files sit under <code>.musickit/</code> so <code>rm -rf &lt;root&gt;/.musickit/index.db*</code> is still a safe "rebuild the cache, keep my favourites" operation.</p>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
 <p>Three forms supported, all per the Subsonic spec:</p>
 <ul>
@@ -1493,16 +1523,16 @@
 <h2 id="response-format">Response format<a class="headerlink" href="#response-format" title="Permanent link">&para;</a></h2>
 <p>Spec default is XML; <code>?f=json</code> opts into JSON. We honour both via a middleware that re-serialises the underlying dict per request. Most modern clients (Symfonium, Feishin, the musickit TUI) send <code>f=json</code>; older / iOS clients (Amperfy, play:Sub) often don't and get XML.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># ~/.config/musickit/serve.toml</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># ~/.config/musickit/serve.toml</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span>
 </code></pre></div>
 <p>Override per-run via <code>--user</code> / <code>--password</code>. CLI flags win over the TOML.</p>
 <h2 id="mdns-bonjour">mDNS / Bonjour<a class="headerlink" href="#mdns-bonjour" title="Permanent link">&para;</a></h2>
 <p>Default-on: <code>serve</code> advertises <code>_subsonic._tcp.local</code> so Symfonium / Amperfy / Feishin auto-list the server in their setup screens without anyone typing the URL. Same service type Navidrome uses, so existing client ecosystems pick it up automatically.</p>
 <p>The <code>musickit tui</code> itself can also discover servers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                  </span><span class="c1"># list and exit</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w">                             </span><span class="c1"># quick browse + show hint</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                  </span><span class="c1"># list and exit</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w">                             </span><span class="c1"># quick browse + show hint</span>
 </code></pre></div>
 <p><code>--no-mdns</code> opts out.</p>
 <p>Tailscale users still need to type the tailnet URL once — mDNS doesn't traverse the WireGuard tunnel.</p>
@@ -1524,26 +1554,26 @@
 </ul>
 <p>Subprocess invocation: <code>ffmpeg -i &lt;path&gt; -vn -c:a libmp3lame -b:a Nk -f mp3 -</code>. The <code>-vn</code> drops the embedded picture stream. The async generator pumps 64 KiB chunks; on client disconnect a <code>finally</code> block kills the subprocess so it doesn't pin a CPU.</p>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>src/musickit/serve/
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  app.py             FastAPI factory + envelope helpers + auth dep + middleware
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  auth.py            plain / enc: / token verification
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>  config.py          serve.toml loader + admin/admin defaults
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>  ids.py             sha1[:16] of artist_dir / album path / track path
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  index.py           IndexCache with reverse-lookup dicts
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  payloads.py        Subsonic dict builders shared across endpoints
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  covers.py          Sidecar-first cover loader + Pillow resize
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>  xml.py             JSON → Subsonic XML converter
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>  discovery.py       mDNS register / unregister
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  watcher.py         watchdog-backed filesystem watcher
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  endpoints/
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    system.py        ping / getLicense / getMusicFolders
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    browsing.py      getArtists / getArtist / getAlbum / getAlbumList2 / getSong / getIndexes
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    search.py        search3 / search2
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>    media.py         stream / download / getCoverArt
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>    scan.py          startScan / getScanStatus
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    extras.py        scrobble / getArtistInfo / getMusicDirectory / getRandomSongs /
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>                     getStarred / star / unstar / getPlaylists / getUser / getUsers /
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>                     getOpenSubsonicExtensions / getGenres
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>src/musickit/serve/
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  app.py             FastAPI factory + envelope helpers + auth dep + middleware
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>  auth.py            plain / enc: / token verification
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  config.py          serve.toml loader + admin/admin defaults
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  ids.py             sha1[:16] of artist_dir / album path / track path
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  index.py           IndexCache with reverse-lookup dicts
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  payloads.py        Subsonic dict builders shared across endpoints
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  covers.py          Sidecar-first cover loader + Pillow resize
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  xml.py             JSON → Subsonic XML converter
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>  discovery.py       mDNS register / unregister
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  watcher.py         watchdog-backed filesystem watcher
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>  endpoints/
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    system.py        ping / getLicense / getMusicFolders
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    browsing.py      getArtists / getArtist / getAlbum / getAlbumList2 / getSong / getIndexes
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    search.py        search3 / search2
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    media.py         stream / download / getCoverArt
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    scan.py          startScan / getScanStatus
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    extras.py        scrobble / getArtistInfo / getMusicDirectory / getRandomSongs /
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>                     getStarred / star / unstar / getPlaylists / getUser / getUsers /
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>                     getOpenSubsonicExtensions / getGenres
 </code></pre></div>
 <p>The cache is built at startup (synchronously, blocking the CLI before <code>uvicorn.run</code>) so the first client request hits a populated index. Background rescans (manual via <code>/rest/startScan</code> or automatic via the filesystem watcher) reuse the same <code>IndexCache.start_background_rescan()</code> path.</p>
 

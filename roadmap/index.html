@@ -970,6 +970,7 @@
 <li><code>musickit playlist gen|list|show</code> — tag-based auto-generated <code>.m3u8</code> mixes anchored to a seed track (similarity scorer over artist / genre / year / compilation flag, per-album + per-artist caps; output is standard extended M3U)</li>
 <li>TUI <code>g</code> keybind — generate-and-play a 60-min mix from the highlighted or currently-playing track</li>
 <li>TUI Mixes browser entry — saved <code>.m3u8</code> files appear in the right pane; selecting one resolves paths against the live index and plays it as a virtual album with stale-path graceful degradation</li>
+<li>Persistent stars / favourites — Subsonic clients' heart buttons are now real. <code>/star</code>, <code>/unstar</code>, <code>/getStarred</code>, <code>/getStarred2</code> backed by <code>&lt;root&gt;/.musickit/stars.toml</code> (TOML, hand-editable, survives index rebuilds).</li>
 </ul>
 
 

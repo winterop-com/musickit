@@ -1140,6 +1140,7 @@
 <li><strong>Pre-buffer</strong> — wait for ~186ms of audio before starting the output stream. Without this the first 1-2 callbacks see an empty queue and the user hears "silence-then-pop" attacks.</li>
 </ul>
 <p>PortAudio buffer latency is 200ms — small enough that the visualizer (which FFTs the chunk being sent to PortAudio) doesn't run noticeably ahead of what the user hears, and large enough to absorb decoder hiccups inside the engine process.</p>
+<p>When playback pauses or stops, the engine stops publishing new band levels. The UI tick applies a per-frame decay (~0.86 multiplier at 30 FPS) to the bars so they fade to zero over ~1 second instead of freezing at the last decoded frame. On resume, pass-through from shared memory takes over again.</p>
 <h2 id="internet-radio">Internet radio<a class="headerlink" href="#internet-radio" title="Permanent link">&para;</a></h2>
 <p>When you select the <strong>Radio</strong> entry in the sidebar, the right pane shows a curated list of stations. Default ones are baked into the code (NRK mP3 / P3 / P3 Musikk / Nyheter); you can add your own via <code>~/.config/musickit/radio.toml</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">[[stations]]</span>
