@@ -88,6 +88,12 @@ class MusickitApp(App[None]):
     #sidebar { width: 34; padding: 0 1; }
     #main { width: 1fr; padding: 0 1 0 0; }
     #now-playing-row { height: auto; }
+    /* The tracklist gets 2x the leftover-space share the visualizer
+       does, so a tall window puts most of the new room into the track
+       list (the primary thing on the page) rather than into ever-taller
+       VU bars. min-height keeps a few rows visible even on short
+       terminals. */
+    #track-scroll { height: 2fr; min-height: 5; }
     /* Fullscreen: keep the visualizer + now-playing visible, hide everything
        library-related. Visualizer height is bumped to 1fr in
        `action_toggle_fullscreen`. */
