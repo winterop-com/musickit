@@ -6,19 +6,12 @@ repo_name: winterop-com/musickit
 
 theme:
   name: material
+  # Dark-only — claude-theme is a dark-mode overlay and looks broken
+  # under the light palette, so we drop the toggle entirely.
   palette:
-    - scheme: default
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    - scheme: slate
-      primary: indigo
-      accent: indigo
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
+    scheme: slate
+    primary: indigo
+    accent: indigo
   features:
     # Left-side nav (no top tabs). `navigation.sections` groups top-level
     # entries; `navigation.expand` keeps the tree expanded by default so
