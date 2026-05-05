@@ -96,12 +96,22 @@ class MusickitApp(App[None]):
        terminals. */
     #track-scroll { height: 2fr; min-height: 5; }
     /* Fullscreen: keep the visualizer + now-playing visible, hide everything
-       library-related. Visualizer height is bumped to 1fr in
-       `action_toggle_fullscreen`. */
+       library-related. The visualizer override MUST live in this app-level
+       stylesheet (not in `Visualizer.DEFAULT_CSS`) — Textual doesn't
+       reliably propagate `Screen.fullscreen Visualizer { ... }` declared
+       inside the widget's own DEFAULT_CSS, so the base `max-height: 14`
+       cap kept winning. Targeting `#visualizer` (the id assigned in
+       `compose()`) avoids the issue entirely. `max-height: 200` is more
+       cells than any reasonable terminal is tall — effectively
+       unbounded. */
     Screen.fullscreen #sidebar { display: none; }
     Screen.fullscreen #track-header { display: none; }
     Screen.fullscreen #track-scroll { display: none; }
     Screen.fullscreen #status { display: none; }
+    Screen.fullscreen #visualizer {
+        height: 1fr;
+        max-height: 200;
+    }
     /* `v` toggle: hide the visualizer + its progress line so the
        tracklist gets all the leftover space. Useful for short albums
        where the meter dominates the screen. */
