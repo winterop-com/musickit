@@ -142,10 +142,23 @@ These are stubs to keep clients quiet on features we don't track yet. They retur
 |---|---|
 | `scrobble` | Accept + discard |
 | `getArtistInfo` / `getArtistInfo2` | Empty bio + similarArtist[] |
-| `getStarred` / `getStarred2` | Empty starred set |
-| `star` / `unstar` | No-op ok |
+| `getStarred` / `getStarred2` | **Real.** Backed by `<root>/.musickit/stars.toml`. Returns artists / albums / songs flagged via `/star`, sorted most-recent-first. Stale IDs (file deleted since starring) are silently filtered out — call `StarStore.prune(...)` to remove them from the file. |
+| `star` / `unstar` | **Real.** Adds / removes IDs in `stars.toml`. Accepts any combination of `id=`, `albumId=`, `artistId=`. Unknown IDs are silently dropped. |
 | `getPlaylists` / `getPlaylist` | Empty playlist list |
 | `getGenres` | Real! Counts songs + distinct albums per genre. |
+
+### Persistent stars (since v0.7.0)
+
+Heart / star buttons in Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) are now real — toggling one persists in `<root>/.musickit/stars.toml` and survives server restarts, schema bumps, and `library index drop`. The file is plain TOML, hand-editable:
+
+```toml
+[items]
+"tr_xxxxxxxxxxxxxxxx" = "2026-05-05T10:30:00Z"
+"al_yyyyyyyyyyyyyyyy" = "2026-05-05T10:31:15Z"
+"ar_zzzzzzzzzzzzzzzz" = "2026-05-05T10:32:42Z"
+```
+
+Stars live OUTSIDE the SQLite library index because the index is fully derived from the filesystem (delete / rebuild = safe), but stars are real user data. Both files sit under `.musickit/` so `rm -rf <root>/.musickit/index.db*` is still a safe "rebuild the cache, keep my favourites" operation.
 
 ## Authentication
 

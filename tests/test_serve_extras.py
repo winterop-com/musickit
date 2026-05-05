@@ -97,17 +97,94 @@ def test_get_random_songs_returns_at_most_size(tmp_path: Path) -> None:
     assert 0 < len(songs) <= 2
 
 
-def test_get_starred_and_starred2_return_empty(tmp_path: Path) -> None:
+def test_get_starred_and_starred2_empty_until_starred(tmp_path: Path) -> None:
+    """Fresh app -> empty starred set; same shape on getStarred / getStarred2."""
     cl = _client(tmp_path)
     s1 = cl.get("/rest/getStarred", params=_params()).json()["subsonic-response"]["starred"]
     s2 = cl.get("/rest/getStarred2", params=_params()).json()["subsonic-response"]["starred2"]
     assert s1 == s2 == {"artist": [], "album": [], "song": []}
 
 
-def test_star_unstar_no_ops(tmp_path: Path) -> None:
+def test_star_persists_and_unstar_removes(tmp_path: Path) -> None:
+    """Round-trip: /star adds, /getStarred2 lists, /unstar removes."""
     cl = _client(tmp_path)
-    assert cl.get("/rest/star", params=_params(id="tr_x")).json()["subsonic-response"]["status"] == "ok"
-    assert cl.get("/rest/unstar", params=_params(id="tr_x")).json()["subsonic-response"]["status"] == "ok"
+    # Resolve a real track id from the cache so the endpoint accepts it.
+    body = cl.get("/rest/getRandomSongs", params=_params(size=1)).json()
+    track = body["subsonic-response"]["randomSongs"]["song"][0]
+    track_id = track["id"]
+
+    # Star it.
+    star_response = cl.get("/rest/star", params=_params(id=track_id)).json()
+    assert star_response["subsonic-response"]["status"] == "ok"
+
+    # getStarred2 lists it under `song`.
+    starred = cl.get("/rest/getStarred2", params=_params()).json()["subsonic-response"]["starred2"]
+    assert len(starred["song"]) == 1
+    assert starred["song"][0]["id"] == track_id
+    assert "starred" in starred["song"][0]  # ISO timestamp
+    assert starred["album"] == []
+    assert starred["artist"] == []
+
+    # Unstar removes it.
+    cl.get("/rest/unstar", params=_params(id=track_id))
+    starred = cl.get("/rest/getStarred2", params=_params()).json()["subsonic-response"]["starred2"]
+    assert starred["song"] == []
+
+
+def test_star_handles_artist_album_song_in_one_request(tmp_path: Path) -> None:
+    """Subsonic clients sometimes pass `id`+`albumId`+`artistId` together — all should land."""
+    cl = _client(tmp_path)
+    # Resolve all three IDs from cache via existing endpoints (no need to
+    # introspect `app.state.cache`; the public API surfaces them).
+    artists = cl.get("/rest/getArtists", params=_params()).json()["subsonic-response"]["artists"]["index"]
+    artist_id_str = artists[0]["artist"][0]["id"]
+    song_payload = cl.get("/rest/getRandomSongs", params=_params(size=1)).json()["subsonic-response"]["randomSongs"][
+        "song"
+    ][0]
+    song_id_str = song_payload["id"]
+    album_id_str = song_payload["albumId"]
+
+    cl.get(
+        "/rest/star",
+        params=_params(id=song_id_str, albumId=album_id_str, artistId=artist_id_str),
+    )
+    starred = cl.get("/rest/getStarred2", params=_params()).json()["subsonic-response"]["starred2"]
+    assert len(starred["artist"]) == 1
+    assert len(starred["album"]) == 1
+    assert len(starred["song"]) == 1
+
+
+def test_star_silently_ignores_unknown_id(tmp_path: Path) -> None:
+    """A stale client request shouldn't 500; unknown IDs are dropped."""
+    cl = _client(tmp_path)
+    response = cl.get("/rest/star", params=_params(id="tr_doesnotexist0000")).json()
+    assert response["subsonic-response"]["status"] == "ok"
+    starred = cl.get("/rest/getStarred2", params=_params()).json()["subsonic-response"]["starred2"]
+    assert starred["song"] == []
+
+
+def test_stars_persist_across_app_restart(tmp_path: Path) -> None:
+    """Stars survive a fresh `create_app` against the same root (TOML on disk)."""
+    cl = _client(tmp_path)
+    body = cl.get("/rest/getRandomSongs", params=_params(size=1)).json()
+    track_id = body["subsonic-response"]["randomSongs"]["song"][0]["id"]
+    cl.get("/rest/star", params=_params(id=track_id))
+
+    # Recreate the app at the same root — should load the stars.toml.
+    cfg = ServeConfig(username="mort", password="secret")
+    fresh_app = create_app(root=tmp_path, cfg=cfg)
+    fresh_app.state.cache._reindex(  # noqa: SLF001
+        LibraryIndex(
+            root=tmp_path,
+            albums=[
+                _album(tmp_path, "ABBA", "Arrival", year="1976", tracks=["Dancing Queen", "Money Money Money"]),
+                _album(tmp_path, "Beck", "Sea Change", year="2002", tracks=["The Golden Age"]),
+            ],
+        ),
+    )
+    fresh_cl = TestClient(fresh_app)
+    starred = fresh_cl.get("/rest/getStarred2", params=_params()).json()["subsonic-response"]["starred2"]
+    assert any(s["id"] == track_id for s in starred["song"])
 
 
 def test_get_playlists_empty(tmp_path: Path) -> None:
