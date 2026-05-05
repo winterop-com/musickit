@@ -311,6 +311,8 @@
       
         
       
+        
+      
     
     
     
@@ -513,6 +515,34 @@
     
   
     musickit serve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/playlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit playlist
   
 
     
@@ -899,8 +929,8 @@
 <h2 id="tier-5-speculative">Tier 5 — speculative<a class="headerlink" href="#tier-5-speculative" title="Permanent link">&para;</a></h2>
 <p>Things that would be interesting if anyone ever asked for them, but not pursued speculatively:</p>
 <ul>
-<li>AI-generated playlists / mood tagging</li>
 <li>BPM / key analysis (needs <code>librosa</code>, big dep weight)</li>
+<li>AI-generated playlists with audio-feature similarity (current <code>musickit playlist gen</code> is tag-based; an audio-feature pass would need fingerprinting / <code>librosa</code>)</li>
 <li>Multi-user serve (right now: single-user)</li>
 <li>Sonos / Chromecast / DLNA output (AirPlay covers the Apple-ecosystem case)</li>
 <li>Cross-fade between tracks</li>
@@ -937,6 +967,9 @@
 <li>Real-world tested against Amperfy / Symfonium / play:Sub / Feishin</li>
 <li>Push to GitHub + CI (<code>make check &amp;&amp; make test</code> on push/PR)</li>
 <li>This documentation site (mkdocs + Material)</li>
+<li><code>musickit playlist gen|list|show</code> — tag-based auto-generated <code>.m3u8</code> mixes anchored to a seed track (similarity scorer over artist / genre / year / compilation flag, per-album + per-artist caps; output is standard extended M3U)</li>
+<li>TUI <code>g</code> keybind — generate-and-play a 60-min mix from the highlighted or currently-playing track</li>
+<li>TUI Mixes browser entry — saved <code>.m3u8</code> files appear in the right pane; selecting one resolves paths against the live index and plays it as a virtual album with stale-path graceful degradation</li>
 </ul>
 
 

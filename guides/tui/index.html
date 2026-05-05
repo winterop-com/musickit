@@ -313,6 +313,8 @@
       
         
       
+        
+      
     
     
     
@@ -609,6 +611,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mixes-auto-generated-playlists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixes — auto-generated playlists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#subsonic-client-mode" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -665,6 +678,34 @@
     
   
     musickit serve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../playlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit playlist
   
 
     
@@ -893,6 +934,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#mixes-auto-generated-playlists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixes — auto-generated playlists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#subsonic-client-mode" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1017,6 +1069,14 @@
 <td>Toggle fullscreen visualizer</td>
 </tr>
 <tr>
+<td><code>v</code></td>
+<td>Show / hide visualizer panel (frees space for the tracklist)</td>
+</tr>
+<tr>
+<td><code>g</code></td>
+<td>Generate a 60-min mix anchored to the highlighted track</td>
+</tr>
+<tr>
 <td><code>/</code></td>
 <td>Filter the focused pane (artists / albums / tracks)</td>
 </tr>
@@ -1091,6 +1151,16 @@
 <p>Defaults baked into code + user TOML are merged at runtime (deduped by URL, user entries win on collision). So the default list only grows when we ship new entries; your file only grows when you add them by hand.</p>
 <p>ICY metadata polling: while a stream is playing, the decoder thread polls <code>container.metadata</code> per packet for <code>StreamTitle</code> updates. The "now playing" pane updates with the live song name as the radio station broadcasts it.</p>
 <p>Radio launches as a first-class mode — <code>musickit tui</code> with no DIR drops directly into station picking (skipping the library scan entirely).</p>
+<h2 id="mixes-auto-generated-playlists">Mixes — auto-generated playlists<a class="headerlink" href="#mixes-auto-generated-playlists" title="Permanent link">&para;</a></h2>
+<p>Press <code>g</code> on a TrackList row to generate a 60-min mix anchored to that track. The action:</p>
+<ol>
+<li>Resolves the seed (highlighted row, falls back to currently-playing track).</li>
+<li>Calls <code>playlist.generate(index, seed, target_minutes=60)</code> — same builder as the <a href="../playlist/"><code>musickit playlist gen</code></a> CLI.</li>
+<li>Persists the result to <code>&lt;root&gt;/.musickit/playlists/&lt;slug&gt;.m3u8</code> for cross-tool reuse (VLC, Subsonic clients).</li>
+<li>Wraps the result as a virtual <code>LibraryAlbum</code> (<code>artist_dir = "Mix"</code>) and starts playback. Next / prev / shuffle / repeat all work on the mix as if it were a regular album.</li>
+</ol>
+<p>Saved mixes are browseable: select <strong>Mixes</strong> in the sidebar (sits next to <strong>Radio</strong>) and the right pane shows one row per <code>.m3u8</code> under <code>&lt;root&gt;/.musickit/playlists/</code>. Enter on a row replays it. Tracks whose paths no longer resolve are silently skipped, so a saved mix degrades gracefully if you've reorganised the library since.</p>
+<p>The on-disk format is the standard extended M3U with <code>#EXTINF</code> lines — every audio player understands it. See the <a href="../playlist/">playlist guide</a> for the similarity scoring details and CLI surface.</p>
 <h2 id="subsonic-client-mode">Subsonic-client mode<a class="headerlink" href="#subsonic-client-mode" title="Permanent link">&para;</a></h2>
 <p><code>musickit tui --subsonic URL</code> makes the TUI talk to any Subsonic-compatible server — your own <code>musickit serve</code> over Tailscale, Navidrome, the original Subsonic, etc.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--subsonic<span class="w"> </span>http://mlaptop.tail4a4b9a.ts.net:4533<span class="w"> </span><span class="se">\</span>

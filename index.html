@@ -400,6 +400,8 @@
       
         
       
+        
+      
     
     
     
@@ -602,6 +604,34 @@
     
   
     musickit serve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="guides/playlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    musickit playlist
   
 
     
@@ -845,8 +875,9 @@
 <li><code>library tree DIR</code> / <code>library audit DIR</code> / <code>library fix DIR</code> — render, audit, auto-fix</li>
 <li><code>library cover IMAGE DIR</code> / <code>library cover-pick DIR</code> / <code>library retag DIR</code> — in-place tag and cover edits; semi-automated cover selection via <a href="https://covers.musichoarders.xyz/">musichoarders.xyz</a></li>
 <li><code>library index status|drop|rebuild DIR</code> — manage the persistent SQLite index at <code>&lt;DIR&gt;/.musickit/index.db</code></li>
-<li><strong><code>musickit tui</code></strong> — Textual UI: artist/album browser, now-playing visualizer, internet radio, and a Subsonic-client mode that connects to your own <code>serve</code> over Tailscale.</li>
+<li><strong><code>musickit tui</code></strong> — Textual UI: artist/album browser, now-playing visualizer, internet radio, saved Mixes view, and a Subsonic-client mode that connects to your own <code>serve</code> over Tailscale. Press <code>g</code> on any track to generate a 60-min mix anchored to it.</li>
 <li><strong><code>musickit serve</code></strong> — Subsonic-compatible HTTP server. Any Subsonic client (Symfonium, Amperfy, play:Sub, Feishin) can browse + stream + control via the standard API. mDNS / Bonjour for autodiscovery, ffmpeg-on-the-fly for transcoding, filesystem watcher for auto-rescan when you drop new albums in.</li>
+<li><strong><code>musickit playlist</code></strong> — auto-generate <code>.m3u8</code> playlists anchored to a seed track using tag-based similarity (artist / genre / year). <code>gen</code> writes a mix; <code>list</code> / <code>show</code> browse what's saved. Output is plain extended M3U so VLC, Subsonic clients, and the TUI's Mixes view all play it.</li>
 <li><strong><code>musickit inspect</code></strong> — quick tag dump for a single file.</li>
 </ul>
 <h2 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">&para;</a></h2>
@@ -857,7 +888,7 @@
 <li><strong><a href="guides/quickstart/">Quickstart</a></strong> — full end-to-end walkthrough including iPhone + Tailscale + Amperfy. ~30 minutes.</li>
 <li><strong><a href="architecture/">Architecture</a></strong> — how the pieces fit together: process model, data flow, audio engine subprocess, SQLite index, FFT visualizer. Read this first if you want a mental model before diving in.</li>
 </ul>
-<p>Per-command guides: <a href="guides/convert/">Convert</a> · <a href="guides/library/">Library</a> · <a href="guides/tui/">TUI</a> · <a href="guides/serve/">Serve</a> · <a href="guides/inspect/">Inspect</a>.</p>
+<p>Per-command guides: <a href="guides/convert/">Convert</a> · <a href="guides/library/">Library</a> · <a href="guides/tui/">TUI</a> · <a href="guides/serve/">Serve</a> · <a href="guides/playlist/">Playlist</a> · <a href="guides/inspect/">Inspect</a>.</p>
 <h2 id="why-this-exists">Why this exists<a class="headerlink" href="#why-this-exists" title="Permanent link">&para;</a></h2>
 <p>Years of rip-collection wrangling produces an audio library full of:</p>
 <ul>
