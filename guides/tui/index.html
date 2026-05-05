@@ -630,6 +630,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Subsonic-client mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#saving-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving credentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -953,6 +970,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Subsonic-client mode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#saving-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving credentials
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1003,12 +1037,15 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w">                                </span><span class="c1"># local library + radio</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w">                                         </span><span class="c1"># radio-only</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--subsonic<span class="w"> </span>URL<span class="w"> </span>--user<span class="w"> </span>U<span class="w"> </span>--password<span class="w"> </span>P<span class="w">    </span><span class="c1"># Subsonic client mode</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                              </span><span class="c1"># list LAN Subsonic servers + AirPlay devices, exit</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;HomePod&#39;</span><span class="w">                     </span><span class="c1"># route playback to an AirPlay device</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w"> </span>--no-cache<span class="w">                     </span><span class="c1"># skip the index DB (in-memory scan only)</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w"> </span>--full-rescan<span class="w">                  </span><span class="c1"># rebuild the index DB from scratch on launch</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--subsonic<span class="w"> </span>URL<span class="w"> </span>--user<span class="w"> </span>U<span class="w"> </span>--password<span class="w"> </span>P<span class="w"> </span>--save-subsonic
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--saved-subsonic<span class="w">                        </span><span class="c1"># reconnect with saved creds (no flags)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--forget-subsonic<span class="w">                       </span><span class="c1"># wipe saved creds + exit</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                              </span><span class="c1"># list LAN Subsonic servers + AirPlay devices, exit</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;HomePod&#39;</span><span class="w">                     </span><span class="c1"># route playback to an AirPlay device</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w"> </span>--no-cache<span class="w">                     </span><span class="c1"># skip the index DB (in-memory scan only)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>./output<span class="w"> </span>--full-rescan<span class="w">                  </span><span class="c1"># rebuild the index DB from scratch on launch</span>
 </code></pre></div>
-<p>Subsonic credentials are NEVER persisted — pass <code>--subsonic</code> / <code>--user</code> / <code>--password</code> explicitly each session. With no arguments the TUI drops directly into radio-only mode.</p>
+<p>Subsonic credentials are saved as a token + salt pair — never the raw password. Authentication on the wire uses the same Subsonic-spec <code>t</code> / <code>s</code> token mode, so the password never travels in a query string regardless of <code>--save-subsonic</code>. The saved block lives in <code>~/.config/musickit/state.toml</code> (mode 0600); <code>--forget-subsonic</code> removes it.</p>
 <p>Local-library mode reuses the persistent SQLite index at <code>&lt;DIR&gt;/.musickit/index.db</code> so the second launch skips the filesystem walk and tag read. See <a href="../library/#index-manage-the-persistent-sqlite-cache"><code>musickit library index</code></a> for management commands and details.</p>
 <h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h2>
 <p>Initial browse view (artist list):</p>
@@ -1167,7 +1204,19 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--subsonic<span class="w"> </span>http://mlaptop.tail4a4b9a.ts.net:4533<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">             </span>--user<span class="w"> </span>mort<span class="w"> </span>--password<span class="w"> </span>secret
 </code></pre></div>
-<p>Credentials are not persisted — pass <code>--subsonic</code> / <code>--user</code> / <code>--password</code> every time you want client mode.</p>
+<h3 id="saving-credentials">Saving credentials<a class="headerlink" href="#saving-credentials" title="Permanent link">&para;</a></h3>
+<p>Add <code>--save-subsonic</code> on first connect to persist the (host, user, token, salt) tuple to <code>~/.config/musickit/state.toml</code>. The TUI derives a token + salt from your password (per the Subsonic spec) and saves THAT — your raw password is never written to disk.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># first time — saves on successful connect</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--subsonic<span class="w"> </span>http://mlaptop.tail4a4b9a.ts.net:4533<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">             </span>--user<span class="w"> </span>mort<span class="w"> </span>--password<span class="w"> </span>secret<span class="w"> </span>--save-subsonic
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># every time after — no flags needed</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--saved-subsonic
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># wipe the saved block when done</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--forget-subsonic
+</code></pre></div>
+<p>The same token-auth path is used on the wire for ALL Subsonic-client traffic regardless of <code>--save-subsonic</code> — the password isn't put in query strings end-to-end. If state.toml leaks, an attacker gets a usable Subsonic auth pair (until you change the password) but NOT the raw password (so reuse on other services is safe). The file is mode 0600.</p>
 <p>How it works:</p>
 <ul>
 <li>Launch: 1 (<code>getArtists</code>) + N (<code>getArtist</code> per artist) calls; ~80 calls for a 800-album library, sub-second over Tailscale. Albums come back as <strong>shells</strong> (metadata + <code>subsonic_id</code>, <code>tracks=[]</code>).</li>
@@ -1185,19 +1234,19 @@
 </ul>
 <p>The selected device persists to <code>state.toml</code> and auto-resumes on next launch (with a 2s scan; if the device isn't on the LAN we fall back silently to local).</p>
 <p>CLI flag for headless / scripted use:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;HomePod&#39;</span><span class="w">                            </span><span class="c1"># exact / substring match by name</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;192.168.1.50&#39;</span><span class="w">                       </span><span class="c1"># match by address</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                                     </span><span class="c1"># list AirPlay devices (and Subsonic servers) and exit</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;HomePod&#39;</span><span class="w">                            </span><span class="c1"># exact / substring match by name</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--airplay<span class="w"> </span><span class="s1">&#39;192.168.1.50&#39;</span><span class="w">                       </span><span class="c1"># match by address</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                                     </span><span class="c1"># list AirPlay devices (and Subsonic servers) and exit</span>
 </code></pre></div>
 <p><code>--airplay</code> hard-fails if no device matches (you asked for a specific one). The auto-resume path (no <code>--airplay</code> flag, <code>state.toml</code> has a saved device) skips silently if not found.</p>
 <h2 id="state-persistence">State persistence<a class="headerlink" href="#state-persistence" title="Permanent link">&para;</a></h2>
 <p><code>~/.config/musickit/state.toml</code> holds:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">theme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;tokyo-night&quot;</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">[airplay]</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;HomePod&quot;</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">identifier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;10.0.0.5&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">theme</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;tokyo-night&quot;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">[airplay]</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;HomePod&quot;</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">identifier</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">address</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;10.0.0.5&quot;</span>
 </code></pre></div>
 <p>Theme persists across all modes. AirPlay block is set when you pick a device from the picker. Subsonic credentials are intentionally not persisted — pass them on the command line each session. Any pre-existing <code>state.json</code> is migrated to <code>state.toml</code> on first launch and removed.</p>
 
