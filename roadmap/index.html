@@ -905,7 +905,7 @@
 </ul>
 <h2 id="tier-2-bigger-directions-3-5-sessions">Tier 2 — bigger directions (~3-5 sessions)<a class="headerlink" href="#tier-2-bigger-directions-3-5-sessions" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Web UI</strong> — small Vue/htmx frontend mounted at <code>/</code> (replacing the JSON probe response). Same Subsonic backend; lets you play from any browser without installing an app.</li>
+<li><strong>Web UI</strong> — first slice landed in v0.9.4: vanilla-JS three-pane browser at <code>/web</code> with login + audio playback. Follow-ups (search, keybinds, lyrics pane, FFT visualizer, queue management) still open.</li>
 <li><strong>Podcast support</strong> — Subsonic spec already defines <code>getPodcasts</code> / <code>getPodcastEpisode</code> / <code>createPodcastChannel</code>. Add an RSS feed list, fetch episodes on schedule, store position. Symfonium has decent podcast UX out of the box.</li>
 <li><strong>iTunes / Apple Music import</strong> — read the local Apple Music database to import play counts, ratings, and playlists. One-shot migration tool.</li>
 </ul>
