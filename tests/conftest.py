@@ -46,6 +46,22 @@ def silent_flac(silent_flac_template: Path, tmp_path: Path) -> Path:
     return dst
 
 
+@pytest.fixture(scope="session")
+def silent_m4a(silent_flac_template: Path, tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Session-scoped silent .m4a converted from the FLAC template.
+
+    Module-scope was the previous shape, but multiple test files calling
+    `convert.to_alac` in the same session triggered a libav segfault on
+    the second container open. Session-scope means one conversion total
+    per pytest run, regardless of how many files use it.
+    """
+    from musickit import convert as convert_mod
+
+    out = tmp_path_factory.mktemp("silent_m4a") / "silent.m4a"
+    convert_mod.to_alac(silent_flac_template, out)
+    return out
+
+
 def make_silent_flac(dst: Path, *, duration: float = 0.2) -> Path:
     """Encode a silent FLAC of `duration` seconds at `dst`. Used for tests
     that need distinct file sizes (e.g. dedup logic that gates on size).
