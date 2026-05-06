@@ -109,6 +109,7 @@
 
   function applyDecay() {
     const playing = !audio.paused && !audio.ended;
+    let anyAudible = false;
     for (let i = 0; i < N_BANDS; i++) {
       if (playing) {
         const target = bandTargets[i];
@@ -120,6 +121,15 @@
         bandLevels[i] *= PAUSE_DECAY;
         if (bandLevels[i] < 0.001) bandLevels[i] = 0;
       }
+      if (bandLevels[i] > 0) anyAudible = true;
+    }
+    // Hide the strip when there's nothing to show — paused AND every
+    // band has decayed to zero. The fullscreen mode keeps the canvas
+    // visible regardless (you opted into it explicitly).
+    if (!playing && !anyAudible) {
+      document.body.classList.add("viz-idle");
+    } else {
+      document.body.classList.remove("viz-idle");
     }
   }
 
@@ -228,4 +238,9 @@
   // First sizing pass on load — even before audio starts, so the
   // canvas backing store matches its CSS box.
   resize();
+
+  // Start hidden — until the user plays something, there's nothing
+  // to visualise. The decay loop will keep this class set during the
+  // pause-decay window and re-add it once bars reach zero.
+  document.body.classList.add("viz-idle");
 })();
