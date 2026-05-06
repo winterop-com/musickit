@@ -183,9 +183,108 @@ async def web_album(request: Request, al_id: str) -> Response:
         "tracks.html",
         {
             "tracks": tracks,
+            "album_id": al_id,
             "album_title": album.tag_album or album.album_dir,
             "album_artist": album.tag_album_artist or album.artist_dir,
         },
+    )
+
+
+@router.get("/web/search", response_class=HTMLResponse, include_in_schema=False)
+async def web_search(request: Request, q: str = "") -> Response:
+    """HTML fragment: combined artist + album + track search results.
+
+    Uses the FTS5 index when available (sub-ms ranked); falls back to
+    a casefolded substring scan when SQLite was built without FTS5.
+    Caps each kind at 30 hits — the right pane isn't a paging UI.
+    """
+    redirect = _require_auth_or_redirect(request)
+    if redirect is not None:
+        return redirect
+    cache = request.app.state.cache
+    query = q.strip()
+    artists: list[dict[str, str]] = []
+    albums: list[dict[str, str | int]] = []
+    tracks: list[dict[str, str | int]] = []
+
+    if query:
+        from musickit.serve import search_index
+
+        if cache.fts is not None:
+            for ar_id in search_index.query(cache.fts, query, kind="artist", limit=30):
+                name = cache.artist_name_by_id.get(ar_id)
+                if name:
+                    artists.append({"id": ar_id, "name": name})
+            for al_id in search_index.query(cache.fts, query, kind="album", limit=30):
+                album = cache.albums_by_id.get(al_id)
+                if album is None:
+                    continue
+                albums.append(
+                    {
+                        "id": al_id,
+                        "title": album.tag_album or album.album_dir,
+                        "artist": album.tag_album_artist or album.artist_dir,
+                        "year": album.tag_year or "",
+                    }
+                )
+            for tr_id in search_index.query(cache.fts, query, kind="song", limit=30):
+                pair = cache.tracks_by_id.get(tr_id)
+                if pair is None:
+                    continue
+                album, track = pair
+                track_album_id = next(
+                    (aid for aid, a in cache.albums_by_id.items() if a is album),
+                    "",
+                )
+                tracks.append(
+                    {
+                        "id": tr_id,
+                        "album_id": track_album_id,
+                        "title": track.title or track.path.stem,
+                        "artist": track.artist or album.artist_dir,
+                        "duration": _fmt_mmss(track.duration_s or 0.0),
+                    }
+                )
+        else:
+            # Fallback: casefolded substring across artist names + album titles
+            # + track titles. Only fires when FTS5 is unavailable; mostly a
+            # smoke for completeness.
+            needle = query.casefold()
+            for ar_id, name in cache.artist_name_by_id.items():
+                if needle in name.casefold():
+                    artists.append({"id": ar_id, "name": name})
+            for al_id, album in cache.albums_by_id.items():
+                title = album.tag_album or album.album_dir
+                if needle in title.casefold():
+                    albums.append(
+                        {
+                            "id": al_id,
+                            "title": title,
+                            "artist": album.tag_album_artist or album.artist_dir,
+                            "year": album.tag_year or "",
+                        }
+                    )
+            for tr_id, (album, track) in cache.tracks_by_id.items():
+                title = track.title or track.path.stem
+                if needle in title.casefold():
+                    track_album_id = next(
+                        (aid for aid, a in cache.albums_by_id.items() if a is album),
+                        "",
+                    )
+                    tracks.append(
+                        {
+                            "id": tr_id,
+                            "album_id": track_album_id,
+                            "title": title,
+                            "artist": track.artist or album.artist_dir,
+                            "duration": _fmt_mmss(track.duration_s or 0.0),
+                        }
+                    )
+
+    return templates.TemplateResponse(
+        request,
+        "search.html",
+        {"query": query, "artists": artists[:30], "albums": albums[:30], "tracks": tracks[:30]},
     )
 
 

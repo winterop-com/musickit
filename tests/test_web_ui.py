@@ -168,6 +168,19 @@ def test_album_fragment_returns_track_list(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert "Dancing Queen" in response.text
     assert 'data-action="play-track"' in response.text
+    # data-album-id is what the JS uses to fetch the now-playing cover.
+    assert f'data-album-id="{al_id}"' in response.text
+
+
+def test_album_fragment_links_cover_thumbnail(tmp_path: Path) -> None:
+    """Album rows include an <img> pointing at /rest/getCoverArt for the album."""
+    client = _client(tmp_path)
+    _login(client)
+    ar_id = artist_id("ABBA")
+    response = client.get(f"/web/artist/{ar_id}")
+    assert response.status_code == 200
+    assert 'class="album-thumb"' in response.text
+    assert "/rest/getCoverArt?id=" in response.text
 
 
 def test_album_fragment_unknown_id_returns_404(tmp_path: Path) -> None:
@@ -176,6 +189,46 @@ def test_album_fragment_unknown_id_returns_404(tmp_path: Path) -> None:
     response = client.get("/web/album/al_does_not_exist")
     assert response.status_code == 404
     assert "not found" in response.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+
+
+def test_search_returns_combined_fragment(tmp_path: Path) -> None:
+    """`/web/search?q=` returns a fragment with artist + album + track sections."""
+    client = _client(tmp_path)
+    _login(client)
+    response = client.get("/web/search?q=ABBA")
+    assert response.status_code == 200
+    assert "Search" in response.text
+    # ABBA is an artist + album_artist + part of the track artist field; at
+    # minimum the artist section should fire.
+    assert "ABBA" in response.text
+
+
+def test_search_empty_query_returns_no_results_section(tmp_path: Path) -> None:
+    """An empty `q=` doesn't error — returns the shell with `No matches.`"""
+    client = _client(tmp_path)
+    _login(client)
+    response = client.get("/web/search?q=")
+    assert response.status_code == 200
+    assert "No matches" in response.text
+
+
+def test_search_finds_track_by_title(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    _login(client)
+    response = client.get("/web/search?q=Dancing")
+    assert response.status_code == 200
+    assert "Dancing Queen" in response.text
+
+
+def test_search_requires_login(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    response = client.get("/web/search?q=ABBA", follow_redirects=False)
+    assert response.status_code == 303
 
 
 # ---------------------------------------------------------------------------

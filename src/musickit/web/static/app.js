@@ -1,33 +1,50 @@
 // musickit web UI — vanilla JS, no framework.
 //
-// What runs here:
-//   - Click delegation on the three panes: artist row -> fetch fragment,
-//     swap into albums-pane; album row -> fetch fragment, swap into
-//     tracks-pane; track row -> set <audio src> and play.
-//   - Keep the now-playing footer in sync with the <audio> element via
-//     play / pause / timeupdate / ended events.
-//   - Space + media keys for play/pause; same vibe as the TUI.
+// State lives in `state` plus on the DOM (data-* attributes on rows).
+// Queue model: clicking a track in the tracks pane builds a queue from
+// all visible tracks in that pane (in DOM order); audio.ended advances;
+// n/p keybinds + buttons step through.
 //
-// State is kept on the elements themselves (data-* attributes) plus a
-// tiny `state` object below for cross-pane bookkeeping. No reactivity
-// layer — ~150 lines, plain reads from DOM.
+// Search: typing into #search debounces a fetch to /web/search?q=, swaps
+// results into the right pane. Empty query → no-op (panes restore on the
+// next normal click).
+//
+// Lyrics: `l` toggles a fixed-position overlay panel on the right. When
+// the playing track has synced LRC, `audio.timeupdate` highlights the
+// active line.
 
 (function () {
   "use strict";
 
   const audio = document.getElementById("audio");
   const playButton = document.getElementById("play-button");
+  const prevButton = document.getElementById("prev-button");
+  const nextButton = document.getElementById("next-button");
   const npTitle = document.getElementById("np-title");
   const npArtist = document.getElementById("np-artist");
+  const npCover = document.getElementById("np-cover");
   const npPos = document.getElementById("np-pos");
   const npDur = document.getElementById("np-dur");
   const npBar = document.getElementById("np-bar");
   const npVol = document.getElementById("np-vol");
+  const searchInput = document.getElementById("search");
+  const lyricsPanel = document.getElementById("lyrics-panel");
+  const lyricsBody = document.getElementById("lyrics-body");
+  const lyricsClose = document.getElementById("lyrics-close");
+  const albumsPane = document.getElementById("albums-pane");
+  const tracksPane = document.getElementById("tracks-pane");
 
   const state = {
-    currentTrackId: null,
-    currentRowEl: null,
+    queue: [], // [{ id, title, artist, albumId, rowEl }]
+    queueIndex: -1, // -1 = nothing playing
+    lyricsLines: [], // [{start_ms, text}] when synced; empty otherwise
+    lyricsSynced: false,
+    lyricsTrackId: null,
   };
+
+  // -------------------------------------------------------------------- //
+  // Helpers                                                              //
+  // -------------------------------------------------------------------- //
 
   function fmtTime(seconds) {
     if (!isFinite(seconds) || seconds <= 0) return "00:00";
@@ -35,14 +52,16 @@
     return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
   }
 
-  async function loadFragment(url, targetId) {
+  async function fetchFragment(url) {
     const response = await fetch(url, { credentials: "same-origin" });
     if (!response.ok) {
-      document.getElementById(targetId).innerHTML =
-        `<p class="empty">Failed to load: ${response.status} ${response.statusText}</p>`;
-      return;
+      return `<p class="empty">Failed to load: ${response.status} ${response.statusText}</p>`;
     }
-    document.getElementById(targetId).innerHTML = await response.text();
+    return await response.text();
+  }
+
+  async function loadInto(url, targetEl) {
+    targetEl.innerHTML = await fetchFragment(url);
   }
 
   function markActiveRow(button, paneSelector) {
@@ -52,40 +71,190 @@
     button.classList.add("is-active");
   }
 
-  function playTrack(trackId, title, artist, rowEl) {
-    audio.src = "/rest/stream?id=" + encodeURIComponent(trackId) + "&f=raw";
-    audio.play().catch((err) => {
-      // Browser autoplay policies can refuse first-play without user
-      // gesture — but this IS a click handler, so this only fires on
-      // genuinely-broken state (e.g. session expired -> 401). Surface it.
-      console.warn("playback failed:", err);
+  // -------------------------------------------------------------------- //
+  // Queue                                                                //
+  // -------------------------------------------------------------------- //
+
+  function buildQueueFromVisibleTracks() {
+    const rows = Array.from(tracksPane.querySelectorAll(".track-row"));
+    return rows.map((rowEl) => ({
+      id: rowEl.dataset.id,
+      title: rowEl.dataset.title,
+      artist: rowEl.dataset.artist,
+      albumId: rowEl.dataset.albumId,
+      rowEl,
+    }));
+  }
+
+  function playQueueIndex(idx) {
+    if (idx < 0 || idx >= state.queue.length) return;
+    const item = state.queue[idx];
+    state.queueIndex = idx;
+
+    audio.src = "/rest/stream?id=" + encodeURIComponent(item.id) + "&f=raw";
+    audio.play().catch((err) => console.warn("playback failed:", err));
+
+    // Visual: orange-out the playing row.
+    document.querySelectorAll(".track-row.is-playing").forEach((el) => {
+      el.classList.remove("is-playing");
     });
-    state.currentTrackId = trackId;
-
-    // Visual: orange-out the playing row, restore the previous one.
-    if (state.currentRowEl) {
-      state.currentRowEl.classList.remove("is-playing");
-    }
-    if (rowEl) {
-      rowEl.classList.add("is-playing");
-      state.currentRowEl = rowEl;
+    if (item.rowEl) {
+      item.rowEl.classList.add("is-playing");
     }
 
-    npTitle.textContent = title || "—";
-    npArtist.textContent = artist || "";
+    npTitle.textContent = item.title || "—";
+    npArtist.textContent = item.artist || "";
+    if (item.albumId) {
+      npCover.src = "/rest/getCoverArt?id=" + encodeURIComponent(item.albumId) + "&size=80";
+      npCover.style.visibility = "visible";
+    } else {
+      npCover.style.visibility = "hidden";
+    }
     playButton.disabled = false;
+    prevButton.disabled = idx === 0;
+    nextButton.disabled = idx === state.queue.length - 1;
+
+    // Auto-load lyrics if the panel is open.
+    if (lyricsPanel.classList.contains("is-open")) {
+      loadLyricsFor(item.id);
+    } else {
+      state.lyricsTrackId = null; // invalidate so a future toggle reloads
+    }
+  }
+
+  function nextTrack() {
+    if (state.queueIndex < 0) return;
+    if (state.queueIndex + 1 < state.queue.length) {
+      playQueueIndex(state.queueIndex + 1);
+    }
+  }
+
+  function prevTrack() {
+    if (state.queueIndex <= 0) return;
+    playQueueIndex(state.queueIndex - 1);
   }
 
   function togglePause() {
-    if (!state.currentTrackId) return;
-    if (audio.paused) {
-      audio.play();
+    if (state.queueIndex < 0) return;
+    if (audio.paused) audio.play();
+    else audio.pause();
+  }
+
+  // -------------------------------------------------------------------- //
+  // Lyrics                                                               //
+  // -------------------------------------------------------------------- //
+
+  function toggleLyrics() {
+    const wasOpen = lyricsPanel.classList.contains("is-open");
+    if (wasOpen) {
+      lyricsPanel.classList.remove("is-open");
+      return;
+    }
+    lyricsPanel.classList.add("is-open");
+    if (state.queueIndex >= 0) {
+      loadLyricsFor(state.queue[state.queueIndex].id);
     } else {
-      audio.pause();
+      lyricsBody.innerHTML = '<p class="empty">No track playing.</p>';
     }
   }
 
-  // ----- click delegation ----------------------------------------------
+  async function loadLyricsFor(trackId) {
+    if (state.lyricsTrackId === trackId) return; // already loaded for this track
+    state.lyricsTrackId = trackId;
+    lyricsBody.innerHTML = '<p class="empty">Loading…</p>';
+    try {
+      const response = await fetch(
+        "/rest/getLyricsBySongId?id=" + encodeURIComponent(trackId) + "&f=json",
+        { credentials: "same-origin" },
+      );
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const body = await response.json();
+      const structured = (body["subsonic-response"] || {}).lyricsList?.structuredLyrics || [];
+      if (!structured.length) {
+        lyricsBody.innerHTML = '<p class="empty">No lyrics for this track.</p>';
+        state.lyricsLines = [];
+        state.lyricsSynced = false;
+        return;
+      }
+      const entry = structured[0];
+      state.lyricsSynced = !!entry.synced;
+      state.lyricsLines = (entry.line || []).map((l) => ({
+        start_ms: l.start || 0,
+        text: l.value || "",
+      }));
+      renderLyrics(0);
+    } catch (err) {
+      console.warn("lyrics fetch failed:", err);
+      lyricsBody.innerHTML = '<p class="empty">Failed to load lyrics.</p>';
+      state.lyricsLines = [];
+      state.lyricsSynced = false;
+    }
+  }
+
+  function renderLyrics(positionMs) {
+    if (!state.lyricsLines.length) {
+      lyricsBody.innerHTML = '<p class="empty">No lyrics for this track.</p>';
+      return;
+    }
+    let activeIdx = -1;
+    if (state.lyricsSynced) {
+      for (let i = 0; i < state.lyricsLines.length; i++) {
+        if (state.lyricsLines[i].start_ms <= positionMs) activeIdx = i;
+        else break;
+      }
+    }
+    const html = state.lyricsLines
+      .map((line, i) => {
+        const cls =
+          i === activeIdx ? "lyric-line is-active" : i < activeIdx ? "lyric-line is-played" : "lyric-line";
+        const text = line.text ? escapeHtml(line.text) : "&nbsp;";
+        return `<p class="${cls}">${text}</p>`;
+      })
+      .join("");
+    lyricsBody.innerHTML = html;
+
+    // Auto-scroll the active line into view.
+    if (activeIdx >= 0) {
+      const activeEl = lyricsBody.querySelectorAll(".lyric-line")[activeIdx];
+      if (activeEl && typeof activeEl.scrollIntoView === "function") {
+        activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }
+
+  function escapeHtml(s) {
+    return s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // -------------------------------------------------------------------- //
+  // Search                                                               //
+  // -------------------------------------------------------------------- //
+
+  let searchTimer = null;
+
+  function onSearchInput() {
+    if (searchTimer) clearTimeout(searchTimer);
+    const q = searchInput.value.trim();
+    if (!q) {
+      // Empty query: leave panes as-is. User can click an artist again.
+      return;
+    }
+    searchTimer = setTimeout(async () => {
+      const url = "/web/search?q=" + encodeURIComponent(q);
+      const html = await fetchFragment(url);
+      // Search results swap into the tracks pane (the widest).
+      tracksPane.innerHTML = html;
+    }, 200);
+  }
+
+  // -------------------------------------------------------------------- //
+  // Click delegation                                                     //
+  // -------------------------------------------------------------------- //
 
   document.addEventListener("click", function (event) {
     const button = event.target.closest("[data-action]");
@@ -93,21 +262,37 @@
     const action = button.dataset.action;
     if (action === "load-artist") {
       markActiveRow(button, ".pane-artists");
-      loadFragment("/web/artist/" + encodeURIComponent(button.dataset.id), "albums-pane");
-      // Reset tracks pane since the artist changed.
-      document.getElementById("tracks-pane").innerHTML =
-        '<p class="empty">Pick an album to see tracks.</p>';
+      loadInto("/web/artist/" + encodeURIComponent(button.dataset.id), albumsPane);
+      tracksPane.innerHTML = '<p class="empty">Pick an album to see tracks.</p>';
     } else if (action === "load-album") {
       markActiveRow(button, ".pane-albums");
-      loadFragment("/web/album/" + encodeURIComponent(button.dataset.id), "tracks-pane");
+      loadInto("/web/album/" + encodeURIComponent(button.dataset.id), tracksPane);
     } else if (action === "play-track") {
-      playTrack(button.dataset.id, button.dataset.title, button.dataset.artist, button);
+      // Defer queue construction until after the click bubbles, so the
+      // .is-playing class set inside playQueueIndex applies cleanly.
+      state.queue = buildQueueFromVisibleTracks();
+      const idx = state.queue.findIndex((q) => q.id === button.dataset.id);
+      playQueueIndex(idx);
     } else if (action === "play-pause") {
       togglePause();
+    } else if (action === "next") {
+      nextTrack();
+    } else if (action === "prev") {
+      prevTrack();
+    } else if (action === "toggle-lyrics") {
+      toggleLyrics();
     }
   });
 
-  // ----- audio element wiring ------------------------------------------
+  if (lyricsClose) {
+    lyricsClose.addEventListener("click", function () {
+      lyricsPanel.classList.remove("is-open");
+    });
+  }
+
+  // -------------------------------------------------------------------- //
+  // Audio element wiring                                                 //
+  // -------------------------------------------------------------------- //
 
   audio.addEventListener("play", function () {
     playButton.classList.remove("is-paused");
@@ -122,6 +307,7 @@
   audio.addEventListener("ended", function () {
     playButton.classList.remove("is-paused");
     playButton.firstElementChild.textContent = "▶";
+    nextTrack();
   });
 
   audio.addEventListener("timeupdate", function () {
@@ -130,13 +316,15 @@
       npDur.textContent = fmtTime(audio.duration);
       npBar.value = audio.currentTime / audio.duration;
     }
+    if (lyricsPanel.classList.contains("is-open") && state.lyricsSynced) {
+      renderLyrics(Math.floor(audio.currentTime * 1000));
+    }
   });
 
   audio.addEventListener("loadedmetadata", function () {
     npDur.textContent = fmtTime(audio.duration);
   });
 
-  // Click on the progress bar to seek.
   npBar.addEventListener("click", function (event) {
     if (!audio.duration) return;
     const rect = npBar.getBoundingClientRect();
@@ -144,20 +332,55 @@
     audio.currentTime = ratio * audio.duration;
   });
 
-  // Volume slider.
   npVol.addEventListener("input", function () {
     audio.volume = parseFloat(npVol.value);
   });
 
-  // ----- keyboard shortcuts --------------------------------------------
+  // -------------------------------------------------------------------- //
+  // Search input                                                         //
+  // -------------------------------------------------------------------- //
+
+  if (searchInput) {
+    searchInput.addEventListener("input", onSearchInput);
+  }
+
+  // -------------------------------------------------------------------- //
+  // Keyboard                                                             //
+  // -------------------------------------------------------------------- //
 
   document.addEventListener("keydown", function (event) {
-    // Don't hijack typing in inputs / textareas.
     const tag = (event.target && event.target.tagName) || "";
-    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    const inField = tag === "INPUT" || tag === "TEXTAREA";
+
+    // Slash always focuses search, even from an input — except when
+    // already in the search input (to allow typing literal `/`).
+    if (event.key === "/" && event.target !== searchInput) {
+      event.preventDefault();
+      searchInput?.focus();
+      return;
+    }
+    if (event.key === "Escape") {
+      if (lyricsPanel.classList.contains("is-open")) {
+        lyricsPanel.classList.remove("is-open");
+        event.preventDefault();
+        return;
+      }
+      if (event.target === searchInput) {
+        searchInput.blur();
+        return;
+      }
+    }
+    if (inField) return; // typing in an input — don't hijack other keys
+
     if (event.code === "Space") {
       event.preventDefault();
       togglePause();
+    } else if (event.key === "n" || event.key === "N") {
+      nextTrack();
+    } else if (event.key === "p" || event.key === "P") {
+      prevTrack();
+    } else if (event.key === "l" || event.key === "L") {
+      toggleLyrics();
     }
   });
 })();

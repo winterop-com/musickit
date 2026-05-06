@@ -182,7 +182,23 @@ The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no bui
 
 Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u=&p=` query params and never see the cookie path — they're untouched by this addition.
 
-Follow-ups not yet shipped: filter / search bar, keybinds beyond Space, lyrics pane, FFT visualizer (Web Audio API), queue management, mobile layout polish.
+**Keybinds:**
+
+| Key | Action |
+|---|---|
+| Space | Play / pause |
+| `n` / `p` | Next / previous track in the current album queue |
+| `l` | Toggle the lyrics panel (synced highlight when LRC is available) |
+| `/` | Focus the search bar |
+| Esc | Close lyrics / blur search |
+
+**Search** uses the same FTS5 index `/search3` does (sub-ms ranked, prefix-matching, diacritic-folded — `bey` finds `Beyoncé`). Results swap into the right pane as artist / album / track sections; click any result to drill in or play.
+
+**Cover art** thumbnails appear in album rows + the now-playing card; sourced from `/rest/getCoverArt` with the LRU cache from v0.9.1.
+
+**Queue** is the visible album. Click a track → play from there; auto-advance through remaining tracks; `n`/`p` step. (Cross-album queueing comes later.)
+
+Follow-ups not yet shipped: FFT visualizer via Web Audio API, custom queue / "play next", playlist creation in the browser.
 
 ## Authentication
 
