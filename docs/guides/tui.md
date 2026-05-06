@@ -54,6 +54,7 @@ Fullscreen visualizer (`f`):
 | `r` | Cycle repeat (off → album → track) |
 | `f` | Toggle fullscreen visualizer |
 | `v` | Show / hide visualizer panel (frees space for the tracklist) |
+| `l` | Show / hide synced lyrics pane (replaces the visualizer) |
 | `g` | Generate a 60-min mix anchored to the highlighted track |
 | `/` | Filter the focused pane (artists / albums / tracks) |
 | `e` | Edit tags — track-level on track list, album-wide on album row |
@@ -117,6 +118,19 @@ Defaults baked into code + user TOML are merged at runtime (deduped by URL, user
 ICY metadata polling: while a stream is playing, the decoder thread polls `container.metadata` per packet for `StreamTitle` updates. The "now playing" pane updates with the live song name as the radio station broadcasts it.
 
 Radio launches as a first-class mode — `musickit tui` with no DIR drops directly into station picking (skipping the library scan entirely).
+
+## Lyrics
+
+Press `l` to swap the visualizer for the lyrics pane. Each line of the active track's lyrics renders top-to-bottom; when the body is synced LRC (`[mm:ss.xx]` markers), the line whose timestamp is the largest one not yet past the playhead is bolded and accented, played lines are dimmed, upcoming lines stay normal. Press `l` again to bring the visualizer back.
+
+Source precedence (set during the library scan):
+
+1. `<track>.lrc` sidecar next to the audio file (user-editable, survives rescans).
+2. Embedded `\xa9lyr` (MP4) / `USLT` (ID3) / `LYRICS` (FLAC Vorbis) tag, picked up by the same scan that reads other tags.
+
+Sidecars win over embedded so a manually-edited `.lrc` doesn't get overwritten by stale tag data on the next rescan. Populate sidecars in bulk with [`musickit library lyrics fetch`](library.md#fetching-lyrics-from-lrclib) — that command pulls from [LRCLIB](https://lrclib.net) (free, no API key, returns synced lyrics for popular tracks).
+
+In Subsonic-client mode the TUI calls the server's `/getLyricsBySongId`; the server promotes LRC bodies to `synced: true` automatically, so the highlight tracks playback the same way local mode does.
 
 ## Mixes — auto-generated playlists
 

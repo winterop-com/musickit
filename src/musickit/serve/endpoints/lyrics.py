@@ -17,6 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Query, Request
 
 from musickit.library.models import LibraryAlbum, LibraryTrack
+from musickit.lyrics import is_synced, parse_lrc
 from musickit.serve.app import envelope, error_envelope
 from musickit.serve.index import IndexCache
 
@@ -42,14 +43,25 @@ def _find_by_artist_title(cache: IndexCache, artist: str, title: str) -> tuple[L
 
 
 def _structured_payload(album: LibraryAlbum, track: LibraryTrack) -> dict[str, Any]:
-    """Build the OpenSubsonic structuredLyrics entry. Unsynced for now (no LRC parsing)."""
+    """Build the OpenSubsonic structuredLyrics entry, promoting LRC bodies to synced.
+
+    When `track.lyrics` parses as LRC (`[mm:ss.xx]` markers), each line gets
+    a `start` field in milliseconds and `synced` flips to True so clients
+    like Symfonium / Amperfy display the highlight tracking real time.
+    Plain-text bodies stay in the unsynced shape.
+    """
     text = track.lyrics or ""
-    lines = [{"value": line} for line in text.splitlines()] if text else []
+    parsed = parse_lrc(text)
+    synced = is_synced(parsed)
+    if synced:
+        lines = [{"start": line.start_ms, "value": line.text} for line in parsed]
+    else:
+        lines = [{"value": line} for line in text.splitlines()] if text else []
     return {
         "displayArtist": track.artist or album.artist_dir,
         "displayTitle": track.title or track.path.stem,
         "lang": "xxx",  # unknown — future: parse from USLT lang field
-        "synced": False,
+        "synced": synced,
         "line": lines,
     }
 

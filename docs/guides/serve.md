@@ -11,7 +11,7 @@ uvx musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [-
 ## Startup banner
 
 ```
-musickit serve — Subsonic API for /Volumes/T9/Output
+musickit serve — Subsonic API for ~/Music
   bind: 0.0.0.0:4533
   LAN:  http://192.168.1.42:4533
   Tailscale: http://my-mac.tail-scale.ts.net:4533
@@ -21,7 +21,7 @@ scanning library…
   142 artists, 318 albums, 4521 tracks
 
   mDNS: advertising as musickit-mlaptop._subsonic._tcp.local
-  watching /Volumes/T9/Output for changes (auto-rescan on add/remove/rename)
+  watching ~/Music for changes (auto-rescan on add/remove/rename)
 ```
 
 The banner gives you everything you need to point a client at the right URL, and tells you which auto-features are active (mDNS + filesystem watcher).
@@ -146,6 +146,15 @@ These are stubs to keep clients quiet on features we don't track yet. They retur
 | `star` / `unstar` | **Real.** Adds / removes IDs in `stars.toml`. Accepts any combination of `id=`, `albumId=`, `artistId=`. Unknown IDs are silently dropped. |
 | `getPlaylists` / `getPlaylist` | Empty playlist list |
 | `getGenres` | Real! Counts songs + distinct albums per genre. |
+
+### Lyrics
+
+| Endpoint | Returns |
+|---|---|
+| `getLyrics?artist=&title=` | Legacy fuzzy lookup. Returns `{artist, title, value}`; empty value when no match (per spec — clients show "no lyrics available"). |
+| `getLyricsBySongId?id=` | OpenSubsonic structured shape. When the stored body looks like LRC (`[mm:ss.xx]` markers), promotes to `synced: true` with `[{start: ms, value: line}, ...]` — Symfonium and Amperfy display the highlight tracking real time. Otherwise returns `synced: false` with one line per text line. |
+
+Lyrics are sourced from a `<track>.lrc` sidecar (preferred) or the file's embedded `\xa9lyr` / `USLT` / `LYRICS` tag. Populate sidecars in bulk with [`musickit library lyrics fetch`](library.md#lyrics--fetch-synced-lyrics-from-lrclib) — pulls from LRCLIB, writes per-track `.lrc` files. Synced lyrics light up automatically the next time the server's index gets reloaded.
 
 ### Persistent stars (since v0.7.0)
 

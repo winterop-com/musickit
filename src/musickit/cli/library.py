@@ -218,6 +218,174 @@ def library_fix(
 
 
 # ---------------------------------------------------------------------------
+# lyrics
+# ---------------------------------------------------------------------------
+
+
+lyrics_app = typer.Typer(
+    no_args_is_help=True,
+    help="Fetch lyrics from LRCLIB and cache as `<track>.lrc` sidecars.",
+)
+library_app.add_typer(lyrics_app, name="lyrics")
+
+
+@lyrics_app.command("fetch")
+def lyrics_fetch(
+    ctx: typer.Context,
+    target_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, help="Library root."),
+    ],
+    missing_only: Annotated[
+        bool,
+        typer.Option(
+            "--missing-only/--all",
+            help=(
+                "Only fetch tracks with no embedded lyrics and no existing sidecar. "
+                "`--all` re-fetches everything (use sparingly — LRCLIB is community-run)."
+            ),
+        ),
+    ] = True,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print intended fetches but don't hit the network or write files."),
+    ] = False,
+    no_cache: _NoCacheOpt = False,
+    full_rescan: _FullRescanOpt = False,
+) -> None:
+    """Populate `<track>.lrc` sidecars from LRCLIB for tracks that don't have lyrics.
+
+    LRCLIB is a free community lyrics database with synced (LRC) and plain
+    bodies; we prefer synced when available. The sidecar wins over the
+    audio file's embedded lyrics on the next library scan, so user edits
+    to the `.lrc` survive (we never overwrite a populated sidecar from
+    embedded text).
+
+    Aborts non-zero if the LRCLIB error rate exceeds 10% of attempted
+    fetches — early signal of a network outage or API shape change.
+    404s ("track not in LRCLIB") do not count toward the failure rate.
+    """
+    from rich.progress import (
+        BarColumn,
+        MofNCompleteColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
+
+    from musickit.lyrics import LrcLibClient, LrcLibError, sidecar_path
+
+    console = Console()
+    verbose = bool(ctx.obj and ctx.obj.get("verbose"))
+    index = _scan_with_progress(
+        console,
+        target_dir.resolve(),
+        verbose=verbose,
+        measure_pictures=False,
+        use_cache=not no_cache,
+        force=full_rescan,
+    )
+
+    candidates: list[tuple[library_mod.LibraryAlbum, library_mod.LibraryTrack]] = []
+    for album in index.albums:
+        for track in album.tracks:
+            if missing_only:
+                if track.lyrics and track.lyrics.strip():
+                    continue
+                if sidecar_path(track.path).exists():
+                    continue
+            if not track.title or not (track.artist or album.tag_album_artist or album.artist_dir):
+                continue
+            candidates.append((album, track))
+
+    if not candidates:
+        console.print("[green]nothing to fetch[/green] — every track already has lyrics or a sidecar")
+        return
+
+    console.print(
+        f"[cyan]fetching lyrics[/cyan] for {len(candidates)} track(s)"
+        + (" [yellow](dry run)[/yellow]" if dry_run else "")
+    )
+
+    fetched = 0
+    not_found = 0
+    errors = 0
+    written = 0
+
+    if dry_run:
+        for album, track in candidates[:20]:
+            console.print(f"  [dim]would fetch:[/dim] {track.artist or album.artist_dir} - {track.title}")
+        if len(candidates) > 20:
+            console.print(f"  [dim]... and {len(candidates) - 20} more[/dim]")
+        return
+
+    with (
+        LrcLibClient() as client,
+        Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TextColumn("•"),
+            TimeElapsedColumn(),
+            console=console,
+            transient=True,
+        ) as progress,
+    ):
+        task = progress.add_task("[cyan]Fetching", total=len(candidates))
+        for album, track in candidates:
+            artist = track.artist or album.tag_album_artist or album.artist_dir
+            label = f"{artist} - {track.title}"
+            if len(label) > 60:
+                label = label[:59] + "…"
+            progress.update(task, description=f"[cyan]Fetching[/] [dim]·[/] {label}")
+            try:
+                payload = client.get(
+                    track_name=track.title or "",
+                    artist_name=artist,
+                    album_name=album.tag_album or album.album_dir,
+                    duration_s=track.duration_s,
+                )
+            except LrcLibError as exc:
+                errors += 1
+                if verbose:
+                    console.print(f"  [red]error[/red] {label}: {exc}")
+            else:
+                fetched += 1
+                if payload is None:
+                    not_found += 1
+                else:
+                    body = client.best_lyrics(payload)
+                    if body:
+                        from musickit.lyrics import write_sidecar
+
+                        try:
+                            write_sidecar(track.path, body)
+                            written += 1
+                        except OSError as exc:
+                            errors += 1
+                            if verbose:
+                                console.print(f"  [red]write failed[/red] {label}: {exc}")
+            progress.advance(task)
+
+    summary = (
+        f"[green]wrote[/green] {written} sidecar(s) · "
+        f"[yellow]no match[/yellow] {not_found} · "
+        f"[red]errors[/red] {errors} · "
+        f"of {len(candidates)} attempted"
+    )
+    console.print(summary)
+
+    attempted = len(candidates)
+    if attempted and errors / attempted > 0.10:
+        console.print(
+            "[red]error rate above 10% — possible LRCLIB outage or API shape change.[/red]",
+        )
+        raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
 # index management
 # ---------------------------------------------------------------------------
 

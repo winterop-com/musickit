@@ -159,7 +159,7 @@ By default this:
 You'll see a startup banner like:
 
 ```
-musickit serve — Subsonic API for /Volumes/T9/Music
+musickit serve — Subsonic API for ~/Music
   bind: 0.0.0.0:4533
   LAN:  http://192.168.1.42:4533
   Tailscale: http://mlaptop.tail4a4b9a.ts.net:4533
@@ -168,7 +168,7 @@ scanning library…
    142 artists, 318 albums, 4521 tracks
 
   mDNS: advertising as musickit-mlaptop._subsonic._tcp.local
-  watching /Volumes/T9/Music for changes (auto-rescan on add/remove/rename)
+  watching ~/Music for changes (auto-rescan on add/remove/rename)
 ```
 
 Note the **Tailscale** URL — that's what the iPhone will use.

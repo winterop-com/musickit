@@ -4,7 +4,6 @@ What's open, organized by what it would feel like.
 
 ## Tier 1 — listening experience wins
 
-- **Lyrics via LRCLIB** — read embedded `\xa9lyr` (MP4) / `USLT` (ID3); fetch from [lrclib.net](https://lrclib.net) for missing ones (free, no API key, supports synced LRC). Cache per-track as `<track>.lrc` sidecar. Server's `getLyrics` / `getLyricsBySongId` are wired but only return embedded text; remote-fetch + sidecar cache is still open. Symfonium + Amperfy display synced lyrics live.
 - **Album cover art in the TUI** — small thumbnail in the now-playing header. Tried once with `textual-image` (Unicode halfblock fallback was too low-res); a `chafa` subprocess approach would give crisp output but adds a `brew install chafa` system dep. Deferred until the cost/benefit is clearer.
 
 ## Tier 2 — bigger directions (~3-5 sessions)
@@ -18,6 +17,8 @@ What's open, organized by what it would feel like.
 - **systemd / launchd plist** — for users wanting `serve` to autostart on boot.
 - **MQTT / webhook scrobble forwarding** — push play events to Home Assistant / Last.fm / external systems.
 - **Bigger `getCoverArt` cache** — currently it's recomputed per request; an LRU keyed on `(album_id, size)` would help on slow disks.
+- **Offline browse cache for Subsonic-client mode** — when the TUI is connected, serialise `getArtists` / `getAlbumList` / `getAlbum` responses into a per-server SQLite. On reconnect with a missing server, hydrate the browse panes from cache so you can navigate offline (playback still requires the live server).
+- **Scrobble forwarder** — `/scrobble` is a no-op stub today. A configurable webhook + MQTT bridge would push play events to Home Assistant / Last.fm / external scrobble services without dragging in a full scrobble database.
 - **TUI `/`-bar filter on top of FTS5** — `/search3` is FTS5-backed (see Done); the TUI's incremental `/` filter is still in-memory casefold substring. Wiring it through the same in-memory FTS5 index would give ranked / prefix-matching results in the TUI.
 
 ## Tier 4 — convert-pipeline polish
@@ -75,3 +76,4 @@ Things that would be interesting if anyone ever asked for them, but not pursued 
 - TUI Mixes browser entry — saved `.m3u8` files appear in the right pane; selecting one resolves paths against the live index and plays it as a virtual album with stale-path graceful degradation
 - Persistent stars / favourites — Subsonic clients' heart buttons are now real. `/star`, `/unstar`, `/getStarred`, `/getStarred2` backed by `<root>/.musickit/stars.toml` (TOML, hand-editable, survives index rebuilds).
 - FTS5 search backend — `/search3` and `/search2` use an in-memory SQLite FTS5 index built fresh on every cache reindex. Sub-ms ranked results with prefix matching (`bey` matches `Beyoncé`), diacritic folding (`unicode61 remove_diacritics 2`), bm25 ordering, and multi-token AND across title + album_artist + year body text. Falls back to casefolded substring scan when SQLite was compiled without FTS5.
+- Lyrics via LRCLIB — `musickit library lyrics fetch <DIR>` populates `<track>.lrc` sidecars from [lrclib.net](https://lrclib.net) (free, no API key). Sidecars take precedence over embedded `\xa9lyr` / `USLT` / `LYRICS` tags on the next library scan, so user edits stick. The server's `getLyricsBySongId` parses LRC bodies and emits `synced: true` with per-line millisecond offsets — Symfonium / Amperfy display the highlight live. The TUI gains an `l` keybind that swaps the visualizer for a lyrics pane, with the active line bolded as playback advances.

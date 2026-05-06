@@ -245,6 +245,78 @@ class Visualizer(Static):
         return "\n".join(lines)
 
 
+class LyricsPane(Static):
+    """Synced lyrics pane — current line highlighted, played lines dimmed.
+
+    Renders parsed LRC content. When `synced` is False (plain-text lyrics
+    body), shows the lines without highlighting. The active-line index is
+    derived from `position_ms`; the line whose `start_ms` is the largest
+    value <= `position_ms` is treated as currently playing.
+
+    Toggled via the `l` keybind in the App. Mutually exclusive with the
+    visualizer in the same right-pane region — App's `Screen.show-lyrics`
+    class hides the visualizer and shows this widget.
+    """
+
+    DEFAULT_CSS = """
+    LyricsPane {
+        width: 1fr;
+        height: 1fr;
+        min-height: 6;
+        max-height: 14;
+        padding: 0 2;
+        border: round $primary 30%;
+        display: none;
+        overflow-y: auto;
+    }
+    LyricsPane.visible {
+        display: block;
+    }
+    """
+
+    # Actual content type is `list[LrcLine]` — declared as `list` here to
+    # avoid pulling the dataclass into widgets.py and keep this file
+    # dependency-light. App writes a list of LrcLine into it.
+    lines: reactive[list] = reactive([], layout=True)
+    position_ms: reactive[int] = reactive(0)
+    synced: reactive[bool] = reactive(False)
+    placeholder: reactive[str] = reactive("[dim]No lyrics for this track.[/]")
+
+    def on_mount(self) -> None:  # noqa: D102
+        self.border_title = "Lyrics"
+
+    def watch_position_ms(self, _old: int, _new: int) -> None:  # noqa: D102
+        # Re-render so the highlighted line tracks the position. Cheap —
+        # render only walks `len(lines)`, which tops out at a few hundred.
+        self.refresh()
+
+    def render(self) -> str:
+        rows = self.lines
+        if not rows:
+            return self.placeholder
+        if not self.synced:
+            return "\n".join(getattr(line, "text", str(line)) for line in rows)
+
+        active = -1
+        pos = self.position_ms
+        for idx, line in enumerate(rows):
+            if line.start_ms <= pos:
+                active = idx
+            else:
+                break
+
+        out: list[str] = []
+        for idx, line in enumerate(rows):
+            text = line.text or " "
+            if idx == active:
+                out.append(f"[bold {C_ACTIVE}]{text}[/]")
+            elif idx < active:
+                out.append(f"[dim]{text}[/]")
+            else:
+                out.append(text)
+        return "\n".join(out)
+
+
 class ProgressLine(Static):
     """`▶ mm:ss <bar> mm:ss` — click anywhere on the bar to seek."""
 
@@ -593,6 +665,7 @@ class KeyBar(Static):
             ("e", "Edit"),
             ("a", "AirPlay"),
             ("g", "Mix"),
+            ("l", "Lyrics"),
             ("v", "Viz"),
             ("f", "Full"),
             ("?", "Help"),

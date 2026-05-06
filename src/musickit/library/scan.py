@@ -12,6 +12,7 @@ from pathlib import Path
 
 from musickit import naming
 from musickit.library.models import LibraryAlbum, LibraryIndex, LibraryTrack
+from musickit.lyrics import read_sidecar
 from musickit.metadata import SUPPORTED_AUDIO_EXTS, read_source
 
 _ALBUM_DIR_YEAR_RE = re.compile(r"^(\d{4})\s*-\s*(.+)$")
@@ -85,7 +86,7 @@ def _scan_album(album_dir: Path, *, measure_pictures: bool = False) -> LibraryAl
             year=_year_only(source.date),
             genre=source.genre,
             genres=list(source.genres),
-            lyrics=source.lyrics,
+            lyrics=_pick_lyrics(audio_path, source.lyrics),
             replaygain=dict(source.replaygain),
             track_no=source.track_no,
             disc_no=source.disc_no,
@@ -123,6 +124,14 @@ def _majority(values: Iterable[str | None]) -> str | None:
     if not counts:
         return None
     return counts.most_common(1)[0][0]
+
+
+def _pick_lyrics(audio_path: Path, embedded: str | None) -> str | None:
+    """Sidecar `.lrc` wins over embedded so user-edited LRC sticks across rescans."""
+    sidecar = read_sidecar(audio_path)
+    if sidecar is not None and sidecar.strip():
+        return sidecar
+    return embedded
 
 
 def _year_only(date: str | None) -> str | None:
