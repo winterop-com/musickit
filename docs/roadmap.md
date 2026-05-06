@@ -8,7 +8,7 @@ What's open, organized by what it would feel like.
 
 ## Tier 2 — bigger directions (~3-5 sessions)
 
-- **Web UI** — small Vue/htmx frontend mounted at `/` (replacing the JSON probe response). Same Subsonic backend; lets you play from any browser without installing an app.
+- **Web UI** — first slice landed in v0.9.4: vanilla-JS three-pane browser at `/web` with login + audio playback. Follow-ups (search, keybinds, lyrics pane, FFT visualizer, queue management) still open.
 - **Podcast support** — Subsonic spec already defines `getPodcasts` / `getPodcastEpisode` / `createPodcastChannel`. Add an RSS feed list, fetch episodes on schedule, store position. Symfonium has decent podcast UX out of the box.
 - **iTunes / Apple Music import** — read the local Apple Music database to import play counts, ratings, and playlists. One-shot migration tool.
 ## Tier 3 — server hardening / scale

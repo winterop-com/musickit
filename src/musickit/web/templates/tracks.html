@@ -1,0 +1,21 @@
+<h2>{{ album_title }}</h2>
+<p class="album-subtitle">{{ album_artist }}</p>
+<ul class="row-list track-list">
+  {% for track in tracks %}
+  <li>
+    <button type="button"
+            class="row-button track-row"
+            data-action="play-track"
+            data-id="{{ track.id }}"
+            data-title="{{ track.title|e }}"
+            data-artist="{{ track.artist|e }}">
+      <span class="track-no">{{ "%2d" % track.track_no }}</span>
+      <span class="track-title">{{ track.title }}</span>
+      <span class="track-artist">{{ track.artist }}</span>
+      <span class="track-time">{{ track.duration }}</span>
+    </button>
+  </li>
+  {% else %}
+  <li class="empty">No tracks on this album.</li>
+  {% endfor %}
+</ul>

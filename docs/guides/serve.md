@@ -169,6 +169,21 @@ Heart / star buttons in Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub)
 
 Stars live OUTSIDE the SQLite library index because the index is fully derived from the filesystem (delete / rebuild = safe), but stars are real user data. Both files sit under `.musickit/` so `rm -rf <root>/.musickit/index.db*` is still a safe "rebuild the cache, keep my favourites" operation.
 
+## Browser UI
+
+Open the server URL in any browser to use the bundled three-pane web player. The first slice ships with v0.9.4:
+
+```
+http://<host>:4533/login          → sign-in form (same creds as the Subsonic API)
+http://<host>:4533/web            → three-pane browser (artists / albums / tracks)
+```
+
+The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same `/rest/getArtists` / `/rest/getArtist` / `/rest/getAlbum` endpoints the rest of the API uses; audio playback hits `/rest/stream` via a native `<audio>` element. Login sets a signed session cookie so subsequent `<audio src="/rest/stream?id=...">` calls don't need to leak the password into HTML page sources.
+
+Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u=&p=` query params and never see the cookie path — they're untouched by this addition.
+
+Follow-ups not yet shipped: filter / search bar, keybinds beyond Space, lyrics pane, FFT visualizer (Web Audio API), queue management, mobile layout polish.
+
 ## Authentication
 
 Three forms supported, all per the Subsonic spec:
