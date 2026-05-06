@@ -1447,7 +1447,7 @@
 </tr>
 <tr>
 <td><code>getCoverArt?id=&amp;size=</code></td>
-<td>Cover image. Sidecar (<code>cover.jpg</code>/<code>folder.jpg</code>/<code>front.jpg</code>) first, embedded picture as fallback. Optional Pillow resize via <code>?size=N</code> (capped at 1500).</td>
+<td>Cover image. Sidecar (<code>cover.jpg</code>/<code>folder.jpg</code>/<code>front.jpg</code>) first, embedded picture as fallback. Optional Pillow resize via <code>?size=N</code> (capped at 1500). Response bytes cached in a bytes-bounded LRU (default 64 MiB) keyed on <code>(id, size)</code>; cleared on every reindex so re-cover-picked albums never serve stale bytes.</td>
 </tr>
 </tbody>
 </table>
