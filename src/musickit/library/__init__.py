@@ -20,6 +20,12 @@ from musickit.library.db import (
 from musickit.library.fix import fix_album, fix_index
 from musickit.library.load import load, load_or_scan
 from musickit.library.models import LibraryAlbum, LibraryIndex, LibraryTrack
+from musickit.library.rename import (
+    RenameError,
+    RenameResult,
+    compute_new_album_path,
+    rename_album_to_match_tags,
+)
 from musickit.library.scan import (
     ScanProgressCallback,
     ValidationResult,
@@ -37,12 +43,15 @@ __all__ = [
     "LibraryAlbum",
     "LibraryIndex",
     "LibraryTrack",
+    "RenameError",
+    "RenameResult",
     "ScanProgressCallback",
     "ValidationResult",
     "_audit_cover",
     "_split_dir_year",
     "audit",
     "audit_album",
+    "compute_new_album_path",
     "db_path",
     "fix_album",
     "fix_index",
@@ -50,6 +59,7 @@ __all__ = [
     "load",
     "load_or_scan",
     "open_db",
+    "rename_album_to_match_tags",
     "rescan_albums",
     "scan",
     "scan_full",

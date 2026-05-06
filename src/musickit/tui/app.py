@@ -1713,22 +1713,47 @@ class MusickitApp(App[None]):
             self._refresh_status()
         self.notify(f"✓ Tags saved: {track.path.name}", severity="information")
 
-    def notify_album_tags_updated(self, album: LibraryAlbum) -> None:
+    @property
+    def library_root(self) -> Path | None:
+        """Library root path. None in radio-only / Subsonic-client modes."""
+        return self._root
+
+    def notify_album_tags_updated(
+        self,
+        album: LibraryAlbum,
+        *,
+        rename_result: library_mod.RenameResult | None = None,
+    ) -> None:
         """Called by the album editor after a successful album-wide save.
 
         Repaints the tracklist (year/genre/album columns may have changed)
         and the now-playing block if a track from this album is playing.
         Doesn't trigger a full library rescan — the in-memory model has
         already been patched by the editor.
+
+        When a folder rename happened (`rename_result is not None and
+        .changed`), the browser entry for the old name is also stale —
+        repopulate the browser so the user sees the new dirname.
         """
         if self._current_album is album:
             self._repopulate_playlist()
         if self._current_album is album and self._current_track_idx is not None:
             self._refresh_status()
-        self.notify(
-            f"✓ Album tags saved across {len(album.tracks)} track(s): {album.album_dir}",
-            severity="information",
-        )
+
+        if rename_result is not None and rename_result.changed:
+            # If the user was inside the old artist dir, the browser is
+            # showing a stale list — repopulate so they see the new
+            # dirname (or the album moved away if album_artist changed).
+            self._populate_browser()
+            self.notify(
+                f"✓ Album tags saved + folder renamed: {rename_result.old_path.name} → {rename_result.new_path.name}",
+                severity="information",
+            )
+        else:
+            self.notify(
+                f"✓ Album tags saved across {len(album.tracks)} track(s): {album.album_dir}",
+                severity="information",
+            )
 
     def action_start_filter(self) -> None:
         """`/`: open a filter input above the focused pane (browser or tracklist)."""
