@@ -529,6 +529,37 @@ button:focus-visible {
 }
 
 /* ---------------------------------------------------------------------- */
+/* FFT visualizer                                                          */
+/* ---------------------------------------------------------------------- */
+
+.visualizer-canvas {
+  position: fixed;
+  top: 56px; /* under the topbar */
+  left: 0;
+  right: 0;
+  bottom: 86px; /* above the now-playing footer */
+  width: 100%;
+  height: calc(100vh - 56px - 86px);
+  background: var(--bg);
+  display: none;
+  z-index: 4;
+}
+
+body.is-viz .visualizer-canvas {
+  display: block;
+}
+
+body.is-viz .three-pane {
+  display: none;
+}
+
+body.is-viz .lyrics-panel {
+  /* Lyrics + visualizer are mutually exclusive — the visualizer fills
+     the space lyrics would have used. */
+  transform: translateX(100%);
+}
+
+/* ---------------------------------------------------------------------- */
 /* Lyrics panel                                                           */
 /* ---------------------------------------------------------------------- */
 

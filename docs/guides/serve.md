@@ -189,8 +189,9 @@ Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u
 | Space | Play / pause |
 | `n` / `p` | Next / previous track in the current album queue |
 | `l` | Toggle the lyrics panel (synced highlight when LRC is available) |
+| `f` | Toggle the FFT visualizer (Web Audio API + Canvas) |
 | `/` | Focus the search bar |
-| Esc | Close lyrics / blur search |
+| Esc | Close lyrics / visualizer / blur search |
 
 **Search** uses the same FTS5 index `/search3` does (sub-ms ranked, prefix-matching, diacritic-folded — `bey` finds `Beyoncé`). Results swap into the right pane as artist / album / track sections; click any result to drill in or play.
 
@@ -198,7 +199,9 @@ Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u
 
 **Queue** is the visible album. Click a track → play from there; auto-advance through remaining tracks; `n`/`p` step. (Cross-album queueing comes later.)
 
-Follow-ups not yet shipped: FFT visualizer via Web Audio API, custom queue / "play next", playlist creation in the browser.
+**FFT visualizer** runs entirely in the browser via the Web Audio API: a `MediaElementAudioSourceNode` tees the `<audio>` element into an `AnalyserNode`, the JS averages the FFT into 48 log-spaced bands (30Hz to 16kHz), and renders bars to a `<canvas>` at 60fps with red/yellow/green VU gradient — same palette as the TUI. Asymmetric attack/release smoothing so transients pop while sustained tones don't shimmer.
+
+Follow-ups not yet shipped: custom queue / "play next", playlist creation in the browser.
 
 ## Authentication
 

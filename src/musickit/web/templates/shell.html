@@ -15,6 +15,8 @@
   </form>
 </header>
 
+<canvas class="visualizer-canvas" id="viz-canvas" aria-hidden="true"></canvas>
+
 <main class="three-pane">
   <section class="pane pane-artists" aria-label="Artists">
     <h2>Artists <span class="count">({{ artists|length }})</span></h2>
@@ -80,6 +82,9 @@
     <span class="np-dur" id="np-dur">00:00</span>
   </div>
   <div class="np-volume">
+    <button type="button" class="np-button" data-action="toggle-viz" aria-label="Toggle visualizer (f)">
+      <span aria-hidden="true">▦</span>
+    </button>
     <button type="button" class="np-button" data-action="toggle-lyrics" aria-label="Toggle lyrics (l)">
       <span aria-hidden="true">♪</span>
     </button>
@@ -90,4 +95,5 @@
 </footer>
 
 <script src="/web-static/app.js"></script>
+<script src="/web-static/visualizer.js"></script>
 {% endblock %}
