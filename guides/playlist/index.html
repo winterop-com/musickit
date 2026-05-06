@@ -1078,13 +1078,13 @@
 <h1 id="musickit-playlist">musickit playlist<a class="headerlink" href="#musickit-playlist" title="Permanent link">&para;</a></h1>
 <p>Auto-generated <code>.m3u8</code> playlists anchored to a seed track. Tag-based similarity only — no audio fingerprinting, no remote lookups, no play-history dependency. Available since v0.6.0; TUI integration since v0.6.1; saved-mixes browser since v0.6.2.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>playlist<span class="w"> </span>gen<span class="w"> </span>/Volumes/T9/Music<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--seed<span class="w"> </span><span class="s2">&quot;/Volumes/T9/Music/Pixies/1989 - Doolittle/01 - Debaser.m4a&quot;</span><span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>playlist<span class="w"> </span>gen<span class="w"> </span>~/Music<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--seed<span class="w"> </span><span class="s2">&quot;~/Music/Pixies/1989 - Doolittle/01 - Debaser.m4a&quot;</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span>--minutes<span class="w"> </span><span class="m">60</span>
 </code></pre></div>
 <p>Output:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Generated Mix - Pixies - Debaser (24 tracks, 61.2 min / target 60 min)
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>→ /Volumes/T9/Music/.musickit/playlists/mix-pixies-debaser.m3u8
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>→ ~/Music/.musickit/playlists/mix-pixies-debaser.m3u8
 </code></pre></div>
 <p>The generated <code>.m3u8</code> is a plain extended M3U with <code>#EXTINF</code> lines, so VLC, mpv, every Subsonic client, and the musickit TUI all open it directly.</p>
 <h2 id="subcommands">Subcommands<a class="headerlink" href="#subcommands" title="Permanent link">&para;</a></h2>
@@ -1140,11 +1140,11 @@
 </tbody>
 </table>
 <h3 id="list-show-saved-mixes"><code>list</code> — show saved mixes<a class="headerlink" href="#list-show-saved-mixes" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>playlist<span class="w"> </span>list<span class="w"> </span>/Volumes/T9/Music
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>playlist<span class="w"> </span>list<span class="w"> </span>~/Music
 </code></pre></div>
 <p>Renders a table of every <code>.m3u8</code> under <code>&lt;ROOT&gt;/.musickit/playlists/</code>, with track counts and on-disk paths.</p>
 <h3 id="show-print-a-saved-mixs-tracks"><code>show</code> — print a saved mix's tracks<a class="headerlink" href="#show-print-a-saved-mixs-tracks" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>playlist<span class="w"> </span>show<span class="w"> </span>/Volumes/T9/Music<span class="w"> </span>mix-pixies-debaser
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>playlist<span class="w"> </span>show<span class="w"> </span>~/Music<span class="w"> </span>mix-pixies-debaser
 </code></pre></div>
 <p>Prints the resolved track paths from the <code>.m3u8</code> with <code>[y]</code> / <code>[n]</code> markers showing whether each file still exists on disk. Useful for sanity-checking a saved mix after moving / renaming files.</p>
 <h2 id="how-the-similarity-score-works">How the similarity score works<a class="headerlink" href="#how-the-similarity-score-works" title="Permanent link">&para;</a></h2>

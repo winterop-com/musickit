@@ -901,7 +901,6 @@
 <p>What's open, organized by what it would feel like.</p>
 <h2 id="tier-1-listening-experience-wins">Tier 1 — listening experience wins<a class="headerlink" href="#tier-1-listening-experience-wins" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Lyrics via LRCLIB</strong> — read embedded <code>\xa9lyr</code> (MP4) / <code>USLT</code> (ID3); fetch from <a href="https://lrclib.net">lrclib.net</a> for missing ones (free, no API key, supports synced LRC). Cache per-track as <code>&lt;track&gt;.lrc</code> sidecar. Server's <code>getLyrics</code> / <code>getLyricsBySongId</code> are wired but only return embedded text; remote-fetch + sidecar cache is still open. Symfonium + Amperfy display synced lyrics live.</li>
 <li><strong>Album cover art in the TUI</strong> — small thumbnail in the now-playing header. Tried once with <code>textual-image</code> (Unicode halfblock fallback was too low-res); a <code>chafa</code> subprocess approach would give crisp output but adds a <code>brew install chafa</code> system dep. Deferred until the cost/benefit is clearer.</li>
 </ul>
 <h2 id="tier-2-bigger-directions-3-5-sessions">Tier 2 — bigger directions (~3-5 sessions)<a class="headerlink" href="#tier-2-bigger-directions-3-5-sessions" title="Permanent link">&para;</a></h2>
@@ -916,6 +915,8 @@
 <li><strong>systemd / launchd plist</strong> — for users wanting <code>serve</code> to autostart on boot.</li>
 <li><strong>MQTT / webhook scrobble forwarding</strong> — push play events to Home Assistant / Last.fm / external systems.</li>
 <li><strong>Bigger <code>getCoverArt</code> cache</strong> — currently it's recomputed per request; an LRU keyed on <code>(album_id, size)</code> would help on slow disks.</li>
+<li><strong>Offline browse cache for Subsonic-client mode</strong> — when the TUI is connected, serialise <code>getArtists</code> / <code>getAlbumList</code> / <code>getAlbum</code> responses into a per-server SQLite. On reconnect with a missing server, hydrate the browse panes from cache so you can navigate offline (playback still requires the live server).</li>
+<li><strong>Scrobble forwarder</strong> — <code>/scrobble</code> is a no-op stub today. A configurable webhook + MQTT bridge would push play events to Home Assistant / Last.fm / external scrobble services without dragging in a full scrobble database.</li>
 <li><strong>TUI <code>/</code>-bar filter on top of FTS5</strong> — <code>/search3</code> is FTS5-backed (see Done); the TUI's incremental <code>/</code> filter is still in-memory casefold substring. Wiring it through the same in-memory FTS5 index would give ranked / prefix-matching results in the TUI.</li>
 </ul>
 <h2 id="tier-4-convert-pipeline-polish">Tier 4 — convert-pipeline polish<a class="headerlink" href="#tier-4-convert-pipeline-polish" title="Permanent link">&para;</a></h2>
@@ -972,6 +973,7 @@
 <li>TUI Mixes browser entry — saved <code>.m3u8</code> files appear in the right pane; selecting one resolves paths against the live index and plays it as a virtual album with stale-path graceful degradation</li>
 <li>Persistent stars / favourites — Subsonic clients' heart buttons are now real. <code>/star</code>, <code>/unstar</code>, <code>/getStarred</code>, <code>/getStarred2</code> backed by <code>&lt;root&gt;/.musickit/stars.toml</code> (TOML, hand-editable, survives index rebuilds).</li>
 <li>FTS5 search backend — <code>/search3</code> and <code>/search2</code> use an in-memory SQLite FTS5 index built fresh on every cache reindex. Sub-ms ranked results with prefix matching (<code>bey</code> matches <code>Beyoncé</code>), diacritic folding (<code>unicode61 remove_diacritics 2</code>), bm25 ordering, and multi-token AND across title + album_artist + year body text. Falls back to casefolded substring scan when SQLite was compiled without FTS5.</li>
+<li>Lyrics via LRCLIB — <code>musickit library lyrics fetch &lt;DIR&gt;</code> populates <code>&lt;track&gt;.lrc</code> sidecars from <a href="https://lrclib.net">lrclib.net</a> (free, no API key). Sidecars take precedence over embedded <code>\xa9lyr</code> / <code>USLT</code> / <code>LYRICS</code> tags on the next library scan, so user edits stick. The server's <code>getLyricsBySongId</code> parses LRC bodies and emits <code>synced: true</code> with per-line millisecond offsets — Symfonium / Amperfy display the highlight live. The TUI gains an <code>l</code> keybind that swaps the visualizer for a lyrics pane, with the active line bolded as playback advances.</li>
 </ul>
 
 

@@ -711,6 +711,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#lyrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lyrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#persistent-stars-since-v070" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1127,6 +1138,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#lyrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lyrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#persistent-stars-since-v070" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1245,7 +1267,7 @@
 </code></pre></div>
 <p><code>TARGET_DIR</code> is required. <code>--host 0.0.0.0</code>, <code>--port 4533</code>, credentials default to <code>admin</code>/<code>admin</code> with a yellow warning. <code>--no-cache</code> skips the persistent SQLite index at <code>&lt;TARGET_DIR&gt;/.musickit/index.db</code>; <code>--full-rescan</code> rebuilds it from scratch on startup. See <a href="../library/#index-manage-the-persistent-sqlite-cache"><code>musickit library index</code></a> for index management.</p>
 <h2 id="startup-banner">Startup banner<a class="headerlink" href="#startup-banner" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>musickit serve — Subsonic API for /Volumes/T9/Output
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>musickit serve — Subsonic API for ~/Music
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  bind: 0.0.0.0:4533
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  LAN:  http://192.168.1.42:4533
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  Tailscale: http://my-mac.tail-scale.ts.net:4533
@@ -1255,7 +1277,7 @@
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  142 artists, 318 albums, 4521 tracks
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  mDNS: advertising as musickit-mlaptop._subsonic._tcp.local
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  watching /Volumes/T9/Output for changes (auto-rescan on add/remove/rename)
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  watching ~/Music for changes (auto-rescan on add/remove/rename)
 </code></pre></div>
 <p>The banner gives you everything you need to point a client at the right URL, and tells you which auto-features are active (mDNS + filesystem watcher).</p>
 <h2 id="why-host-0000-is-the-default">Why <code>--host 0.0.0.0</code> is the default<a class="headerlink" href="#why-host-0000-is-the-default" title="Permanent link">&para;</a></h2>
@@ -1503,6 +1525,26 @@
 </tr>
 </tbody>
 </table>
+<h3 id="lyrics">Lyrics<a class="headerlink" href="#lyrics" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>getLyrics?artist=&amp;title=</code></td>
+<td>Legacy fuzzy lookup. Returns <code>{artist, title, value}</code>; empty value when no match (per spec — clients show "no lyrics available").</td>
+</tr>
+<tr>
+<td><code>getLyricsBySongId?id=</code></td>
+<td>OpenSubsonic structured shape. When the stored body looks like LRC (<code>[mm:ss.xx]</code> markers), promotes to <code>synced: true</code> with <code>[{start: ms, value: line}, ...]</code> — Symfonium and Amperfy display the highlight tracking real time. Otherwise returns <code>synced: false</code> with one line per text line.</td>
+</tr>
+</tbody>
+</table>
+<p>Lyrics are sourced from a <code>&lt;track&gt;.lrc</code> sidecar (preferred) or the file's embedded <code>\xa9lyr</code> / <code>USLT</code> / <code>LYRICS</code> tag. Populate sidecars in bulk with <a href="../library/#lyrics--fetch-synced-lyrics-from-lrclib"><code>musickit library lyrics fetch</code></a> — pulls from LRCLIB, writes per-track <code>.lrc</code> files. Synced lyrics light up automatically the next time the server's index gets reloaded.</p>
 <h3 id="persistent-stars-since-v070">Persistent stars (since v0.7.0)<a class="headerlink" href="#persistent-stars-since-v070" title="Permanent link">&para;</a></h3>
 <p>Heart / star buttons in Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) are now real — toggling one persists in <code>&lt;root&gt;/.musickit/stars.toml</code> and survives server restarts, schema bumps, and <code>library index drop</code>. The file is plain TOML, hand-editable:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[items]</span>

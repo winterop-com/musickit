@@ -555,6 +555,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#lyrics-fetch-synced-lyrics-from-lrclib" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lyrics — fetch synced lyrics from LRCLIB
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#index-manage-the-persistent-sqlite-cache" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -940,6 +951,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#lyrics-fetch-synced-lyrics-from-lrclib" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lyrics — fetch synced lyrics from LRCLIB
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#index-manage-the-persistent-sqlite-cache" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1148,13 +1170,21 @@
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>retag<span class="w"> </span>path/to/album<span class="w"> </span>--genre<span class="w"> </span><span class="s1">&#39;&#39;</span>
 </code></pre></div>
 <p><code>--rename</code> renames <code>DIR</code> to <code>YYYY - Album</code> based on the post-update tags after the retag completes.</p>
+<h2 id="lyrics-fetch-synced-lyrics-from-lrclib"><code>lyrics</code> — fetch synced lyrics from LRCLIB<a class="headerlink" href="#lyrics-fetch-synced-lyrics-from-lrclib" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>lyrics<span class="w"> </span>fetch<span class="w"> </span>DIR<span class="w">                  </span><span class="c1"># populate missing sidecars</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>lyrics<span class="w"> </span>fetch<span class="w"> </span>DIR<span class="w"> </span>--dry-run<span class="w">        </span><span class="c1"># show intent without hitting the network</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>lyrics<span class="w"> </span>fetch<span class="w"> </span>DIR<span class="w"> </span>--all<span class="w">            </span><span class="c1"># re-fetch every track (use sparingly)</span>
+</code></pre></div>
+<p>For each track without lyrics — no embedded <code>\xa9lyr</code> / <code>USLT</code> / <code>LYRICS</code> tag and no existing <code>&lt;track&gt;.lrc</code> sidecar — query <a href="https://lrclib.net">LRCLIB</a> (free, no API key) and, on a hit, write the result as <code>&lt;track&gt;.flac.lrc</code> (or whatever the audio suffix is). Synced bodies (<code>syncedLyrics</code> field) are preferred over plain when LRCLIB returns both.</p>
+<p>Sidecars take precedence over embedded tags on the next library scan, so user-edited <code>.lrc</code> files survive rescans untouched. The TUI's <code>l</code> keybind and the server's <code>/getLyricsBySongId</code> both pick up the populated lyrics automatically — synced bodies render with a live time-tracked highlight.</p>
+<p>The command exits non-zero if more than 10% of attempted fetches raise transport errors (HTTP 5xx, timeout, malformed JSON) — early signal of a network outage or LRCLIB API change. 404s ("no match in LRCLIB for this track") do not count toward the failure rate; common for live recordings, deep cuts, and non-English tracks.</p>
 <h2 id="index-manage-the-persistent-sqlite-cache"><code>index</code> — manage the persistent SQLite cache<a class="headerlink" href="#index-manage-the-persistent-sqlite-cache" title="Permanent link">&para;</a></h2>
 <p>The first scan of any library writes a SQLite cache at <code>&lt;DIR&gt;/.musickit/index.db</code>. On every subsequent launch — <code>library</code>, <code>tui</code>, or <code>serve</code> — the in-memory <code>LibraryIndex</code> is hydrated from rows instead of re-reading every audio file's tags. A delta-validate pass then reconciles the DB against any filesystem changes that happened since the last run (added albums, removed albums, tag edits applied with another tool).</p>
 <p>The DB is fully derived from the filesystem, so it's always safe to delete.</p>
 <h3 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>status<span class="w">  </span>DIR<span class="w">     </span><span class="c1"># schema version, library_root_abs, row counts, DB size</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>drop<span class="w">    </span>DIR<span class="w">     </span><span class="c1"># delete &lt;DIR&gt;/.musickit/</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>rebuild<span class="w"> </span>DIR<span class="w">     </span><span class="c1"># wipe + rebuild from scratch</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>status<span class="w">  </span>DIR<span class="w">     </span><span class="c1"># schema version, library_root_abs, row counts, DB size</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>drop<span class="w">    </span>DIR<span class="w">     </span><span class="c1"># delete &lt;DIR&gt;/.musickit/</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>library<span class="w"> </span>index<span class="w"> </span>rebuild<span class="w"> </span>DIR<span class="w">     </span><span class="c1"># wipe + rebuild from scratch</span>
 </code></pre></div>
 <p><code>--no-cache</code> (on <code>tree</code> / <code>audit</code> / <code>fix</code> / <code>tui</code> / <code>serve</code>) skips the DB entirely — useful for read-only mounts where <code>&lt;DIR&gt;/.musickit/</code> can't be created. <code>--full-rescan</code> (on the same set) rebuilds the index from scratch on this run. <code>cover-pick</code> uses the existing in-memory scan and doesn't expose either flag.</p>
 <h3 id="schema">Schema<a class="headerlink" href="#schema" title="Permanent link">&para;</a></h3>
