@@ -267,6 +267,19 @@
     if (rafId !== null) resize();
   });
 
+  // CSS-driven size changes (the height: 0 → 64px transition when
+  // viz-idle clears, the flex: 1 in fullscreen mode) don't fire the
+  // window resize event, so the canvas's backing store stays stuck
+  // at the initial 0x0 measurement and bars draw into nothing. A
+  // ResizeObserver on the canvas itself fires for those layout
+  // changes and re-syncs the backing store to the new CSS box.
+  if (typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(function () {
+      resize();
+    });
+    ro.observe(canvas);
+  }
+
   // First sizing pass on load — even before audio starts, so the
   // canvas backing store matches its CSS box.
   resize();
