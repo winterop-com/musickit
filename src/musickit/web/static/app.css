@@ -533,20 +533,21 @@ button:focus-visible {
 /* ---------------------------------------------------------------------- */
 
 .visualizer-canvas {
-  position: fixed;
-  top: 56px; /* under the topbar */
-  left: 0;
-  right: 0;
-  bottom: 86px; /* above the now-playing footer */
+  /* Always visible — small strip above the now-playing footer.
+     Press `f` to expand to fullscreen (replaces the three-pane). */
+  display: block;
   width: 100%;
-  height: calc(100vh - 56px - 86px);
-  background: var(--bg);
-  display: none;
-  z-index: 4;
+  height: 64px;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 body.is-viz .visualizer-canvas {
-  display: block;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  background: var(--bg);
 }
 
 body.is-viz .three-pane {
@@ -554,8 +555,7 @@ body.is-viz .three-pane {
 }
 
 body.is-viz .lyrics-panel {
-  /* Lyrics + visualizer are mutually exclusive — the visualizer fills
-     the space lyrics would have used. */
+  /* Lyrics + fullscreen visualizer are mutually exclusive. */
   transform: translateX(100%);
 }
 

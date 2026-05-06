@@ -1,25 +1,23 @@
 // musickit web UI — Web Audio + Canvas FFT visualizer.
 //
-// Loaded after app.js. Self-contained — only touches the global <audio>
-// element + its own canvas. Toggled via `f` keybind or the visualizer
-// button in the now-playing footer.
+// Always-visible small canvas above the now-playing footer (~64px).
+// Press `f` (or click the ▦ button) to expand to fullscreen, replacing
+// the three-pane browse area; press `f` again or Esc to shrink.
 //
 // Architecture:
-//   - Lazy-init: create AudioContext + MediaElementAudioSourceNode +
-//     AnalyserNode on the FIRST toggle. createMediaElementSource can
-//     only be called once per <audio> element, so we cache the wired
-//     graph and reuse it forever after.
-//   - Render loop runs only while the canvas is visible. Toggling off
-//     cancels the rAF; toggling back on restarts it. The AudioContext
-//     keeps running either way (Chrome resumes it on the user click).
+//   - Lazy-init AudioContext + MediaElementAudioSourceNode +
+//     AnalyserNode on the FIRST `audio.play` event. createMediaElement
+//     Source can only be called once per <audio> element, and Chrome
+//     blocks AudioContext until a user gesture — playing a track is
+//     itself the user gesture, so this works without extra prompting.
+//   - Once the graph exists, the rAF loop runs continuously: while
+//     audio plays, bars track the FFT; while paused, bars decay
+//     smoothly to zero. Toggling fullscreen just resizes the canvas.
 //   - 48 log-spaced bands from 30Hz to 16kHz. Each band averages the
 //     FFT bins that fall in its [lo, hi) range. dB → linear via
 //     `(db + 90) / 90`, clipped to [0, 1].
-//   - Visual decay: each frame we lerp toward the target level — fast
-//     attack, slow release — so loud transients pop while sustained
-//     tones don't shimmer at 60fps.
-//   - Color gradient: top of the bar is red, middle yellow, bottom
-//     green — same as the TUI.
+//   - Asymmetric attack/release smoothing — fast attack so transients
+//     pop, slow release so sustained tones don't shimmer at 60fps.
 
 (function () {
   "use strict";
@@ -28,9 +26,9 @@
   const FREQ_LO = 30;
   const FREQ_HI = 16000;
   const FFT_SIZE = 2048;
-  const ATTACK = 0.45; // weight on the new value when level rises
-  const RELEASE = 0.12; // weight on the new value when level falls
-  const PAUSE_DECAY = 0.92; // per-frame multiplier when nothing's playing
+  const ATTACK = 0.45;
+  const RELEASE = 0.12;
+  const PAUSE_DECAY = 0.92;
   const DB_FLOOR = -90;
   const DB_RANGE = 90;
 
@@ -43,33 +41,39 @@
   let audioCtx = null;
   let analyser = null;
   let freqData = null;
-  let bandTargets = new Float32Array(N_BANDS);
-  let bandLevels = new Float32Array(N_BANDS);
+  const bandTargets = new Float32Array(N_BANDS);
+  const bandLevels = new Float32Array(N_BANDS);
   let bandLoBin = null;
   let bandHiBin = null;
   let rafId = null;
 
   function ensureAudioGraph() {
-    if (audioCtx) return;
+    if (audioCtx) return true;
     const Ctor = window.AudioContext || window.webkitAudioContext;
     if (!Ctor) {
       console.warn("Web Audio API not supported; visualizer disabled.");
-      return;
+      return false;
     }
-    audioCtx = new Ctor();
-    const source = audioCtx.createMediaElementSource(audio);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = FFT_SIZE;
-    analyser.smoothingTimeConstant = 0.0; // we apply our own attack/release
-    source.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    freqData = new Float32Array(analyser.frequencyBinCount);
-    computeBandRanges(audioCtx.sampleRate);
+    try {
+      audioCtx = new Ctor();
+      const source = audioCtx.createMediaElementSource(audio);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = FFT_SIZE;
+      analyser.smoothingTimeConstant = 0.0; // we apply our own attack/release
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      freqData = new Float32Array(analyser.frequencyBinCount);
+      computeBandRanges(audioCtx.sampleRate);
+      return true;
+    } catch (err) {
+      console.warn("visualizer init failed:", err);
+      audioCtx = null;
+      analyser = null;
+      return false;
+    }
   }
 
   function computeBandRanges(sampleRate) {
-    // FFT bin i covers frequency `i * sampleRate / fftSize`. Build per-band
-    // [lo, hi] bin indices in log-spaced frequency.
     bandLoBin = new Int32Array(N_BANDS);
     bandHiBin = new Int32Array(N_BANDS);
     const binHz = sampleRate / FFT_SIZE;
@@ -94,7 +98,6 @@
       const lo = bandLoBin[i];
       const hi = bandHiBin[i];
       for (let b = lo; b < hi; b++) {
-        // freqData[b] is in dB, range roughly [-100, 0].
         sum += freqData[b];
         count++;
       }
@@ -105,7 +108,7 @@
   }
 
   function applyDecay() {
-    const playing = !audio.paused && !audio.ended && state_isAudible();
+    const playing = !audio.paused && !audio.ended;
     for (let i = 0; i < N_BANDS; i++) {
       if (playing) {
         const target = bandTargets[i];
@@ -120,14 +123,6 @@
     }
   }
 
-  // Cheap "are we actually decoding audio" probe — `audio.paused` is
-  // false during a buffering pause too. We don't have a great signal
-  // for "PortAudio just consumed bytes" in the browser, so this stays
-  // as a paused-flag check; works fine for the common case.
-  function state_isAudible() {
-    return !audio.paused;
-  }
-
   function resize() {
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
@@ -139,6 +134,7 @@
   function draw() {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
+    if (w === 0 || h === 0) return; // not laid out yet
     ctx2d.clearRect(0, 0, w, h);
 
     const gap = 2;
@@ -151,29 +147,30 @@
       const barHeight = level * h;
       const x = i * (barWidth + gap);
       const y = h - barHeight;
-
-      // Vertical gradient per-bar so each band fades from green (bottom)
-      // through yellow (mid) to red (peak) — VU style. Building one
-      // gradient per bar is expensive at 60fps, so we cache by quantized
-      // height bucket; small enough that the cache is microseconds and
-      // big enough that visual banding is invisible.
       const grad = gradientForHeight(barHeight, h);
       ctx2d.fillStyle = grad;
       ctx2d.fillRect(x, y, barWidth, barHeight);
     }
   }
 
-  // Cheap per-height gradient cache. Keyed on the bucket so frame-to-frame
-  // small-amplitude wiggle doesn't churn through createLinearGradient.
-  const gradCache = new Map();
+  // Per-height gradient cache. Keyed on quantized height bucket so
+  // small frame-to-frame amplitude wiggle doesn't churn through
+  // createLinearGradient at 60fps. Cleared on resize.
+  let gradCache = new Map();
+  let gradCacheHeight = 0;
+
   function gradientForHeight(barHeight, fullHeight) {
+    if (gradCacheHeight !== fullHeight) {
+      gradCache = new Map();
+      gradCacheHeight = fullHeight;
+    }
     const bucket = Math.round((barHeight / fullHeight) * 64);
     let g = gradCache.get(bucket);
     if (!g) {
       g = ctx2d.createLinearGradient(0, fullHeight - barHeight, 0, fullHeight);
-      g.addColorStop(0, "#f7768e");   // peak (red)
+      g.addColorStop(0, "#f7768e"); // peak (red)
       g.addColorStop(0.45, "#e0af68"); // mid (amber)
-      g.addColorStop(1, "#9ece6a");   // base (green)
+      g.addColorStop(1, "#9ece6a"); // base (green)
       gradCache.set(bucket, g);
     }
     return g;
@@ -186,50 +183,49 @@
     rafId = requestAnimationFrame(loop);
   }
 
-  function show() {
-    ensureAudioGraph();
-    if (!analyser) return; // Web Audio unavailable
+  function startLoop() {
+    if (rafId !== null) return;
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function toggleFullscreen() {
+    document.body.classList.toggle("is-viz");
+    // Layout changed — re-measure on the next frame so width/height
+    // reflect the new size.
+    requestAnimationFrame(resize);
+  }
+
+  // Lazy-init on first play. The autoplay policy in Chrome blocks
+  // AudioContext until a user gesture; clicking a track to play
+  // counts, so this is the right hook.
+  audio.addEventListener("play", function () {
+    if (!ensureAudioGraph()) return;
     if (audioCtx.state === "suspended") {
       audioCtx.resume().catch(() => {});
     }
-    document.body.classList.add("is-viz");
     resize();
-    if (rafId === null) {
-      rafId = requestAnimationFrame(loop);
-    }
-  }
+    startLoop();
+  });
 
-  function hide() {
-    document.body.classList.remove("is-viz");
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
-    // Clear so a re-show doesn't flash the last frame.
-    ctx2d.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-  }
-
-  function toggle() {
-    if (document.body.classList.contains("is-viz")) hide();
-    else show();
-  }
-
-  toggleButton.addEventListener("click", toggle);
+  toggleButton.addEventListener("click", toggleFullscreen);
 
   document.addEventListener("keydown", function (event) {
     const tag = (event.target && event.target.tagName) || "";
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     if (event.key === "f" || event.key === "F") {
       event.preventDefault();
-      toggle();
+      toggleFullscreen();
     } else if (event.key === "Escape" && document.body.classList.contains("is-viz")) {
-      hide();
+      document.body.classList.remove("is-viz");
+      requestAnimationFrame(resize);
     }
   });
 
   window.addEventListener("resize", function () {
-    if (document.body.classList.contains("is-viz")) {
-      resize();
-    }
+    if (rafId !== null) resize();
   });
+
+  // First sizing pass on load — even before audio starts, so the
+  // canvas backing store matches its CSS box.
+  resize();
 })();

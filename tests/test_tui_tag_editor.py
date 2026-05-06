@@ -195,13 +195,24 @@ async def test_e_opens_album_editor_from_browser_before_playback(silent_flac_tem
 
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
-        # Drill into the artist so the browser shows an album row.
+        # Wait for the library scan + browser populate. A single pause()
+        # is enough on macOS but flakes on Linux CI where scan timing
+        # differs; poll for an artist row instead.
         browser = pilot.app.query_one(BrowserList)
+        for _ in range(50):
+            if any(getattr(c, "entry_kind", None) == "artist" for c in browser.children):
+                break
+            await pilot.pause(0.05)
+        # Drill into the artist so the browser shows an album row.
         a = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
         pilot.app._handle_browser_selection(a)  # type: ignore[attr-defined]
         await pilot.pause()
         # Highlight the album row + focus the browser.
         browser.focus()
+        for _ in range(50):
+            if any(getattr(c, "entry_kind", None) == "album" for c in browser.children):
+                break
+            await pilot.pause(0.05)
         album_idx = next(i for i, c in enumerate(browser.children) if getattr(c, "entry_kind", None) == "album")
         browser.index = album_idx
         await pilot.pause()
