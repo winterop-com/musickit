@@ -19,7 +19,6 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from musickit import convert as convert_mod
 from musickit.tui.audio_engine import AudioEngine, SharedState
 from musickit.tui.audio_proto import (
     SAMPLE_RATE,
@@ -31,13 +30,9 @@ from musickit.tui.audio_proto import (
     PlayPayload,
 )
 
-
-@pytest.fixture
-def silent_m4a(silent_flac_template: Path, tmp_path: Path) -> Path:
-    """A short silent .m4a track produced by the existing convert helper."""
-    dst = tmp_path / "silent.m4a"
-    convert_mod.to_alac(silent_flac_template, dst)
-    return dst
+# `silent_m4a` is provided session-scoped via tests/conftest.py so a single
+# convert-to-alac call serves every audio test in the run; PyAV segfaulted
+# when multiple test files re-converted the same template in one session.
 
 
 # ---------------------------------------------------------------------------
