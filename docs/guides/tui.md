@@ -57,7 +57,7 @@ Fullscreen visualizer (`f`):
 | `l` | Show / hide synced lyrics pane (replaces the visualizer) |
 | `g` | Generate a 60-min mix anchored to the highlighted track |
 | `/` | Filter the focused pane (artists / albums / tracks) |
-| `e` | Edit tags — track-level on track list, album-wide on album row |
+| `e` | Edit tags — track-level on track list, album-wide on album row. Album-wide edits to Album / Album Artist / Year also move the on-disk folder to match. |
 | `Tab` | Cycle focus across browser / track list |
 | `Backspace` | Browser: go up one level |
 | `Ctrl+R` / `F5` | Rescan library (delta-validate against filesystem) |

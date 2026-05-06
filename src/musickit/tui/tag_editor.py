@@ -297,7 +297,8 @@ class AlbumTagEditorScreen(ModalScreen[None]):
         self.query_one("#f-album", Input).focus()
 
     def action_save(self) -> None:
-        """Validate, write to every track, patch the in-memory album."""
+        """Validate, write to every track, patch the in-memory album, rename folder if needed."""
+        from musickit.library import RenameError, rename_album_to_match_tags
         from musickit.metadata import apply_tag_overrides
 
         try:
@@ -320,7 +321,23 @@ class AlbumTagEditorScreen(ModalScreen[None]):
             self._set_status(f"[red]{n} file(s) failed (e.g. {first_name}: {first_err})[/]")
             return
         self._patch_album_in_memory(overrides)
-        self._app_ref.notify_album_tags_updated(self._album)
+
+        # Album / album_artist / year changes warrant a folder rename so
+        # the on-disk layout matches the tags. Year-only is borderline
+        # (the convention is `YYYY - Title`) — included for consistency
+        # with the convert pipeline. Genre never affects the path.
+        rename_result = None
+        triggers = (overrides.album, overrides.album_artist, overrides.year)
+        if self._app_ref.library_root is not None and any(t is not None for t in triggers):
+            try:
+                rename_result = rename_album_to_match_tags(self._album, self._app_ref.library_root)
+            except RenameError as exc:
+                self._set_status(f"[yellow]tags saved but rename failed: {exc}[/]")
+                # Stay in the modal so the user sees the warning; let them
+                # press Esc to dismiss when ready.
+                return
+
+        self._app_ref.notify_album_tags_updated(self._album, rename_result=rename_result)
         self.dismiss(None)
 
     def _build_overrides(self) -> TagOverrides:
