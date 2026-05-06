@@ -771,6 +771,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scrobble-forwarder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scrobble forwarder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#mdns-bonjour" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1198,6 +1209,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#scrobble-forwarder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scrobble forwarder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#mdns-bonjour" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1501,7 +1523,7 @@
 <tbody>
 <tr>
 <td><code>scrobble</code></td>
-<td>Accept + discard</td>
+<td>Forward play events to webhook + MQTT (see <a href="#scrobble-forwarder">Scrobble forwarder</a>) — or accept-and-discard when nothing is configured.</td>
 </tr>
 <tr>
 <td><code>getArtistInfo</code> / <code>getArtistInfo2</code></td>
@@ -1570,11 +1592,50 @@
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span>
 </code></pre></div>
 <p>Override per-run via <code>--user</code> / <code>--password</code>. CLI flags win over the TOML.</p>
+<h2 id="scrobble-forwarder">Scrobble forwarder<a class="headerlink" href="#scrobble-forwarder" title="Permanent link">&para;</a></h2>
+<p>Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) call <code>/scrobble</code> after every track. By default that's a no-op. Add a <code>[scrobble.webhook]</code> and/or <code>[scrobble.mqtt]</code> block to forward each play event:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># ~/.config/musickit/serve.toml</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[scrobble.webhook]</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://my-bridge.example.com/play&quot;</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shh&quot;</span><span class="w">          </span><span class="c1"># optional — sent as `X-Musickit-Secret` header</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">timeout_s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">5.0</span><span class="w">         </span><span class="c1"># optional — defaults to 5s</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="k">[scrobble.mqtt]</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">broker</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mqtt://homeassistant.local:1883&quot;</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">topic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit/scrobble&quot;</span><span class="w">   </span><span class="c1"># default shown</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="w">          </span><span class="c1"># optional</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span><span class="w">       </span><span class="c1"># optional</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="n">client_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="w">          </span><span class="c1"># optional</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="c1"># Optional: forward `submission=false` (&quot;now playing&quot;) probes too.</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="c1"># Default false — Home Assistant &quot;currently playing&quot; automations want true.</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="n">include_now_playing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+</code></pre></div>
+<p>Each event is JSON like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&quot;user&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">&quot;track_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tr_abc123&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Levitating&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">&quot;artist&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Dua Lipa&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">&quot;album&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Future Nostalgia&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nt">&quot;duration_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">203.0</span><span class="p">,</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span><span class="nt">&quot;played_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-05-06T18:42:11Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="nt">&quot;submission&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="p">}</span>
+</code></pre></div>
+<p>Forwarding is fire-and-forget on a small thread pool; webhook + MQTT failures are logged at WARNING and swallowed so a dead bridge never 500s the client's <code>/scrobble</code> request. MQTT is optional — the dispatcher lazy-imports <code>paho-mqtt</code>; missing the dep just disables the MQTT half.</p>
+<p>Common destinations:</p>
+<ul>
+<li><strong>Home Assistant</strong> — subscribe to the MQTT topic, build "what's playing" cards / automations.</li>
+<li><strong>Last.fm</strong> — POST the JSON to a small bridge that translates to the <a href="https://www.last.fm/api/show/track.scrobble">Last.fm Scrobble API</a>.</li>
+<li><strong>ListenBrainz</strong> — same shape; MetaBrainz documents the API at <a href="https://listenbrainz.org/profile/">listenbrainz.org/profile</a>.</li>
+<li><strong>Custom analytics</strong> — POST into Postgres / SQLite / Google Sheets via Zapier / n8n / etc.</li>
+</ul>
 <h2 id="mdns-bonjour">mDNS / Bonjour<a class="headerlink" href="#mdns-bonjour" title="Permanent link">&para;</a></h2>
 <p>Default-on: <code>serve</code> advertises <code>_subsonic._tcp.local</code> so Symfonium / Amperfy / Feishin auto-list the server in their setup screens without anyone typing the URL. Same service type Navidrome uses, so existing client ecosystems pick it up automatically.</p>
 <p>The <code>musickit tui</code> itself can also discover servers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                  </span><span class="c1"># list and exit</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w">                             </span><span class="c1"># quick browse + show hint</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                  </span><span class="c1"># list and exit</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w">                             </span><span class="c1"># quick browse + show hint</span>
 </code></pre></div>
 <p><code>--no-mdns</code> opts out.</p>
 <p>Tailscale users still need to type the tailnet URL once — mDNS doesn't traverse the WireGuard tunnel.</p>
@@ -1596,26 +1657,26 @@
 </ul>
 <p>Subprocess invocation: <code>ffmpeg -i &lt;path&gt; -vn -c:a libmp3lame -b:a Nk -f mp3 -</code>. The <code>-vn</code> drops the embedded picture stream. The async generator pumps 64 KiB chunks; on client disconnect a <code>finally</code> block kills the subprocess so it doesn't pin a CPU.</p>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>src/musickit/serve/
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  app.py             FastAPI factory + envelope helpers + auth dep + middleware
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>  auth.py            plain / enc: / token verification
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  config.py          serve.toml loader + admin/admin defaults
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  ids.py             sha1[:16] of artist_dir / album path / track path
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  index.py           IndexCache with reverse-lookup dicts
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  payloads.py        Subsonic dict builders shared across endpoints
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  covers.py          Sidecar-first cover loader + Pillow resize
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  xml.py             JSON → Subsonic XML converter
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>  discovery.py       mDNS register / unregister
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  watcher.py         watchdog-backed filesystem watcher
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>  endpoints/
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    system.py        ping / getLicense / getMusicFolders
-<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    browsing.py      getArtists / getArtist / getAlbum / getAlbumList2 / getSong / getIndexes
-<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    search.py        search3 / search2
-<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    media.py         stream / download / getCoverArt
-<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    scan.py          startScan / getScanStatus
-<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    extras.py        scrobble / getArtistInfo / getMusicDirectory / getRandomSongs /
-<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>                     getStarred / star / unstar / getPlaylists / getUser / getUsers /
-<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>                     getOpenSubsonicExtensions / getGenres
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>src/musickit/serve/
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  app.py             FastAPI factory + envelope helpers + auth dep + middleware
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  auth.py            plain / enc: / token verification
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>  config.py          serve.toml loader + admin/admin defaults
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  ids.py             sha1[:16] of artist_dir / album path / track path
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>  index.py           IndexCache with reverse-lookup dicts
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>  payloads.py        Subsonic dict builders shared across endpoints
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>  covers.py          Sidecar-first cover loader + Pillow resize
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>  xml.py             JSON → Subsonic XML converter
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>  discovery.py       mDNS register / unregister
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>  watcher.py         watchdog-backed filesystem watcher
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>  endpoints/
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    system.py        ping / getLicense / getMusicFolders
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>    browsing.py      getArtists / getArtist / getAlbum / getAlbumList2 / getSong / getIndexes
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>    search.py        search3 / search2
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>    media.py         stream / download / getCoverArt
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>    scan.py          startScan / getScanStatus
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>    extras.py        scrobble / getArtistInfo / getMusicDirectory / getRandomSongs /
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>                     getStarred / star / unstar / getPlaylists / getUser / getUsers /
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>                     getOpenSubsonicExtensions / getGenres
 </code></pre></div>
 <p>The cache is built at startup (synchronously, blocking the CLI before <code>uvicorn.run</code>) so the first client request hits a populated index. Background rescans (manual via <code>/rest/startScan</code> or automatic via the filesystem watcher) reuse the same <code>IndexCache.start_background_rescan()</code> path.</p>
 
