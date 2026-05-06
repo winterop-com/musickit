@@ -49,3 +49,27 @@ def test_matches_accented_needle_matches_stripped_haystack() -> None:
     """A user typing the accented form still finds the unaccented tag."""
     assert matches("Rós", "Sigur Ros")
     assert matches("González", "Jose Gonzalez")
+
+
+def test_matches_multi_token_and_finds_non_adjacent_words() -> None:
+    """Each whitespace-split token is its own substring; word order + adjacency don't matter."""
+    assert matches("daft homework", "Daft Punk - Homework")
+    assert matches("homework daft", "Daft Punk - Homework")
+    assert matches("punk home", "Daft Punk - Homework")
+
+
+def test_matches_multi_token_requires_every_token() -> None:
+    """If any token is missing, the whole match fails."""
+    assert not matches("daft music", "Daft Punk - Homework")
+    assert not matches("homework metallica", "Daft Punk - Homework")
+
+
+def test_matches_multi_token_works_with_diacritics() -> None:
+    """Multi-token AND composes with diacritic folding."""
+    assert matches("sigur takk", "Sigur Rós - Takk...")
+    assert matches("beyonce halo", "Beyoncé - Halo")
+
+
+def test_matches_whitespace_only_needle_passes_through() -> None:
+    """`"   "` is treated as no-filter — same as empty string."""
+    assert matches("   ", "anything")

@@ -18,6 +18,7 @@ from pathlib import Path
 from musickit import library as library_mod
 from musickit.library.models import LibraryAlbum, LibraryIndex, LibraryTrack
 from musickit.serve import search_index
+from musickit.serve.cover_cache import CoverCache
 from musickit.serve.ids import album_id, artist_id, track_id
 
 
@@ -38,6 +39,10 @@ class IndexCache:
         # when SQLite was compiled without FTS5 (search falls back to the
         # original substring scan).
         self.fts: sqlite3.Connection | None = None
+        # `getCoverArt` LRU. Bounded by total bytes (~64 MiB) so a browse
+        # of N albums + a request burst from a mobile client doesn't pay
+        # the sidecar read + Pillow resize on every row twice.
+        self.cover_cache: CoverCache = CoverCache()
         self.scan_in_progress: bool = False
         # `_scan_lock` guards `scan_in_progress` flips so two threads can't
         # both think they're the "first" rescan and double-walk the disk.
@@ -137,6 +142,9 @@ class IndexCache:
             except sqlite3.Error:  # pragma: no cover — defensive
                 pass
         self.fts = search_index.build(self)
+        # Drop cached cover bytes — file content / sidecar may have
+        # changed underneath us (e.g. a re-cover-picked album).
+        self.cover_cache.clear()
 
     @property
     def album_count(self) -> int:
