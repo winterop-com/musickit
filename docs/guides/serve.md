@@ -11,7 +11,7 @@ uvx musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [-
 ## Startup banner
 
 ```
-musickit serve — Subsonic API for /Volumes/T9/Output
+musickit serve — Subsonic API for ~/Music
   bind: 0.0.0.0:4533
   LAN:  http://192.168.1.42:4533
   Tailscale: http://my-mac.tail-scale.ts.net:4533
@@ -21,7 +21,7 @@ scanning library…
   142 artists, 318 albums, 4521 tracks
 
   mDNS: advertising as musickit-mlaptop._subsonic._tcp.local
-  watching /Volumes/T9/Output for changes (auto-rescan on add/remove/rename)
+  watching ~/Music for changes (auto-rescan on add/remove/rename)
 ```
 
 The banner gives you everything you need to point a client at the right URL, and tells you which auto-features are active (mDNS + filesystem watcher).

@@ -5,8 +5,8 @@ Auto-generated `.m3u8` playlists anchored to a seed track. Tag-based similarity 
 ## Quick start
 
 ```bash
-uvx musickit playlist gen /Volumes/T9/Music \
-    --seed "/Volumes/T9/Music/Pixies/1989 - Doolittle/01 - Debaser.m4a" \
+uvx musickit playlist gen ~/Music \
+    --seed "~/Music/Pixies/1989 - Doolittle/01 - Debaser.m4a" \
     --minutes 60
 ```
 
@@ -14,7 +14,7 @@ Output:
 
 ```
 Generated Mix - Pixies - Debaser (24 tracks, 61.2 min / target 60 min)
-→ /Volumes/T9/Music/.musickit/playlists/mix-pixies-debaser.m3u8
+→ ~/Music/.musickit/playlists/mix-pixies-debaser.m3u8
 ```
 
 The generated `.m3u8` is a plain extended M3U with `#EXTINF` lines, so VLC, mpv, every Subsonic client, and the musickit TUI all open it directly.
@@ -42,7 +42,7 @@ musickit playlist show ROOT NAME
 ### `list` — show saved mixes
 
 ```bash
-uvx musickit playlist list /Volumes/T9/Music
+uvx musickit playlist list ~/Music
 ```
 
 Renders a table of every `.m3u8` under `<ROOT>/.musickit/playlists/`, with track counts and on-disk paths.
@@ -50,7 +50,7 @@ Renders a table of every `.m3u8` under `<ROOT>/.musickit/playlists/`, with track
 ### `show` — print a saved mix's tracks
 
 ```bash
-uvx musickit playlist show /Volumes/T9/Music mix-pixies-debaser
+uvx musickit playlist show ~/Music mix-pixies-debaser
 ```
 
 Prints the resolved track paths from the `.m3u8` with `[y]` / `[n]` markers showing whether each file still exists on disk. Useful for sanity-checking a saved mix after moving / renaming files.
