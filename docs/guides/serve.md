@@ -147,6 +147,15 @@ These are stubs to keep clients quiet on features we don't track yet. They retur
 | `getPlaylists` / `getPlaylist` | Empty playlist list |
 | `getGenres` | Real! Counts songs + distinct albums per genre. |
 
+### Lyrics
+
+| Endpoint | Returns |
+|---|---|
+| `getLyrics?artist=&title=` | Legacy fuzzy lookup. Returns `{artist, title, value}`; empty value when no match (per spec — clients show "no lyrics available"). |
+| `getLyricsBySongId?id=` | OpenSubsonic structured shape. When the stored body looks like LRC (`[mm:ss.xx]` markers), promotes to `synced: true` with `[{start: ms, value: line}, ...]` — Symfonium and Amperfy display the highlight tracking real time. Otherwise returns `synced: false` with one line per text line. |
+
+Lyrics are sourced from a `<track>.lrc` sidecar (preferred) or the file's embedded `\xa9lyr` / `USLT` / `LYRICS` tag. Populate sidecars in bulk with [`musickit library lyrics fetch`](library.md#lyrics--fetch-synced-lyrics-from-lrclib) — pulls from LRCLIB, writes per-track `.lrc` files. Synced lyrics light up automatically the next time the server's index gets reloaded.
+
 ### Persistent stars (since v0.7.0)
 
 Heart / star buttons in Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) are now real — toggling one persists in `<root>/.musickit/stars.toml` and survives server restarts, schema bumps, and `library index drop`. The file is plain TOML, hand-editable:

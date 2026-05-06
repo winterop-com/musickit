@@ -166,6 +166,28 @@ class SubsonicClient:
         params = {**self._auth_params(), "id": song_id}
         return f"{self.base_url}/rest/stream?{urlencode(params)}"
 
+    def get_lyrics(self, song_id: str) -> tuple[list[dict[str, Any]], bool]:
+        """Fetch structured lyrics via `getLyricsBySongId`.
+
+        Returns `(lines, synced)` where `lines` is the raw OpenSubsonic
+        `line[]` array (each item `{start?: int, value: str}`) and
+        `synced` is True when the server promoted the body. Empty list +
+        False when no lyrics are available; never raises for "no match".
+        """
+        try:
+            body = self._get("getLyricsBySongId", id=song_id)
+        except SubsonicError:
+            return [], False
+        lyrics_list = body.get("lyricsList", {})
+        structured = lyrics_list.get("structuredLyrics") or []
+        if not structured:
+            return [], False
+        first = structured[0]
+        lines_raw = first.get("line", [])
+        lines = [line for line in lines_raw if isinstance(line, dict)]
+        synced = bool(first.get("synced"))
+        return lines, synced
+
     def cover_url(self, item_id: str, *, size: int | None = None) -> str:
         """Build the auth-loaded `/rest/getCoverArt` URL."""
         params: dict[str, str | int] = {**self._auth_params(), "id": item_id}

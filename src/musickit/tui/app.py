@@ -51,6 +51,7 @@ from musickit.tui.widgets import (
     BrowserList,
     FilterInput,
     KeyBar,
+    LyricsPane,
     NowPlayingMeta,
     ProgressLine,
     ScanOverlay,
@@ -116,6 +117,13 @@ class MusickitApp(App[None]):
        tracklist gets all the leftover space. Useful for short albums
        where the meter dominates the screen. */
     Screen.no-viz #visualizer { display: none; }
+    /* `l` toggle: when lyrics are showing, the visualizer steps aside so
+       the lyrics pane has the full right-pane region. The lyrics widget
+       keeps the same height envelope (1fr / max-height: 14) as the
+       visualizer to avoid layout churn. Pressing `l` again hides
+       lyrics; the visualizer comes back unless `v` had also been used. */
+    Screen.show-lyrics #visualizer { display: none; }
+    Screen.fullscreen #lyrics { display: none; }
     /* Scan-in-progress: hide the rest of the body so the centered scan
        overlay is the only thing visible. Avoids the awkward half-empty
        UI behind the scan card. */
@@ -161,6 +169,7 @@ class MusickitApp(App[None]):
         Binding("r", "cycle_repeat", "Repeat mode", show=True),
         Binding("f", "toggle_fullscreen", "Fullscreen viz", show=True),
         Binding("v", "toggle_visualizer", "Show / hide visualizer", show=True),
+        Binding("l", "toggle_lyrics", "Show / hide lyrics", show=True),
         Binding("g", "generate_playlist", "Generate mix from track", show=True),
         Binding("tab", "focus_next", "Focus next pane", show=True),
         Binding("ctrl+left", "tree_narrower", "Sidebar narrower", show=True),
@@ -228,6 +237,11 @@ class MusickitApp(App[None]):
         # focusable widget remains (BrowserList) — surprising for users who
         # were last interacting with the TrackList.
         self._focus_before_fullscreen: Widget | None = None
+        # Lyrics state: parsed lines for the currently-loaded track + a
+        # cache keyed on stable identity (path or stream URL) so we don't
+        # re-parse / re-fetch every tick. None = no track loaded yet.
+        self._lyrics_track_key: str | None = None
+        self._lyrics_subsonic_cache: dict[str, tuple[list, bool]] = {}
 
     def on_resize(self, event: events.Resize) -> None:
         """Schedule a debounced row reflow after the user stops resizing.
@@ -354,6 +368,7 @@ class MusickitApp(App[None]):
                 with Horizontal(id="now-playing-row"):
                     yield NowPlayingMeta(id="meta")
                 yield Visualizer(id="visualizer")
+                yield LyricsPane(id="lyrics")
                 yield ProgressLine(id="progress")
                 yield TrackTableHeader(id="track-header")
                 with VerticalScroll(id="track-scroll", can_focus=False):
@@ -1123,6 +1138,26 @@ class MusickitApp(App[None]):
         else:
             status.album_label = "—"
             status.cursor_label = "0/0"
+        self._tick_lyrics()
+
+    def _tick_lyrics(self) -> None:
+        """Update the lyrics pane's position; reload lines when the track changes.
+
+        Cheap when the pane is hidden — only the active-track key check
+        runs, no rendering. When visible, writes position_ms which the
+        widget watches to re-render with the new highlighted line.
+        """
+        try:
+            pane = self.query_one(LyricsPane)
+        except NoMatches:
+            return
+        if not pane.has_class("visible"):
+            return
+        track = self._currently_playing_track()
+        key = str(track.path) if track is not None else None
+        if key != self._lyrics_track_key:
+            self._load_lyrics_for_current_track(pane)
+        pane.position_ms = int(self._player.position * 1000)
 
     def _populate_meta_from_stream(self, meta: NowPlayingMeta) -> None:
         station = self._player.stream_station_name or "Live Stream"
@@ -1342,6 +1377,108 @@ class MusickitApp(App[None]):
         self._pending_force_rescan = True
         self._show_scan_overlay("[bold cyan]Force-rescanning library…[/]")
         self._scan_library_async(initial=False)
+
+    def action_toggle_lyrics(self) -> None:
+        """`l` — toggle the lyrics pane.
+
+        Mutually exclusive with the visualizer in the right-pane region:
+        showing lyrics hides `#visualizer` via the `Screen.show-lyrics`
+        CSS class. Loads the active track's lyrics on demand — local
+        mode reads `track.lyrics` (already populated by scan); Subsonic
+        mode calls `getLyricsBySongId` once per track and caches the
+        parsed result.
+        """
+        try:
+            pane = self.query_one(LyricsPane)
+        except NoMatches:
+            return
+        if self.screen.has_class("show-lyrics"):
+            self.screen.remove_class("show-lyrics")
+            pane.remove_class("visible")
+            return
+        # Turning lyrics on. Load the active track's lyrics now so first
+        # paint already shows them.
+        self._load_lyrics_for_current_track(pane)
+        self.screen.add_class("show-lyrics")
+        pane.add_class("visible")
+
+    def _load_lyrics_for_current_track(self, pane: LyricsPane) -> None:
+        """Populate `pane.lines` / `pane.synced` from the playing-or-cued track."""
+        from musickit.lyrics import is_synced, parse_lrc
+
+        track = self._currently_playing_track()
+        if track is None and self._current_album is not None:
+            tracklist = self.query_one(TrackList)
+            highlighted = tracklist.highlighted_child
+            idx = getattr(highlighted, "track_index", None) if highlighted is not None else None
+            if isinstance(idx, int) and 0 <= idx < len(self._current_album.tracks):
+                track = self._current_album.tracks[idx]
+        if track is None:
+            pane.lines = []
+            pane.synced = False
+            pane.placeholder = "[dim]No track playing.[/]"
+            self._lyrics_track_key = None
+            return
+
+        key = str(track.path)
+        self._lyrics_track_key = key
+
+        # Subsonic-client mode — fetch the structured payload once per
+        # track. Server-side does the synced promotion; we just use it.
+        if self._subsonic_client is not None and track.stream_url:
+            cached = self._lyrics_subsonic_cache.get(key)
+            if cached is None:
+                song_id = self._subsonic_song_id_for_track(track)
+                if song_id is None:
+                    pane.lines = []
+                    pane.synced = False
+                    pane.placeholder = "[dim]Lyrics unavailable from server.[/]"
+                    return
+                lines_raw, synced = self._subsonic_client.get_lyrics(song_id)
+                lines = self._lrclines_from_subsonic(lines_raw, synced)
+                cached = (lines, synced)
+                self._lyrics_subsonic_cache[key] = cached
+            pane.lines = list(cached[0])
+            pane.synced = cached[1]
+            if not cached[0]:
+                pane.placeholder = "[dim]No lyrics for this track.[/]"
+            return
+
+        text = track.lyrics or ""
+        if not text.strip():
+            pane.lines = []
+            pane.synced = False
+            pane.placeholder = "[dim]No lyrics for this track.[/]"
+            return
+        parsed = parse_lrc(text)
+        pane.lines = parsed
+        pane.synced = is_synced(parsed)
+
+    def _subsonic_song_id_for_track(self, track: LibraryTrack) -> str | None:
+        """Subsonic ID lives in stream_url's query string (`id=...`); pull it out."""
+        from urllib.parse import parse_qs, urlparse
+
+        if not track.stream_url:
+            return None
+        qs = parse_qs(urlparse(track.stream_url).query)
+        ids = qs.get("id")
+        if ids:
+            return ids[0]
+        return None
+
+    def _lrclines_from_subsonic(self, lines: list, synced: bool) -> list:
+        """Convert OpenSubsonic `line[]` entries to `LrcLine` shape for the widget."""
+        from musickit.lyrics import LrcLine
+
+        out: list[LrcLine] = []
+        for line in lines:
+            text = line.get("value", "")
+            start_ms = int(line.get("start") or 0)
+            out.append(LrcLine(start_ms=start_ms, text=text))
+        # Server may have emitted unsynced shape (no `start` keys); only
+        # `synced` indicates whether to highlight by time.
+        del synced
+        return out
 
     def action_toggle_visualizer(self) -> None:
         """`v` — hide / show the visualizer panel.

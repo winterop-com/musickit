@@ -91,6 +91,39 @@ def test_get_lyrics_by_song_id_unknown_returns_70(tmp_path: Path) -> None:
     assert body["subsonic-response"]["error"]["code"] == 70
 
 
+def test_get_lyrics_by_song_id_promotes_lrc_to_synced(tmp_path: Path) -> None:
+    """`[mm:ss.xx]`-tagged lyrics are surfaced as `synced: True` with `start` ms per line."""
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg)
+    lrc = "[00:01.00]hello\n[00:02.50]world"
+    track = LibraryTrack(
+        path=tmp_path / "Synced" / "Album" / "01.flac",
+        title="Synced Song",
+        artist="Synced",
+        album="Album",
+        duration_s=10.0,
+        lyrics=lrc,
+    )
+    album = LibraryAlbum(
+        path=tmp_path / "Synced" / "Album",
+        artist_dir="Synced",
+        album_dir="Album",
+        track_count=1,
+        tracks=[track],
+    )
+    app.state.cache._reindex(LibraryIndex(root=tmp_path, albums=[album]))  # noqa: SLF001
+    body = TestClient(app).get("/rest/getLyricsBySongId", params=_params(id=track_id(track))).json()
+    inner = body["subsonic-response"]
+    structured = inner["lyricsList"]["structuredLyrics"]
+    assert len(structured) == 1
+    entry = structured[0]
+    assert entry["synced"] is True
+    assert entry["line"] == [
+        {"start": 1000, "value": "hello"},
+        {"start": 2500, "value": "world"},
+    ]
+
+
 def test_get_lyrics_by_song_id_no_lyrics_returns_empty_list(tmp_path: Path) -> None:
     """Track exists but has no lyrics → empty structuredLyrics, not error 70."""
     cfg = ServeConfig(username="mort", password="secret")

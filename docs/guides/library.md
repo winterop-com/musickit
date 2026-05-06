@@ -125,6 +125,20 @@ uvx musickit library retag path/to/album --genre ''
 
 `--rename` renames `DIR` to `YYYY - Album` based on the post-update tags after the retag completes.
 
+## `lyrics` — fetch synced lyrics from LRCLIB
+
+```bash
+uvx musickit library lyrics fetch DIR                  # populate missing sidecars
+uvx musickit library lyrics fetch DIR --dry-run        # show intent without hitting the network
+uvx musickit library lyrics fetch DIR --all            # re-fetch every track (use sparingly)
+```
+
+For each track without lyrics — no embedded `\xa9lyr` / `USLT` / `LYRICS` tag and no existing `<track>.lrc` sidecar — query [LRCLIB](https://lrclib.net) (free, no API key) and, on a hit, write the result as `<track>.flac.lrc` (or whatever the audio suffix is). Synced bodies (`syncedLyrics` field) are preferred over plain when LRCLIB returns both.
+
+Sidecars take precedence over embedded tags on the next library scan, so user-edited `.lrc` files survive rescans untouched. The TUI's `l` keybind and the server's `/getLyricsBySongId` both pick up the populated lyrics automatically — synced bodies render with a live time-tracked highlight.
+
+The command exits non-zero if more than 10% of attempted fetches raise transport errors (HTTP 5xx, timeout, malformed JSON) — early signal of a network outage or LRCLIB API change. 404s ("no match in LRCLIB for this track") do not count toward the failure rate; common for live recordings, deep cuts, and non-English tracks.
+
 ## `index` — manage the persistent SQLite cache
 
 The first scan of any library writes a SQLite cache at `<DIR>/.musickit/index.db`. On every subsequent launch — `library`, `tui`, or `serve` — the in-memory `LibraryIndex` is hydrated from rows instead of re-reading every audio file's tags. A delta-validate pass then reconciles the DB against any filesystem changes that happened since the last run (added albums, removed albums, tag edits applied with another tool).
