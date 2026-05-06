@@ -396,7 +396,12 @@ class MusickitApp(App[None]):
             self._player.set_replaygain_mode(saved_rg)
         # Visualizer ticks at 30 FPS; status text only at 4 FPS to save
         # redraws on text that doesn't need to change frame-to-frame.
-        self.set_interval(1 / 30, self._refresh_visualizer)
+        # 60 FPS visualizer tick — matches the web UI for parity, gives a
+        # noticeably smoother bar response than the previous 30 FPS even
+        # though terminals quantise to character cells. The audio engine
+        # runs in a separate process (its own GIL) so the higher tick
+        # rate can't stall the audio callback into a buffer underrun.
+        self.set_interval(1 / 60, self._refresh_visualizer)
         self.set_interval(0.25, self._refresh_status)
         self.set_interval(0.05, self._drain_end_pending)
         self.set_interval(0.5, self._drain_stream_metadata)
@@ -1074,10 +1079,11 @@ class MusickitApp(App[None]):
             visualizer.levels = self._player.band_levels
         else:
             # Paused / stopped: decay the previously-shown levels toward 0.
-            # 0.858 ≈ 0.01 ** (1/30) → bars reach ~1% in ~1s at 30 FPS,
-            # matching the visualizer's natural release feel.
+            # 0.926 ≈ 0.01 ** (1/60) → bars reach ~1% in ~1s at 60 FPS,
+            # matching the visualizer's natural release feel. Bumped from
+            # 0.858 (30 FPS) when the tick rate doubled.
             current = list(visualizer.levels)
-            decayed = [v * 0.858 if v > 0.005 else 0.0 for v in current]
+            decayed = [v * 0.926 if v > 0.005 else 0.0 for v in current]
             # Avoid the cost of a no-op reactive write once everything's
             # already at the floor — the visualizer redraw isn't free.
             if any(v > 0.0 for v in decayed) or any(v > 0.0 for v in current):

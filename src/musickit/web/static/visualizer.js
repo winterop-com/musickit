@@ -74,11 +74,6 @@
       analyser.connect(audioCtx.destination);
       freqData = new Float32Array(analyser.frequencyBinCount);
       computeBandRanges(audioCtx.sampleRate);
-      console.log(
-        "[viz] init ok — sampleRate=" + audioCtx.sampleRate +
-        " bins=" + analyser.frequencyBinCount +
-        " state=" + audioCtx.state,
-      );
       return true;
     } catch (err) {
       console.warn("[viz] init failed:", err);
@@ -104,12 +99,9 @@
     }
   }
 
-  let _diagFrameCount = 0;
-
   function readBands() {
     if (!analyser) return;
     analyser.getFloatFrequencyData(freqData);
-    let maxDb = -Infinity;
     for (let i = 0; i < N_BANDS; i++) {
       let sum = 0;
       let count = 0;
@@ -118,24 +110,10 @@
       for (let b = lo; b < hi; b++) {
         sum += freqData[b];
         count++;
-        if (freqData[b] > maxDb) maxDb = freqData[b];
       }
       const avgDb = count > 0 ? sum / count : DB_FLOOR;
       const level = Math.max(0, Math.min(1, (avgDb - DB_FLOOR) / DB_RANGE));
       bandTargets[i] = level;
-    }
-    // Once per ~2 seconds, log the loudest bin so the user can confirm
-    // the analyser is actually receiving signal. -100 / -Infinity =
-    // silence (CORS or routing issue); reasonable values like -30 to
-    // -60 = bars should show.
-    _diagFrameCount++;
-    if (_diagFrameCount % 120 === 0) {
-      console.log(
-        "[viz] frame=" + _diagFrameCount +
-        " maxBinDb=" + (isFinite(maxDb) ? maxDb.toFixed(1) : "−inf") +
-        " ctxState=" + (audioCtx ? audioCtx.state : "?") +
-        " paused=" + audio.paused,
-      );
     }
   }
 

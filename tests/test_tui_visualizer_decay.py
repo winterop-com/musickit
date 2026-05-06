@@ -22,11 +22,11 @@ def test_decay_unit_is_strict_contraction() -> None:
     """The per-band decay rule is a strict contraction toward zero.
 
     The implementation lives at `_refresh_visualizer`'s else-branch as
-    `[v * 0.858 if v > 0.005 else 0.0 for v in current]`. Verify the
-    rule directly without booting the App — Pilot's 30 FPS timer makes
+    `[v * 0.926 if v > 0.005 else 0.0 for v in current]`. Verify the
+    rule directly without booting the App — Pilot's 60 FPS timer makes
     "exactly one tick" hard to assert.
     """
-    decay = lambda v: v * 0.858 if v > 0.005 else 0.0  # noqa: E731 — mirror the impl one-liner
+    decay = lambda v: v * 0.926 if v > 0.005 else 0.0  # noqa: E731 — mirror the impl one-liner
 
     # Loud band shrinks but doesn't snap.
     assert 0 < decay(0.8) < 0.8
@@ -55,8 +55,8 @@ async def test_visualizer_levels_drop_when_not_playing(silent_flac_template: Pat
         # Seed the bars high — simulates "just paused while audio was loud."
         viz.levels = [0.8] * len(viz.levels)
 
-        # Idle for ~2s of wall time at 30 FPS = ~60 ticks. Our decay
-        # constant takes ~30-60 ticks to reach the < 0.005 snap-to-zero
+        # Idle for ~2s of wall time at 60 FPS = ~120 ticks. Our decay
+        # constant takes ~60-120 ticks to reach the < 0.005 snap-to-zero
         # threshold from 0.8, so 2s is comfortably long.
         for _ in range(40):
             await pilot.pause(0.05)
