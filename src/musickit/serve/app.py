@@ -12,13 +12,16 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from musickit.serve.auth import AuthError, verify
 from musickit.serve.config import ServeConfig
 from musickit.serve.index import IndexCache
 from musickit.serve.xml import to_xml
+from musickit.web.session import RestQueryAuthFromSessionMiddleware, derive_session_secret
 
 API_VERSION = "1.16.1"
 SERVER_NAME = "musickit"
@@ -83,15 +86,30 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
 
     app.state.scrobble = ScrobbleDispatcher(cfg.scrobble)
 
-    # Spec default is XML; clients opt into JSON via `?f=json`. Convert here
-    # so endpoints stay simple (return dicts; the middleware emits the right
-    # serialization). Binary responses (stream / cover) skip conversion via
-    # the content-type check below.
+    # Middleware order is REVERSE of registration — last add_middleware
+    # is the outermost wrap. We need:
+    #   request -> Session -> RestQueryAuthFromSession -> PostFormToQuery
+    #            -> SubsonicFormat -> route
+    # so that:
+    #   - Session sets request.session before RestQueryAuth reads it.
+    #   - RestQueryAuth injects ?u=&p= so the existing auth dep works for
+    #     browser <audio src='/rest/stream?id=...'> calls.
+    #   - PostForm merges form-body credentials so play:Sub works.
+    #   - SubsonicFormat converts JSON responses to XML when needed.
     app.add_middleware(SubsonicFormatMiddleware)
-    # Outermost: merge POST form-body params into query string so the
-    # auth dependency + endpoint Query() defaults pick them up uniformly.
-    # play:Sub (iOS) sends credentials this way.
     app.add_middleware(PostFormToQueryMiddleware)
+    app.add_middleware(RestQueryAuthFromSessionMiddleware)
+    # Sign cookies with a key derived from the password. Changing the
+    # password invalidates every existing session — desirable. 30-day
+    # sliding expiry is plenty for self-hosted use.
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=derive_session_secret(cfg.password),
+        session_cookie="musickit_session",
+        max_age=30 * 24 * 60 * 60,
+        same_site="lax",
+        https_only=False,
+    )
 
     async def require_auth(
         request: Request,
@@ -132,18 +150,31 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     app.include_router(extras_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(lyrics_router, prefix="/rest", dependencies=auth_dep)
 
-    # Root probe: Amperfy and some other clients hit `GET /` before `/rest/ping`
-    # to confirm the host is reachable. Without this they get a 404 and refuse
-    # to log in. The response body is informational + harmless to expose pre-auth.
+    # Web UI — login + three-pane browse + audio player. Lives at /login,
+    # /web, /web/artist/{id}, /web/album/{id}. Static assets served via
+    # the StaticFiles mount below.
+    from musickit.web.routes import router as web_router
+
+    app.include_router(web_router)
+    web_static_dir = Path(__file__).resolve().parents[1] / "web" / "static"
+    app.mount("/web-static", StaticFiles(directory=str(web_static_dir)), name="web-static")
+
+    # Root probe — JSON for Subsonic clients (Amperfy hits / pre-login
+    # to confirm the host is reachable), HTML redirect for browsers.
     @app.get("/")
-    async def server_info() -> dict[str, Any]:
-        return {
-            "name": SERVER_NAME,
-            "version": SERVER_VERSION,
-            "type": "subsonic-compatible",
-            "api": "/rest/",
-            "spec": "https://opensubsonic.netlify.app/docs/api-reference/",
-        }
+    async def server_info(request: Request) -> Response:
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            return RedirectResponse(url="/login", status_code=303)
+        return JSONResponse(
+            {
+                "name": SERVER_NAME,
+                "version": SERVER_VERSION,
+                "type": "subsonic-compatible",
+                "api": "/rest/",
+                "spec": "https://opensubsonic.netlify.app/docs/api-reference/",
+            }
+        )
 
     return app
 

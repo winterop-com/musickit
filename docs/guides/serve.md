@@ -169,6 +169,40 @@ Heart / star buttons in Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub)
 
 Stars live OUTSIDE the SQLite library index because the index is fully derived from the filesystem (delete / rebuild = safe), but stars are real user data. Both files sit under `.musickit/` so `rm -rf <root>/.musickit/index.db*` is still a safe "rebuild the cache, keep my favourites" operation.
 
+## Browser UI
+
+Open the server URL in any browser to use the bundled three-pane web player. The first slice ships with v0.9.4:
+
+```
+http://<host>:4533/login          → sign-in form (same creds as the Subsonic API)
+http://<host>:4533/web            → three-pane browser (artists / albums / tracks)
+```
+
+The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same `/rest/getArtists` / `/rest/getArtist` / `/rest/getAlbum` endpoints the rest of the API uses; audio playback hits `/rest/stream` via a native `<audio>` element. Login sets a signed session cookie so subsequent `<audio src="/rest/stream?id=...">` calls don't need to leak the password into HTML page sources.
+
+Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u=&p=` query params and never see the cookie path — they're untouched by this addition.
+
+**Keybinds:**
+
+| Key | Action |
+|---|---|
+| Space | Play / pause |
+| `n` / `p` | Next / previous track in the current album queue |
+| `l` | Toggle the lyrics panel (synced highlight when LRC is available) |
+| `f` | Toggle the FFT visualizer (Web Audio API + Canvas) |
+| `/` | Focus the search bar |
+| Esc | Close lyrics / visualizer / blur search |
+
+**Search** uses the same FTS5 index `/search3` does (sub-ms ranked, prefix-matching, diacritic-folded — `bey` finds `Beyoncé`). Results swap into the right pane as artist / album / track sections; click any result to drill in or play.
+
+**Cover art** thumbnails appear in album rows + the now-playing card; sourced from `/rest/getCoverArt` with the LRU cache from v0.9.1.
+
+**Queue** is the visible album. Click a track → play from there; auto-advance through remaining tracks; `n`/`p` step. (Cross-album queueing comes later.)
+
+**FFT visualizer** runs entirely in the browser via the Web Audio API: a `MediaElementAudioSourceNode` tees the `<audio>` element into an `AnalyserNode`, the JS averages the FFT into 48 log-spaced bands (30Hz to 16kHz), and renders bars to a `<canvas>` at 60fps with red/yellow/green VU gradient — same palette as the TUI. Asymmetric attack/release smoothing so transients pop while sustained tones don't shimmer.
+
+Follow-ups not yet shipped: custom queue / "play next", playlist creation in the browser.
+
 ## Authentication
 
 Three forms supported, all per the Subsonic spec:

@@ -1,0 +1,26 @@
+<h2>Albums <span class="count">({{ albums|length }})</span></h2>
+<ul class="row-list" id="albums-list">
+  {% for album in albums %}
+  <li>
+    <button type="button"
+            class="row-button album-row"
+            data-action="load-album"
+            data-id="{{ album.id }}">
+      <img class="album-thumb"
+           src="/rest/getCoverArt?id={{ album.id }}&size=64"
+           alt=""
+           loading="lazy"
+           onerror="this.style.visibility='hidden'">
+      <span class="album-text">
+        <span class="album-title">{{ album.title }}</span>
+        <span class="album-meta">
+          {% if album.year %}<span class="album-year">{{ album.year }}</span>{% endif %}
+          <span class="album-tracks">{{ album.track_count }} tracks</span>
+        </span>
+      </span>
+    </button>
+  </li>
+  {% else %}
+  <li class="empty">No albums for this artist.</li>
+  {% endfor %}
+</ul>
