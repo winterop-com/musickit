@@ -73,7 +73,7 @@ Click semantics on the track list mirror Spotify / iTunes: single click moves th
 
 ![Help panel](../screenshots/help-panel.svg)
 
-`/` opens an inline filter that narrows the focused pane to a case-insensitive, **diacritic-folded** substring match — `beyonce` finds `Beyoncé`, `sigur ros` finds `Sigur Rós`. Useful for jumping to an artist on a 1000+ album library:
+`/` opens an inline filter that narrows the focused pane to a case-insensitive, **diacritic-folded multi-token AND** substring match. `beyonce` finds `Beyoncé`; `sigur ros` finds `Sigur Rós`; `daft homework` finds `Daft Punk - Homework` (each token must be a folded substring of the row, but they don't need to be adjacent or in order). Useful for jumping to an artist on a 1000+ album library:
 
 ![Filter active on the artist pane](../screenshots/filter-active.svg)
 

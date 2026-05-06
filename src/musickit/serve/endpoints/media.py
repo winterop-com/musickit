@@ -198,6 +198,16 @@ async def get_cover_art(
     if album is None:
         return JSONResponse(error_envelope(70, f"Cover not found: {id}"))
 
+    # Key on the URL `id` directly. Two different track IDs from the same
+    # album yield two cache entries — fine. The point is to short-circuit
+    # repeated requests for the same `id` (a mobile client paging through
+    # albums fires the same `id` once per render), not to dedupe across IDs.
+    cache_key = (id, size)
+    cached = cache.cover_cache.get(cache_key)
+    if cached is not None:
+        data, mime = cached
+        return Response(content=data, media_type=mime)
+
     cover = load_album_cover(album)
     if cover is None:
         return JSONResponse(error_envelope(70, "no cover art for this album"))
@@ -208,4 +218,5 @@ async def get_cover_art(
             data, mime = resize(data, max_size=size)
         except Exception:  # pragma: no cover — Pillow refused; fall back to original bytes
             pass
+    cache.cover_cache.put(cache_key, data, mime)
     return Response(content=data, media_type=mime)

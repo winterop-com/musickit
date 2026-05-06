@@ -118,7 +118,7 @@ All under `/rest/`. Every endpoint accepts both `GET` and `POST` (some clients p
 | `stream?id=&format=mp3` | Transcode via ffmpeg → MP3 (default 192k) |
 | `stream?id=&maxBitRate=128` | Cap delivered bitrate (transcodes to MP3 at that rate) |
 | `download?id=` | Always raw bytes — ignores `format`/`maxBitRate` per spec |
-| `getCoverArt?id=&size=` | Cover image. Sidecar (`cover.jpg`/`folder.jpg`/`front.jpg`) first, embedded picture as fallback. Optional Pillow resize via `?size=N` (capped at 1500). |
+| `getCoverArt?id=&size=` | Cover image. Sidecar (`cover.jpg`/`folder.jpg`/`front.jpg`) first, embedded picture as fallback. Optional Pillow resize via `?size=N` (capped at 1500). Response bytes cached in a bytes-bounded LRU (default 64 MiB) keyed on `(id, size)`; cleared on every reindex so re-cover-picked albums never serve stale bytes. |
 
 ### Library control
 

@@ -1,21 +1,20 @@
-"""TUI `/`-bar filter — diacritic-folded casefolded substring matching.
+"""TUI `/`-bar filter — diacritic-folded multi-token AND substring matching.
 
 Real-world libraries are full of accented characters (Sigur Rós,
-Björk, José González, Beyoncé, Daft Punk's Cœur). The original
-filter did `needle.casefold() in haystack.casefold()`, which is fast
-but doesn't fold accents — so `beyonce` failed to find `Beyoncé`,
-and the user had to know which exact diacritics the artist name was
-tagged with.
+Björk, José González, Beyoncé, Daft Punk's Cœur). The folding step
+NFKD-decomposes both sides and drops combining marks so `beyonce`
+finds `Beyoncé` without the user typing the exact diacritics.
 
-This module normalises both sides to ASCII-equivalent lowercase
-before doing the substring check. Same speed (microseconds on 1200
-items), much friendlier on an internationally-tagged library.
+Multiple whitespace-split tokens AND together: `daft homework`
+matches `Daft Punk - Homework` because each token is independently a
+folded substring of the haystack. Pure-substring would fail there
+since the literal `"daft homework"` is never adjacent in the row.
 
 The server-side `/search3` endpoint uses SQLite FTS5 with
-`unicode61 remove_diacritics 2`, which gives the same folding plus
-ranked / prefix-matched results for the much higher-volume client
-hit rate. The TUI doesn't need ranking — a 1200-album substring
-filter is already imperceptibly fast.
+`unicode61 remove_diacritics 2` for ranked / prefix-matched results
+on the much higher-volume client hit rate. The TUI doesn't need
+ranking — it just hides non-matching rows, and per-pane substring
+on 1200 items is microseconds.
 """
 
 from __future__ import annotations
@@ -37,11 +36,17 @@ def fold(text: str) -> str:
 
 
 def matches(needle: str, haystack: str) -> bool:
-    """True iff `needle` is a substring of `haystack` after diacritic folding.
+    """True iff every whitespace-split token in `needle` is a substring of `haystack`.
 
-    Empty `needle` returns True (a "no filter" sentinel). Both sides
-    are folded; callers don't need to pre-process.
+    Both sides are diacritic-folded before the substring check. Empty
+    `needle` returns True (a "no filter" sentinel). A whitespace-only
+    needle (e.g. `"   "`) also returns True for the same reason.
+
+    Multi-token semantics:
+      `matches("daft homework", "Daft Punk - Homework")` -> True
+      `matches("daft music",    "Daft Punk - Homework")` -> False
     """
-    if not needle:
+    if not needle or not needle.strip():
         return True
-    return fold(needle) in fold(haystack)
+    folded_haystack = fold(haystack)
+    return all(tok in folded_haystack for tok in fold(needle).split())
