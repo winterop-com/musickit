@@ -140,7 +140,7 @@ These are stubs to keep clients quiet on features we don't track yet. They retur
 
 | Endpoint | Behaviour |
 |---|---|
-| `scrobble` | Accept + discard |
+| `scrobble` | Forward play events to webhook + MQTT (see [Scrobble forwarder](#scrobble-forwarder)) — or accept-and-discard when nothing is configured. |
 | `getArtistInfo` / `getArtistInfo2` | Empty bio + similarArtist[] |
 | `getStarred` / `getStarred2` | **Real.** Backed by `<root>/.musickit/stars.toml`. Returns artists / albums / songs flagged via `/star`, sorted most-recent-first. Stale IDs (file deleted since starring) are silently filtered out — call `StarStore.prune(...)` to remove them from the file. |
 | `star` / `unstar` | **Real.** Adds / removes IDs in `stars.toml`. Accepts any combination of `id=`, `albumId=`, `artistId=`. Unknown IDs are silently dropped. |
@@ -194,6 +194,53 @@ password = "supersecret"
 ```
 
 Override per-run via `--user` / `--password`. CLI flags win over the TOML.
+
+## Scrobble forwarder
+
+Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) call `/scrobble` after every track. By default that's a no-op. Add a `[scrobble.webhook]` and/or `[scrobble.mqtt]` block to forward each play event:
+
+```toml
+# ~/.config/musickit/serve.toml
+[scrobble.webhook]
+url = "https://my-bridge.example.com/play"
+secret = "shh"          # optional — sent as `X-Musickit-Secret` header
+timeout_s = 5.0         # optional — defaults to 5s
+
+[scrobble.mqtt]
+broker = "mqtt://homeassistant.local:1883"
+topic = "musickit/scrobble"   # default shown
+username = "musickit"          # optional
+password = "supersecret"       # optional
+client_id = "musickit"          # optional
+
+# Optional: forward `submission=false` ("now playing") probes too.
+# Default false — Home Assistant "currently playing" automations want true.
+include_now_playing = false
+```
+
+Each event is JSON like:
+
+```json
+{
+  "user": "mort",
+  "track_id": "tr_abc123",
+  "title": "Levitating",
+  "artist": "Dua Lipa",
+  "album": "Future Nostalgia",
+  "duration_s": 203.0,
+  "played_at": "2026-05-06T18:42:11Z",
+  "submission": true
+}
+```
+
+Forwarding is fire-and-forget on a small thread pool; webhook + MQTT failures are logged at WARNING and swallowed so a dead bridge never 500s the client's `/scrobble` request. MQTT is optional — the dispatcher lazy-imports `paho-mqtt`; missing the dep just disables the MQTT half.
+
+Common destinations:
+
+- **Home Assistant** — subscribe to the MQTT topic, build "what's playing" cards / automations.
+- **Last.fm** — POST the JSON to a small bridge that translates to the [Last.fm Scrobble API](https://www.last.fm/api/show/track.scrobble).
+- **ListenBrainz** — same shape; MetaBrainz documents the API at [listenbrainz.org/profile](https://listenbrainz.org/profile/).
+- **Custom analytics** — POST into Postgres / SQLite / Google Sheets via Zapier / n8n / etc.
 
 ## mDNS / Bonjour
 

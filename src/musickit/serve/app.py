@@ -75,6 +75,14 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
 
     app.state.stars = StarStore.for_root(root)
 
+    # Scrobble forwarder — only spun up when `[scrobble.webhook]` or
+    # `[scrobble.mqtt]` is in serve.toml. The dispatcher's `dispatch()`
+    # is a no-op when both are unset, so keeping it on `app.state` even
+    # in the disabled case keeps the endpoint code branchless.
+    from musickit.serve.scrobble import ScrobbleDispatcher
+
+    app.state.scrobble = ScrobbleDispatcher(cfg.scrobble)
+
     # Spec default is XML; clients opt into JSON via `?f=json`. Convert here
     # so endpoints stay simple (return dicts; the middleware emits the right
     # serialization). Binary responses (stream / cover) skip conversion via

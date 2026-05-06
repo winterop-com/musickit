@@ -21,8 +21,10 @@ from typing import Any
 from fastapi import APIRouter, Query, Request
 
 from musickit.serve.app import envelope, error_envelope
+from musickit.serve.config import ServeConfig
 from musickit.serve.index import IndexCache
 from musickit.serve.payloads import album_payload, artist_summary, song_payload
+from musickit.serve.scrobble import ScrobbleDispatcher, ScrobbleEvent
 from musickit.serve.stars import StarStore
 
 router = APIRouter()
@@ -43,8 +45,53 @@ def _get_stars(request: Request) -> StarStore:
 
 @router.api_route("/scrobble", methods=["GET", "POST", "HEAD"])
 @router.api_route("/scrobble.view", methods=["GET", "POST", "HEAD"])
-async def scrobble() -> dict:
-    """No-op — accept and discard. Returning ok keeps client logs clean."""
+async def scrobble(
+    request: Request,
+    id: str | None = Query(default=None),
+    time: int | None = Query(default=None),
+    submission: bool = Query(default=True),
+    u: str | None = Query(default=None),
+) -> dict:
+    """Forward the play event to configured webhook / MQTT targets, or no-op.
+
+    The Subsonic spec defines `submission=false` as the "now playing"
+    probe (fired at track start) and `submission=true` as the "I
+    finished playing this" event (fired at track end / threshold).
+    Forwarders default to true-only; flip `[scrobble].include_now_playing`
+    to receive both.
+
+    `time` is the start time of playback in unix-millis (per the spec).
+    Falls back to "now" when the client doesn't send it.
+    """
+    del time  # client-supplied wall-clock; we use server-side `played_at` for stability
+    cache = _get_cache(request)
+    dispatcher: ScrobbleDispatcher = request.app.state.scrobble
+
+    # No id → invalid request shape; still ack so the client doesn't bark.
+    if not id:
+        return envelope()
+    # Resolve track for the payload. Unknown ID → still ack; just don't forward.
+    pair = cache.tracks_by_id.get(id)
+    if pair is None:
+        return envelope()
+
+    album, track = pair
+    cfg: ServeConfig = request.app.state.cfg
+    user = u or cfg.username
+
+    from datetime import UTC, datetime
+
+    event = ScrobbleEvent(
+        user=user,
+        track_id=id,
+        title=track.title or track.path.stem,
+        artist=track.artist or album.artist_dir,
+        album=album.tag_album or album.album_dir,
+        duration_s=float(track.duration_s or 0.0),
+        played_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        submission=bool(submission),
+    )
+    dispatcher.dispatch(event)
     return envelope()
 
 
