@@ -25,14 +25,14 @@ from musickit.pipeline.report import AlbumReport, _print_summary
 
 
 def default_workers() -> int:
-    """Worker thread default: 2.
+    """Worker thread default: 4.
 
-    Each worker spawns ffmpeg, which is itself multi-threaded — so even 2
-    workers keeps a modern Mac usable for browsing/dev while a big convert
-    runs in the background. Bump explicitly with `--workers N` if you don't
-    care about foreground responsiveness.
+    Each worker spawns ffmpeg, which is itself multi-threaded. 4 saturates
+    a typical 8-core laptop's encode throughput while still leaving cycles
+    for browsing / dev. Bump higher with `--workers N` on bigger boxes;
+    drop to 2 if foreground responsiveness suffers.
     """
-    return 2
+    return 4
 
 
 def run(

@@ -94,7 +94,7 @@ Both calls go through a polite client: a 1 req/sec throttle per host, a descript
 - `--overwrite/--no-overwrite` — default off; existing albums are preserved + the run merges into existing output
 - `--remove-source/--no-remove-source` — default off; when on, deletes each input album dir on successful convert
 - `--allow-lossy-recompress` — opt into MP3→AAC tandem encode under `--format aac`
-- `--workers / -w N` (default 2; each worker spawns ffmpeg which is itself multi-threaded)
+- `--workers / -w N` (default 4; each worker spawns ffmpeg which is itself multi-threaded)
 - `--cover-max-edge PX` (default 1000)
 - `--acoustid-key TEXT` (or `MUSICKIT_ACOUSTID_KEY` env var; off by default)
 
