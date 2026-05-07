@@ -933,9 +933,9 @@
 
 <h1 id="musickit-convert"><code>musickit convert</code><a class="headerlink" href="#musickit-convert" title="Permanent link">&para;</a></h1>
 <p>The heart of the project. Walks an input tree, groups audio files into albums, re-encodes via <code>ffmpeg</code>, writes clean tags + a normalised cover, lays the result out as <code>output/&lt;Artist&gt;/&lt;YYYY&gt; - &lt;Album&gt;/NN - &lt;Title&gt;.&lt;ext&gt;</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx musickit convert [INPUT_DIR] [OUTPUT_DIR] [...flags]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx musickit convert INPUT_DIR OUTPUT_DIR [...flags]
 </code></pre></div>
-<p>Defaults: <code>INPUT_DIR=./input</code>, <code>OUTPUT_DIR=./output</code>, <code>--format auto</code>.</p>
+<p>Both directories are required (no defaults — <code>uvx</code>-installed runs anywhere on the filesystem and silent <code>./input</code> / <code>./output</code> magic would do the wrong thing). <code>INPUT_DIR</code> must exist; <code>OUTPUT_DIR</code> is created if missing. <code>--format</code> defaults to <code>auto</code>.</p>
 <h2 id="what-runs-per-album">What runs per album<a class="headerlink" href="#what-runs-per-album" title="Permanent link">&para;</a></h2>
 <p>Roughly in order:</p>
 <ol>
@@ -1097,8 +1097,8 @@
 <p>Both calls go through a polite client: a 1 req/sec throttle per host, a descriptive User-Agent, and 15-second timeouts. Errors are non-fatal — the album just falls back to the offline candidate and a warning lands in the per-album notes column.</p>
 <h2 id="all-flags">All flags<a class="headerlink" href="#all-flags" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>INPUT_DIR</code> (default <code>./input</code>)</li>
-<li><code>OUTPUT_DIR</code> (default <code>./output</code>)</li>
+<li><code>INPUT_DIR</code> (required, must exist)</li>
+<li><code>OUTPUT_DIR</code> (required; created if missing)</li>
 <li><code>--format / -f auto|alac|mp3|aac</code> (default <code>auto</code>)</li>
 <li><code>--bitrate / -b 192k|256k|320k</code> (default <code>256k</code>, ignored for ALAC)</li>
 <li><code>--enrich/--no-enrich</code> (default: auto-probe, on if reachable)</li>
