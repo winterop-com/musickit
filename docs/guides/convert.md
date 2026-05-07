@@ -3,10 +3,10 @@
 The heart of the project. Walks an input tree, groups audio files into albums, re-encodes via `ffmpeg`, writes clean tags + a normalised cover, lays the result out as `output/<Artist>/<YYYY> - <Album>/NN - <Title>.<ext>`.
 
 ```
-uvx musickit convert [INPUT_DIR] [OUTPUT_DIR] [...flags]
+uvx musickit convert INPUT_DIR OUTPUT_DIR [...flags]
 ```
 
-Defaults: `INPUT_DIR=./input`, `OUTPUT_DIR=./output`, `--format auto`.
+Both directories are required (no defaults — `uvx`-installed runs anywhere on the filesystem and silent `./input` / `./output` magic would do the wrong thing). `INPUT_DIR` must exist; `OUTPUT_DIR` is created if missing. `--format` defaults to `auto`.
 
 ## What runs per album
 
@@ -85,8 +85,8 @@ Both calls go through a polite client: a 1 req/sec throttle per host, a descript
 
 ## All flags
 
-- `INPUT_DIR` (default `./input`)
-- `OUTPUT_DIR` (default `./output`)
+- `INPUT_DIR` (required, must exist)
+- `OUTPUT_DIR` (required; created if missing)
 - `--format / -f auto|alac|mp3|aac` (default `auto`)
 - `--bitrate / -b 192k|256k|320k` (default `256k`, ignored for ALAC)
 - `--enrich/--no-enrich` (default: auto-probe, on if reachable)

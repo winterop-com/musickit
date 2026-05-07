@@ -18,10 +18,21 @@ from musickit.cover import DEFAULT_MAX_EDGE as DEFAULT_COVER_MAX_EDGE
 @app.command()
 def convert(
     ctx: typer.Context,
-    input_dir: Annotated[Path, typer.Argument(help="Root folder containing albums.")] = Path("./input"),
-    output_dir: Annotated[Path, typer.Argument(help="Where to write `<Artist>/<Album> (Year)/` folders.")] = Path(
-        "./output"
-    ),
+    input_dir: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            file_okay=False,
+            help="Root folder containing albums to convert.",
+        ),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Argument(
+            file_okay=False,
+            help="Where to write `<Artist>/<YYYY> - <Album>/` folders.",
+        ),
+    ],
     fmt: Annotated[
         OutputFormat,
         typer.Option(
