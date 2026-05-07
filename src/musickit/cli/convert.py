@@ -86,7 +86,10 @@ def convert(
             "--workers",
             "-w",
             min=0,
-            help="Parallel track encoders. 0 (default) = 4 workers — saturates a typical 8-core laptop's encode throughput.",
+            help=(
+                "Parallel track encoders. 0 (default) = 4 workers — saturates a typical "
+                "8-core laptop's encode throughput."
+            ),
         ),
     ] = 0,
     cover_max_edge: Annotated[
