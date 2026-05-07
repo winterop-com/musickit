@@ -106,10 +106,17 @@ class SidebarStats(Static):
         self.border_title = "Library"
 
     def render(self) -> str:
+        # All four icons must be reliably single-cell — picking from
+        # Unicode's "Geometric Shapes" block (U+25xx) which has no emoji
+        # presentation, so Apple Terminal / iTerm / Alacritty all render
+        # them as 1-cell text. The previous ☺ (U+263A WHITE SMILING FACE)
+        # was getting promoted to a 2-cell emoji glyph in modern
+        # terminals, which pushed the "Artists" label one column right of
+        # the others.
         rows = [
             f" [{C_ACCENT}]♪[/]  Tracks   [dim]{self.track_count:>5}[/]",
             f" [{C_ACCENT}]◉[/]  Albums   [dim]{self.album_count:>5}[/]",
-            f" [{C_ACCENT}]☺[/]  Artists  [dim]{self.artist_count:>5}[/]",
+            f" [{C_ACCENT}]◆[/]  Artists  [dim]{self.artist_count:>5}[/]",
             f" [{C_ACCENT}]▦[/]  Folders  [dim]{self.folder_count:>5}[/]",
         ]
         return "\n".join(rows)
