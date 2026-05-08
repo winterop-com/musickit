@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://winterop-com.github.io/musickit/guides/inspect/">
+        <link rel="canonical" href="https://winterop-com.github.io/musickit/guides/mobile/">
       
       
-        <link rel="prev" href="../library/">
+        <link rel="prev" href="../desktop/">
       
       
-        <link rel="next" href="../tui/">
+        <link rel="next" href="../../architecture/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>inspect - MusicKit</title>
+        <title>Mobile (Subsonic) - MusicKit</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#musickit-inspect" class="md-skip">
+        <a href="#mobile" class="md-skip">
           Skip to content
         </a>
       
@@ -116,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              inspect
+              Mobile (Subsonic)
             
           </span>
         </div>
@@ -292,10 +292,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -320,11 +318,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -345,7 +345,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -416,19 +416,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../inspect/" class="md-nav__link">
         
   
   
@@ -444,7 +435,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -545,8 +535,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -563,13 +555,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -590,7 +580,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -633,10 +623,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../mobile/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mobile (Subsonic)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -652,6 +669,209 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tldr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TL;DR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iOS
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="iOS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#playsub" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        play:Sub
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#amperfy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amperfy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#android" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Android
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Android">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#symfonium" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symfonium
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dsub" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DSub
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tempo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tempo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#could-not-connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Could not connect"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invalid-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Invalid credentials"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-music-shows-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "No music shows up"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cover-art-looks-low-res" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cover art looks low-res
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-musickit-doesnt-do-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What MusicKit doesn't do (yet)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -960,6 +1180,197 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tldr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TL;DR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ios" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iOS
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="iOS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#playsub" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        play:Sub
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#amperfy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amperfy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#android" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Android
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Android">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#symfonium" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symfonium
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dsub" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DSub
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tempo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tempo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#could-not-connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Could not connect"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invalid-credentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Invalid credentials"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-music-shows-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "No music shows up"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cover-art-looks-low-res" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cover art looks low-res
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-musickit-doesnt-do-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What MusicKit doesn't do (yet)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -978,43 +1389,129 @@
   
 
 
-<h1 id="musickit-inspect"><code>musickit inspect</code><a class="headerlink" href="#musickit-inspect" title="Permanent link">&para;</a></h1>
-<p>Quick tag + cover summary for a single audio file.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>inspect<span class="w"> </span>PATH
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>inspect<span class="w"> </span>PATH<span class="w"> </span>--json<span class="w">   </span><span class="c1"># raw model dump for scripting / jq</span>
-</code></pre></div>
-<p>Prints title, artist, album_artist, album, year, genre, track/disc tuples, BPM, label, catalog, lyrics, replaygain values, MusicBrainz IDs (if present), and embedded picture dimensions, all as labelled rich panels — File, Tags, ReplayGain (when present), Lyrics (when present), Embedded picture (when present). Empty fields are suppressed so the output reflects only what's actually tagged.</p>
-<p>Useful when:</p>
+<h1 id="mobile">Mobile<a class="headerlink" href="#mobile" title="Permanent link">&para;</a></h1>
+<p>MusicKit's <code>serve</code> command exposes the <a href="https://www.subsonic.org/pages/api.jsp">Subsonic API</a>, so any
+Subsonic-compatible mobile app can stream from your library — there's no
+MusicKit mobile app to install.</p>
+<p>This guide walks through the four clients that work well in 2026.</p>
+<h2 id="tldr">TL;DR<a class="headerlink" href="#tldr" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Run <code>musickit serve</code> somewhere your phone can reach (Tailscale, LAN, or
+   a public URL behind a reverse proxy).</li>
+<li>Install one of the apps below.</li>
+<li>Point it at <code>http(s)://&lt;host&gt;:4533/rest</code>, with the username + password
+   from <code>~/.config/musickit/musickit.toml</code> (or <code>MUSICKIT_SERVER__USERNAME</code>
+   / <code>MUSICKIT_SERVER__PASSWORD</code>).</li>
+<li>Stream.</li>
+</ol>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>The server itself is covered in <a href="../serve/">the serve guide</a>. For mobile
+the things to double-check are:</p>
 <ul>
-<li>Debugging "why didn't convert pick up X?" — read the source tags directly.</li>
-<li>Verifying an output file got the tags you expected after a <code>convert</code> run.</li>
-<li>Spot-checking a single file from a problematic rip before running <code>library audit</code> over the whole library.</li>
+<li><strong>Reachable from the phone.</strong> Localhost won't work; the phone needs to
+  resolve the host. The easiest answer is <a href="https://tailscale.com">Tailscale</a> (the phone joins
+  the same tailnet as the server, then connects to
+  <code>http://&lt;machine-name&gt;:4533</code>). LAN works too if the phone is on
+  the same Wi-Fi.</li>
+<li><strong>Username + password set.</strong> The default <code>admin</code> / <code>admin</code> will
+  authenticate, but every client persists credentials, so use the same
+  pair you set in <code>musickit.toml</code>.</li>
+<li><strong>HTTPS if leaving the LAN.</strong> Subsonic auth is salted-token, but the
+  audio stream is plaintext bytes. Put the server behind a Caddy /
+  Tailscale Funnel / nginx terminator before exposing it on the public
+  internet.</li>
 </ul>
-<p>Sample output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>─── File ───────────────────────────────────────
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  path      ./output/ABBA/1976 - Arrival/01 - When I Kissed The Teacher.m4a
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  size      6.2 MiB
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  format    M4A
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  duration  3:00
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>─── Tags ───────────────────────────────────────
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  title         When I Kissed The Teacher
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  artist        ABBA
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  album artist  ABBA
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  album         Arrival
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  date          1976
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>  track         1/10
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  disc          1/1
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>  genres        Pop
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>  bpm           113
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>─── Embedded picture ───────────────────────────
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>  mime    image/jpeg
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>  size    245.0 KiB
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>  pixels  ~1,000,000 px
-</code></pre></div>
-<p>Pass <code>--json</code> to skip the Rich rendering and get the raw <code>SourceTrack</code> model serialised for downstream pipes (<code>uvx musickit inspect track.m4a --json | jq .title</code>).</p>
-<p>Backed by <code>metadata.read_source(path)</code> — the same tag reader the convert pipeline uses. So what you see here is what convert sees.</p>
+<h2 id="ios">iOS<a class="headerlink" href="#ios" title="Permanent link">&para;</a></h2>
+<h3 id="playsub">play:Sub<a class="headerlink" href="#playsub" title="Permanent link">&para;</a></h3>
+<p>Polished, free, supported. Best general-purpose client.</p>
+<ol>
+<li>Install <a href="https://apps.apple.com/app/play-sub/id955329386">play:Sub</a>
+   from the App Store.</li>
+<li>Settings → Servers → Add Server.</li>
+<li>Fill in:</li>
+<li><strong>Server Address</strong>: <code>http://&lt;host&gt;:4533</code> (no trailing <code>/rest</code>)</li>
+<li><strong>Username</strong>: from <code>musickit.toml</code></li>
+<li><strong>Password</strong>: from <code>musickit.toml</code></li>
+<li>Save. play:Sub does the salted-token handshake; if the credentials
+   are right, "Test Connection" succeeds.</li>
+<li>Browse → tap album → play.</li>
+</ol>
+<h3 id="amperfy">Amperfy<a class="headerlink" href="#amperfy" title="Permanent link">&para;</a></h3>
+<p>Free, open source, scrobble-aware. Good if you also use Last.fm.</p>
+<ol>
+<li>Install <a href="https://apps.apple.com/app/amperfy/id1530145105">Amperfy</a>.</li>
+<li>Settings → Server → Add Server. Same fields as above.</li>
+<li>Amperfy defaults to JSON (<code>f=json</code>); MusicKit serves both — no
+   tweak needed.</li>
+</ol>
+<h2 id="android">Android<a class="headerlink" href="#android" title="Permanent link">&para;</a></h2>
+<h3 id="symfonium">Symfonium<a class="headerlink" href="#symfonium" title="Permanent link">&para;</a></h3>
+<p>Paid (~5 EUR), best-in-class UI.</p>
+<ol>
+<li>Install <a href="https://play.google.com/store/apps/details?id=app.symfonik.music_player">Symfonium</a>
+   from Play.</li>
+<li>Settings → Sources → Add → Subsonic.</li>
+<li>URL: <code>http://&lt;host&gt;:4533</code>, plus user + password.</li>
+<li>Save → Sync. Syncing pulls a metadata index; subsequent browsing is
+   offline-aware.</li>
+</ol>
+<h3 id="dsub">DSub<a class="headerlink" href="#dsub" title="Permanent link">&para;</a></h3>
+<p>Free, open source, the Subsonic veteran. Older UI but rock-solid.</p>
+<ol>
+<li>Install <a href="https://f-droid.org/en/packages/github.daneren2005.dsub/">DSub</a>
+   from F-Droid (the Play version is years out of date).</li>
+<li>Settings → Servers → Server 1 → enable + fill in the same fields.</li>
+</ol>
+<h3 id="tempo">Tempo<a class="headerlink" href="#tempo" title="Permanent link">&para;</a></h3>
+<p>Free, open source, works on phone + Android Auto.</p>
+<ol>
+<li>Install <a href="https://github.com/CappielloAntonio/tempo">Tempo</a> from
+   F-Droid or GitHub.</li>
+<li>Login screen takes the same URL + credentials.</li>
+</ol>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="could-not-connect">"Could not connect"<a class="headerlink" href="#could-not-connect" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Confirm the server is reachable from the phone:
+  <code>curl http://&lt;host&gt;:4533/rest/ping?u=&lt;user&gt;&amp;p=&lt;password&gt;</code> from a
+  laptop on the same network.</li>
+<li>Don't include <code>/rest</code> in the URL field — the apps append it.</li>
+</ul>
+<h3 id="invalid-credentials">"Invalid credentials"<a class="headerlink" href="#invalid-credentials" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The Subsonic spec uses salted-token auth (<code>md5(password + salt)</code>),
+  not plain password. All four apps handle this transparently — but if
+  you've set <code>MUSICKIT_SERVER__PASSWORD</code> to a long random token,
+  occasional clients hash incorrectly. A short alphanumeric password
+  works around this.</li>
+</ul>
+<h3 id="no-music-shows-up">"No music shows up"<a class="headerlink" href="#no-music-shows-up" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The server only sees what's under the path you launched it with:
+  <code>musickit serve /path/to/Music</code>. Verify
+  <code>curl 'http://&lt;host&gt;:4533/rest/getArtists?u=...&amp;p=...&amp;f=json'</code> returns
+  a non-empty list.</li>
+<li>If <code>getArtists</code> returns content but the app's empty, force-rescan
+  inside the app (most have a "Sync" or "Refresh server" action).</li>
+</ul>
+<h3 id="cover-art-looks-low-res">Cover art looks low-res<a class="headerlink" href="#cover-art-looks-low-res" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Subsonic apps fetch cover art via <code>/rest/getCoverArt?id=...&amp;size=N</code>.
+  MusicKit serves the original embedded artwork; if your library has
+  small embeds, the upscale is what the app sees. Embed at 1000×1000
+  via <a href="../convert/">convert</a> for crisp art.</li>
+</ul>
+<h2 id="what-musickit-doesnt-do-yet">What MusicKit doesn't do (yet)<a class="headerlink" href="#what-musickit-doesnt-do-yet" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>No native iOS / Android app of its own.</strong> The Subsonic ecosystem
+  is solid; we'd rather you use a polished third-party client than ship
+  a 1.0 MusicKit app that's worse than play:Sub or Symfonium.</li>
+<li><strong>No CarPlay / Android Auto direct.</strong> Tempo (Android) supports
+  Android Auto. CarPlay routing on iOS depends on the client; play:Sub
+  works.</li>
+<li><strong>No background download / offline cache support in MusicKit itself.</strong>
+  Each client handles caching independently — most cache by default.</li>
+</ul>
 
 
 
