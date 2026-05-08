@@ -38,6 +38,9 @@ nav:
       - tui: guides/tui.md
       - serve: guides/serve.md
       - playlist: guides/playlist.md
+  - Clients:
+      - Desktop apps: guides/desktop.md
+      - Mobile (Subsonic): guides/mobile.md
   - Reference:
       - Architecture: architecture.md
       - Edge cases: edge-cases.md

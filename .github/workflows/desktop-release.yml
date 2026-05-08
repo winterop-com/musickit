@@ -1,0 +1,158 @@
+name: Desktop Release
+
+# Builds the Tauri + Electron desktop wrappers and attaches the resulting
+# .dmg / .exe / .AppImage / .deb artifacts to the GitHub Release that
+# release.yml created for this tag.
+#
+# Triggered on the same `v*` tag push as the Python release. Both
+# workflows run independently against the tag — the desktop build does
+# NOT block the PyPI publish, so a desktop-build failure won't hold up
+# the Python release.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  tauri:
+    name: Tauri (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-14 = Apple Silicon (arm64). macos-13 still builds Intel
+        # if we ever want a universal binary; skipped for now to keep
+        # the matrix small.
+        platform: [macos-14, ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/tauri/src-tauri -> target
+
+      - name: Set up Node (Tauri's icon CLI uses it)
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install Linux build deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Set up Python (for sync script)
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Sync desktop versions to pyproject
+        shell: bash
+        run: |
+          # Make the desktop crate/package version match the pushed tag
+          # so the bundle filenames embed it correctly.
+          python3 scripts/sync_desktop_versions.py
+
+      - name: Build Tauri bundle
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: desktop/tauri/src-tauri
+          # We attach to the release that release.yml created — never
+          # ask tauri-action to create or overwrite it.
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseDraft: false
+          prerelease: false
+          # Don't include the unsigned signature file in uploads.
+          includeUpdaterJson: false
+
+      - name: Rename artifacts to embed "Tauri" tag
+        if: matrix.platform == 'macos-14'
+        run: python3 scripts/rename_tauri_artifacts.py
+
+      - name: Upload renamed macOS artifacts
+        if: matrix.platform == 'macos-14'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          cd desktop/tauri/src-tauri/target/release/bundle/dmg
+          for f in MusicKit-Tauri-*.dmg; do
+            gh release upload "${GITHUB_REF_NAME}" "$f" --clobber
+          done
+
+  electron:
+    name: Electron (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-14, ubuntu-22.04, windows-2022]
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Set up Python (for sync script)
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Sync desktop versions to pyproject
+        shell: bash
+        run: python3 scripts/sync_desktop_versions.py
+
+      - name: Sync frontend assets into desktop/frontend
+        shell: bash
+        run: |
+          cp src/musickit/web/static/_palette.css   desktop/frontend/_palette.css
+          cp src/musickit/web/static/app.css        desktop/frontend/_app.css
+          cp src/musickit/web/static/favicon.svg    desktop/frontend/favicon.svg
+          cp src/musickit/web/static/visualizer.js  desktop/frontend/js/visualizer.js
+
+      - name: Install + build Electron
+        working-directory: desktop/electron
+        shell: bash
+        run: |
+          npm install
+          npm run build
+
+      - name: Upload Electron artifacts to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          shopt -s nullglob 2>/dev/null || true
+          cd desktop/electron/dist
+          # electron-builder's artifactName already produces
+          # MusicKit-Electron-<version>-<arch>.<ext> — upload everything
+          # but exclude builder block-map / latest-yml manifests.
+          for f in MusicKit-Electron-*; do
+            case "$f" in
+              *.blockmap|latest*.yml) continue ;;
+            esac
+            gh release upload "${GITHUB_REF_NAME}" "$f" --clobber
+          done
