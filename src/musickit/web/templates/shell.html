@@ -167,10 +167,24 @@
   <span class="kb"><kbd>l</kbd>·Lyrics</span>
   <span class="kb"><kbd>f</kbd>·Full</span>
   <span class="kb"><kbd>esc</kbd>·Close</span>
+  <span class="kb"><kbd>⌘P</kbd>·Palette</span>
 </div>
 
 <audio id="audio" preload="none"></audio>
 
+<div class="palette-backdrop" id="palette-backdrop" hidden>
+  <div class="palette" id="palette" role="dialog" aria-label="Command palette">
+    <input type="text"
+           id="palette-input"
+           class="palette-input"
+           placeholder="type a command…"
+           autocomplete="off"
+           spellcheck="false">
+    <ul class="palette-list" id="palette-list" role="listbox"></ul>
+  </div>
+</div>
+
 <script src="/web-static/app.js"></script>
 <script src="/web-static/visualizer.js"></script>
+<script src="/web-static/palette.js"></script>
 {% endblock %}

@@ -152,7 +152,7 @@ def test_successful_login_sets_session_cookie(tmp_path: Path) -> None:
 
 
 def test_shell_renders_tui_alike_chrome(tmp_path: Path) -> None:
-    """The shell carries the TUI-style chrome: Library stats, KeyBar, version brand."""
+    """The shell carries the TUI-style chrome: Library stats, KeyBar, version brand, palette."""
     client = _client(tmp_path)
     _login(client)
     text = client.get("/web", follow_redirects=False).text
@@ -165,6 +165,14 @@ def test_shell_renders_tui_alike_chrome(tmp_path: Path) -> None:
     # Centered topbar with versioned brand.
     assert 'class="brand"' in text
     assert 'class="version"' in text
+    # Now Playing card + Levels viz panels at the top.
+    assert "Now Playing" in text and "Levels" in text
+    # StatusBar with Vol/Repeat/Shuffle/Time.
+    assert 'class="status-bar"' in text
+    assert "Vol:" in text and "Repeat:" in text and "Shuffle:" in text and "Time:" in text
+    # Command palette modal + script.
+    assert 'id="palette"' in text
+    assert "palette.js" in text
 
 
 def test_artist_fragment_returns_album_list(tmp_path: Path) -> None:

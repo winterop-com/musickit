@@ -227,6 +227,19 @@ button:focus-visible {
   gap: 0.5rem;
   padding: 0.5rem 0.5rem 0;
   flex-shrink: 0;
+  /* Without an explicit cap, the grid row stretches to fill whatever the
+     visualizer canvas's `flex: 1` chooses, which on first paint can be
+     hundreds of pixels (canvases default to 150px tall, then the flex
+     algorithm grows the grid row to match siblings). 150px keeps the
+     Now Playing card snug while still giving the Levels panel a
+     readable bar height. Fullscreen mode (`body.is-viz`) overrides this
+     to grow the region to fill the viewport. */
+  height: 150px;
+}
+
+.now-playing-region .panel {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .np-card {
@@ -806,6 +819,7 @@ body.viz-idle .viz-panel {
 body.is-viz .now-playing-region {
   grid-template-columns: 1fr;
   flex: 1;
+  height: auto;
 }
 
 body.is-viz .np-card { display: none; }
@@ -888,6 +902,89 @@ body.is-viz .lyrics-panel { transform: translateX(100%); }
 .lyric-line.is-active {
   color: var(--active);
   font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Command palette (Ctrl+P / Cmd+P)                                       */
+/* ---------------------------------------------------------------------- */
+
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8vh;
+  z-index: 10;
+}
+
+.palette-backdrop[hidden] {
+  display: none;
+}
+
+.palette {
+  width: 480px;
+  max-width: 90vw;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.palette-input {
+  width: 100%;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: var(--mono);
+}
+
+.palette-input:focus {
+  outline: none;
+}
+
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.palette-item:hover,
+.palette-item.is-active {
+  background: var(--bg-hover);
+  color: var(--header);
+}
+
+.palette-label {
+  color: inherit;
+}
+
+.palette-hint {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.05rem 0.45rem;
+  background: var(--bg);
 }
 
 /* ---------------------------------------------------------------------- */
