@@ -25,9 +25,16 @@
     { label: "Play / pause", hint: "space", action: { key: " " } },
     { label: "Next track", hint: "n", action: { key: "n" } },
     { label: "Previous track", hint: "p", action: { key: "p" } },
+    { label: "Volume up", hint: "0", action: { key: "0" } },
+    { label: "Volume down", hint: "9", action: { key: "9" } },
+    { label: "Seek backward 5s", hint: "<", action: { key: "<" } },
+    { label: "Seek forward 5s", hint: ">", action: { key: ">" } },
+    { label: "Cycle repeat (off / album / track)", hint: "r", action: { key: "r" } },
+    { label: "Toggle shuffle", hint: "s", action: { key: "s" } },
     { label: "Toggle lyrics", hint: "l", action: { key: "l" } },
     { label: "Toggle visualizer", hint: "f", action: { key: "f" } },
     { label: "Focus search", hint: "/", action: { key: "/" } },
+    { label: "Show keyboard shortcuts", hint: "?", action: { key: "?" } },
     { label: "Close lyrics / visualizer", hint: "esc", action: { key: "Escape" } },
     { label: "Sign out", hint: "", action: { submit: "form.logout-form" } },
   ];
@@ -100,8 +107,27 @@
     if (key === " ") return "Space";
     if (key === "/") return "Slash";
     if (key === "Escape") return "Escape";
+    if (key === "<" || key === ",") return "Comma";
+    if (key === ">" || key === ".") return "Period";
+    if (key === "0" || key === "9") return "Digit" + key;
+    if (key === "?") return "Slash"; // Shift+/
     if (key.length === 1) return "Key" + key.toUpperCase();
     return key;
+  }
+
+  function dispatchKeyExtended(key) {
+    // Some keys ride on Shift (`?`, `<`, `>`); fire the event with the
+    // proper modifier so the listener's `event.key` checks (which look
+    // at the produced character) match.
+    const shifted = key === "?" || key === "<" || key === ">";
+    const event = new KeyboardEvent("keydown", {
+      key,
+      code: keyToCode(key),
+      shiftKey: shifted,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(event);
   }
 
   function invoke(cmd) {
@@ -109,7 +135,7 @@
     if (cmd.action.key) {
       // Brief defer so the close finishes before the keybind handler
       // re-evaluates focus (e.g. `/` should focus the search bar).
-      setTimeout(() => dispatchKey(cmd.action.key), 0);
+      setTimeout(() => dispatchKeyExtended(cmd.action.key), 0);
     } else if (cmd.action.submit) {
       const form = document.querySelector(cmd.action.submit);
       if (form && typeof form.submit === "function") form.submit();

@@ -35,6 +35,8 @@
   // StatusBar
   const sbVol = document.getElementById("sb-vol");
   const sbVolBar = document.getElementById("sb-vol-bar");
+  const sbRepeat = document.getElementById("sb-repeat");
+  const sbShuffle = document.getElementById("sb-shuffle");
   const sbAlbum = document.getElementById("sb-album");
   const sbCursor = document.getElementById("sb-cursor");
   const sbTime = document.getElementById("sb-time");
@@ -51,6 +53,10 @@
     lyricsLines: [], // [{start_ms, text}] when synced; empty otherwise
     lyricsSynced: false,
     lyricsTrackId: null,
+    // Playback modes — match the TUI's order. `r` cycles off → album →
+    // track → off; `s` toggles shuffle.
+    repeat: "off", // "off" | "album" | "track"
+    shuffle: false,
   };
 
   // -------------------------------------------------------------------- //
@@ -154,6 +160,18 @@
 
   function nextTrack() {
     if (state.queueIndex < 0) return;
+    if (state.shuffle && state.queue.length > 1) {
+      // Pick a random index different from the current one. With
+      // `repeat == "off"` we still allow re-picking after the queue
+      // exhausts; tracking played-indices isn't worth the complexity
+      // for a 10-30 track album queue.
+      let idx = state.queueIndex;
+      while (idx === state.queueIndex) {
+        idx = Math.floor(Math.random() * state.queue.length);
+      }
+      playQueueIndex(idx);
+      return;
+    }
     if (state.queueIndex + 1 < state.queue.length) {
       playQueueIndex(state.queueIndex + 1);
     }
@@ -164,10 +182,38 @@
     playQueueIndex(state.queueIndex - 1);
   }
 
+  function cycleRepeat() {
+    const order = ["off", "album", "track"];
+    state.repeat = order[(order.indexOf(state.repeat) + 1) % order.length];
+    updateRepeatShuffleReadout();
+  }
+
+  function toggleShuffle() {
+    state.shuffle = !state.shuffle;
+    updateRepeatShuffleReadout();
+  }
+
+  function updateRepeatShuffleReadout() {
+    if (sbRepeat) sbRepeat.textContent = state.repeat;
+    if (sbShuffle) sbShuffle.textContent = state.shuffle ? "on" : "off";
+  }
+
   function togglePause() {
     if (state.queueIndex < 0) return;
     if (audio.paused) audio.play();
     else audio.pause();
+  }
+
+  function adjustVolume(delta) {
+    const v = Math.max(0, Math.min(1, audio.volume + delta));
+    audio.volume = v;
+    npVol.value = v;
+    updateVolumeReadout(v);
+  }
+
+  function seekBy(seconds) {
+    if (!audio.duration || !isFinite(audio.duration)) return;
+    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
   }
 
   // -------------------------------------------------------------------- //
@@ -311,6 +357,10 @@
       prevTrack();
     } else if (action === "toggle-lyrics") {
       toggleLyrics();
+    } else if (action === "cycle-repeat") {
+      cycleRepeat();
+    } else if (action === "toggle-shuffle") {
+      toggleShuffle();
     }
   });
 
@@ -344,6 +394,24 @@
     playButton.classList.remove("is-paused");
     playButton.firstElementChild.textContent = "▶";
     setStateIcon("■");
+    // Repeat behaviour mirrors the TUI:
+    //   off   — advance to next, stop at end
+    //   album — advance, wrap to index 0 at the end
+    //   track — replay current track
+    if (state.repeat === "track" && state.queueIndex >= 0) {
+      playQueueIndex(state.queueIndex);
+      return;
+    }
+    if (state.shuffle && state.queue.length > 1) {
+      nextTrack();
+      return;
+    }
+    if (state.queueIndex + 1 >= state.queue.length) {
+      if (state.repeat === "album" && state.queue.length > 0) {
+        playQueueIndex(0);
+      }
+      return;
+    }
     nextTrack();
   });
 
@@ -431,6 +499,14 @@
     }
     if (inField) return; // typing in an input — don't hijack other keys
 
+    // Ignore modifier combos (Cmd/Ctrl/Alt + key). The command palette
+    // owns Cmd/Ctrl+P; without this guard, Cmd+P would also fire the
+    // bare-`p` "previous track" handler and skip the currently-playing
+    // song the moment the palette opens. Bare keybinds (n/p/l/9/0/etc.)
+    // are not intended to combine with modifiers, so a blanket bail is
+    // correct here. (Shift is allowed — `<` and `>` are shifted.)
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
     if (event.code === "Space") {
       event.preventDefault();
       togglePause();
@@ -438,8 +514,58 @@
       nextTrack();
     } else if (event.key === "p" || event.key === "P") {
       prevTrack();
+    } else if (event.key === "r" || event.key === "R") {
+      cycleRepeat();
+    } else if (event.key === "s" || event.key === "S") {
+      toggleShuffle();
     } else if (event.key === "l" || event.key === "L") {
       toggleLyrics();
+    } else if (event.key === "0" || event.key === "+" || event.key === "=") {
+      // Volume up — same keys as the TUI / mpv (`0` and `+`).
+      event.preventDefault();
+      adjustVolume(+0.05);
+    } else if (event.key === "9" || event.key === "-") {
+      event.preventDefault();
+      adjustVolume(-0.05);
+    } else if (event.key === "<" || event.key === ",") {
+      // Seek backward — `<` is Shift+`,` on US layout; treat both the
+      // shifted form and bare `,` as seek so layouts that don't shift
+      // produce `<` still work.
+      event.preventDefault();
+      seekBy(-5);
+    } else if (event.key === ">" || event.key === ".") {
+      event.preventDefault();
+      seekBy(+5);
+    } else if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
+      // `?` (Shift+`/`) opens the help overlay. Don't intercept the
+      // bare `/` here — that path is handled above for search focus.
+      event.preventDefault();
+      toggleHelp();
+    }
+  });
+
+  // -------------------------------------------------------------------- //
+  // Help overlay (?)                                                     //
+  // -------------------------------------------------------------------- //
+
+  const helpPanel = document.getElementById("help-panel");
+  const helpClose = document.getElementById("help-close");
+
+  function toggleHelp() {
+    if (!helpPanel) return;
+    helpPanel.classList.toggle("is-open");
+  }
+
+  if (helpClose) {
+    helpClose.addEventListener("click", () => {
+      if (helpPanel) helpPanel.classList.remove("is-open");
+    });
+  }
+  // Esc also closes help — extend the existing Escape branch above by
+  // listening at module level since the existing branch returns early.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && helpPanel && helpPanel.classList.contains("is-open")) {
+      helpPanel.classList.remove("is-open");
     }
   });
 })();

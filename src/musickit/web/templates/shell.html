@@ -131,11 +131,13 @@
     <span class="sb-value sb-vol" id="sb-vol">100%</span>
     <span class="sb-bar" id="sb-vol-bar">[||||||||||||]</span>
   </span>
-  <span class="sb-group">
+  <span class="sb-group sb-clickable" data-action="cycle-repeat" role="button" tabindex="0"
+        title="Cycle repeat mode (r)">
     <span class="sb-label">Repeat:</span>
     <span class="sb-value sb-repeat" id="sb-repeat">off</span>
   </span>
-  <span class="sb-group">
+  <span class="sb-group sb-clickable" data-action="toggle-shuffle" role="button" tabindex="0"
+        title="Toggle shuffle (s)">
     <span class="sb-label">Shuffle:</span>
     <span class="sb-value sb-shuffle" id="sb-shuffle">off</span>
   </span>
@@ -163,13 +165,44 @@
   <span class="kb"><kbd>space</kbd>·Play</span>
   <span class="kb"><kbd>n</kbd>·Next</span>
   <span class="kb"><kbd>p</kbd>·Prev</span>
+  <span class="kb"><kbd>&lt;</kbd>/<kbd>&gt;</kbd>·Seek</span>
+  <span class="kb"><kbd>9</kbd>/<kbd>0</kbd>·Vol</span>
+  <span class="kb"><kbd>r</kbd>·Repeat</span>
+  <span class="kb"><kbd>s</kbd>·Shuffle</span>
   <span class="kb"><kbd>/</kbd>·Filter</span>
   <span class="kb"><kbd>l</kbd>·Lyrics</span>
   <span class="kb"><kbd>f</kbd>·Full</span>
+  <span class="kb"><kbd>?</kbd>·Help</span>
   <span class="kb"><kbd>⌘P</kbd>·Palette</span>
 </div>
 
 <audio id="audio" preload="none"></audio>
+
+<aside class="help-panel" id="help-panel" aria-label="Keyboard shortcuts">
+  <div class="help-header">
+    <span>Keys</span>
+    <button type="button" class="ghost-button" id="help-close" aria-label="Close help">×</button>
+  </div>
+  <div class="help-body">
+    <ul class="help-list">
+      <li class="help-row"><span class="help-key"><kbd>space</kbd></span><span class="help-desc">Play / pause</span></li>
+      <li class="help-row"><span class="help-key"><kbd>n</kbd></span><span class="help-desc">Next track</span></li>
+      <li class="help-row"><span class="help-key"><kbd>p</kbd></span><span class="help-desc">Previous track</span></li>
+      <li class="help-row"><span class="help-key"><kbd>0</kbd> <kbd>+</kbd></span><span class="help-desc">Volume up</span></li>
+      <li class="help-row"><span class="help-key"><kbd>9</kbd> <kbd>-</kbd></span><span class="help-desc">Volume down</span></li>
+      <li class="help-row"><span class="help-key"><kbd>&lt;</kbd></span><span class="help-desc">Seek backward</span></li>
+      <li class="help-row"><span class="help-key"><kbd>&gt;</kbd></span><span class="help-desc">Seek forward</span></li>
+      <li class="help-row"><span class="help-key"><kbd>r</kbd></span><span class="help-desc">Cycle repeat (off / album / track)</span></li>
+      <li class="help-row"><span class="help-key"><kbd>s</kbd></span><span class="help-desc">Toggle shuffle</span></li>
+      <li class="help-row"><span class="help-key"><kbd>l</kbd></span><span class="help-desc">Show / hide lyrics</span></li>
+      <li class="help-row"><span class="help-key"><kbd>f</kbd></span><span class="help-desc">Fullscreen visualizer</span></li>
+      <li class="help-row"><span class="help-key"><kbd>/</kbd></span><span class="help-desc">Filter / search</span></li>
+      <li class="help-row"><span class="help-key"><kbd>?</kbd></span><span class="help-desc">Toggle help</span></li>
+      <li class="help-row"><span class="help-key"><kbd>⌘P</kbd></span><span class="help-desc">Open the command palette</span></li>
+      <li class="help-row"><span class="help-key"><kbd>esc</kbd></span><span class="help-desc">Close panel</span></li>
+    </ul>
+  </div>
+</aside>
 
 <div class="palette-backdrop" id="palette-backdrop" hidden>
   <div class="palette" id="palette" role="dialog" aria-label="Command palette">
@@ -183,7 +216,7 @@
   </div>
 </div>
 
-<script src="/web-static/app.js"></script>
-<script src="/web-static/visualizer.js"></script>
-<script src="/web-static/palette.js"></script>
+<script src="/web-static/app.js?v={{ asset_version }}"></script>
+<script src="/web-static/visualizer.js?v={{ asset_version }}"></script>
+<script src="/web-static/palette.js?v={{ asset_version }}"></script>
 {% endblock %}

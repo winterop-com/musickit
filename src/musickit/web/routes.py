@@ -21,6 +21,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from musickit import __version__
 from musickit.serve.auth import AuthError, verify
 from musickit.web.session import SESSION_PW_KEY, SESSION_USER_KEY, new_csrf_token
 
@@ -58,7 +59,11 @@ async def login_form(request: Request) -> Response:
         return RedirectResponse(url="/web", status_code=303)
     csrf = new_csrf_token()
     request.session["csrf"] = csrf
-    return templates.TemplateResponse(request, "login.html", {"csrf": csrf, "error": None})
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {"csrf": csrf, "error": None, "asset_version": __version__},
+    )
 
 
 @router.post("/login", response_class=HTMLResponse, include_in_schema=False)
@@ -74,7 +79,11 @@ async def login_submit(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {"csrf": new_csrf_token(), "error": "Session expired — please try again."},
+            {
+                "csrf": new_csrf_token(),
+                "error": "Session expired — please try again.",
+                "asset_version": __version__,
+            },
             status_code=400,
         )
     cfg = request.app.state.cfg
@@ -84,7 +93,11 @@ async def login_submit(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {"csrf": new_csrf_token(), "error": "Wrong username or password."},
+            {
+                "csrf": new_csrf_token(),
+                "error": "Wrong username or password.",
+                "asset_version": __version__,
+            },
             status_code=401,
         )
     request.session[SESSION_USER_KEY] = username
@@ -124,8 +137,6 @@ async def web_shell(request: Request) -> Response:
         "artists": cache.artist_count,
         "folders": folder_count,
     }
-    from musickit import __version__
-
     return templates.TemplateResponse(
         request,
         "shell.html",
@@ -134,6 +145,10 @@ async def web_shell(request: Request) -> Response:
             "stats": stats,
             "user": request.session.get(SESSION_USER_KEY, ""),
             "version": __version__,
+            # `asset_version` cache-busts /web-static/{app.css,app.js,...}
+            # links so a `make` -> reload picks up CSS / JS changes
+            # without forcing the user into Cmd+Shift+R every time.
+            "asset_version": __version__,
         },
     )
 
