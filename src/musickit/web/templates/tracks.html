@@ -1,5 +1,14 @@
-<h2>{{ album_title }}</h2>
-<p class="album-subtitle">{{ album_artist }}</p>
+<div class="album-heading">
+  <span class="album-heading-title">{{ album_title }}</span>
+  <span class="album-heading-artist">{{ album_artist }}</span>
+</div>
+<div class="track-table-header">
+  <span class="th-no">#</span>
+  <span class="th-title">Title</span>
+  <span class="th-artist">Artist</span>
+  <span class="th-time">Time</span>
+</div>
+<div class="track-table-rule"></div>
 <ul class="row-list track-list">
   {% for track in tracks %}
   <li>

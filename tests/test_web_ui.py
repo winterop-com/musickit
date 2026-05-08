@@ -140,13 +140,31 @@ def test_successful_login_sets_session_cookie(tmp_path: Path) -> None:
     # The session cookie is now in the client jar; subsequent /web hit succeeds.
     response = client.get("/web", follow_redirects=False)
     assert response.status_code == 200
-    assert "<h2>Artists" in response.text
+    # The TUI-aligned shell uses panel-titled sections — "Library" + "Browse".
+    assert "Library" in response.text
+    assert "Browse" in response.text
     assert "ABBA" in response.text
 
 
 # ---------------------------------------------------------------------------
 # Authenticated browsing
 # ---------------------------------------------------------------------------
+
+
+def test_shell_renders_tui_alike_chrome(tmp_path: Path) -> None:
+    """The shell carries the TUI-style chrome: Library stats, KeyBar, version brand."""
+    client = _client(tmp_path)
+    _login(client)
+    text = client.get("/web", follow_redirects=False).text
+    # Library stats panel + counts.
+    assert "Library" in text
+    assert "Tracks" in text and "Albums" in text and "Artists" in text and "Folders" in text
+    # KeyBar at the bottom.
+    assert 'class="keybar"' in text
+    assert "·Play" in text
+    # Centered topbar with versioned brand.
+    assert 'class="brand"' in text
+    assert 'class="version"' in text
 
 
 def test_artist_fragment_returns_album_list(tmp_path: Path) -> None:

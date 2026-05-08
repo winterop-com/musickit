@@ -2,48 +2,72 @@
 {% block title %}musickit{% endblock %}
 {% block body %}
 <header class="topbar">
-  <span class="brand">musickit</span>
-  <input type="search"
-         id="search"
-         class="search-input"
-         placeholder="Search artists, albums, tracks…  (/)"
-         autocomplete="off"
-         spellcheck="false">
-  <span class="user">{{ user }}</span>
-  <form method="post" action="/logout" class="logout-form">
-    <button type="submit" class="ghost-button">Sign out</button>
-  </form>
+  <div class="topbar-left">
+    <input type="search"
+           id="search"
+           class="search-input"
+           placeholder="filter / search…"
+           autocomplete="off"
+           spellcheck="false">
+  </div>
+  <div class="topbar-center">
+    <span class="brand">musickit</span><span class="version">v{{ version }}</span>
+  </div>
+  <div class="topbar-right">
+    <span class="user">{{ user }}</span>
+    <form method="post" action="/logout" class="logout-form">
+      <button type="submit" class="ghost-button">Sign out</button>
+    </form>
+  </div>
 </header>
 
 <main class="three-pane">
-  <section class="pane pane-artists" aria-label="Artists">
-    <h2>Artists <span class="count">({{ artists|length }})</span></h2>
-    <ul class="row-list" id="artists-list">
-      {% for ar_id, name in artists %}
-      <li>
-        <button type="button"
-                class="row-button"
-                data-action="load-artist"
-                data-id="{{ ar_id }}">
-          {{ name }}
-        </button>
-      </li>
-      {% else %}
-      <li class="empty">No artists in library yet.</li>
-      {% endfor %}
-    </ul>
+  <section class="pane pane-sidebar" aria-label="Library">
+    <section class="panel" aria-label="Library stats">
+      <h2 class="panel-title">Library</h2>
+      <ul class="stats-list">
+        <li><span class="stat-icon">♪</span> Tracks   <span class="stat-num">{{ "%5d"|format(stats.tracks) }}</span></li>
+        <li><span class="stat-icon">◉</span> Albums   <span class="stat-num">{{ "%5d"|format(stats.albums) }}</span></li>
+        <li><span class="stat-icon">◆</span> Artists  <span class="stat-num">{{ "%5d"|format(stats.artists) }}</span></li>
+        <li><span class="stat-icon">▦</span> Folders  <span class="stat-num">{{ "%5d"|format(stats.folders) }}</span></li>
+      </ul>
+    </section>
+
+    <section class="panel panel-grow" aria-label="Browse">
+      <h2 class="panel-title">Browse <span class="count">({{ artists|length }})</span></h2>
+      <ul class="row-list" id="artists-list">
+        {% for ar_id, name in artists %}
+        <li>
+          <button type="button"
+                  class="row-button"
+                  data-action="load-artist"
+                  data-id="{{ ar_id }}">
+            {{ name }}
+          </button>
+        </li>
+        {% else %}
+        <li class="empty">No artists in library yet.</li>
+        {% endfor %}
+      </ul>
+    </section>
   </section>
 
   <section class="pane pane-albums" aria-label="Albums">
-    <div id="albums-pane">
-      <p class="empty">Pick an artist to see albums.</p>
-    </div>
+    <section class="panel panel-grow">
+      <h2 class="panel-title">Albums</h2>
+      <div id="albums-pane">
+        <p class="empty">Pick an artist to see albums.</p>
+      </div>
+    </section>
   </section>
 
   <section class="pane pane-tracks" aria-label="Tracks">
-    <div id="tracks-pane">
-      <p class="empty">Pick an album to see tracks.</p>
-    </div>
+    <section class="panel panel-grow">
+      <h2 class="panel-title">Tracks</h2>
+      <div id="tracks-pane">
+        <p class="empty">Pick an album to see tracks.</p>
+      </div>
+    </section>
   </section>
 </main>
 
@@ -61,6 +85,19 @@
 
 <footer class="now-playing" id="now-playing">
   <img id="np-cover" class="np-cover" alt="" style="visibility: hidden">
+  <div class="np-meta">
+    <span class="np-title" id="np-title">Nothing playing</span>
+    <span class="np-artist-line">
+      <span class="np-artist" id="np-artist"></span>
+      <span class="np-album-sep" id="np-album-sep"></span>
+      <span class="np-album" id="np-album"></span>
+    </span>
+  </div>
+  <div class="np-progress">
+    <span class="np-pos" id="np-pos">00:00</span>
+    <progress id="np-bar" max="1" value="0"></progress>
+    <span class="np-dur" id="np-dur">00:00</span>
+  </div>
   <div class="np-controls">
     <button type="button" class="np-button" data-action="prev" id="prev-button" disabled aria-label="Previous track">
       <span aria-hidden="true">⏮</span>
@@ -71,15 +108,6 @@
     <button type="button" class="np-button" data-action="next" id="next-button" disabled aria-label="Next track">
       <span aria-hidden="true">⏭</span>
     </button>
-  </div>
-  <div class="np-meta">
-    <span class="np-title" id="np-title">Nothing playing</span>
-    <span class="np-artist" id="np-artist"></span>
-  </div>
-  <div class="np-progress">
-    <span class="np-pos" id="np-pos">00:00</span>
-    <progress id="np-bar" max="1" value="0"></progress>
-    <span class="np-dur" id="np-dur">00:00</span>
   </div>
   <div class="np-volume">
     <button type="button" class="np-button" data-action="toggle-viz" aria-label="Toggle visualizer (f)">
@@ -93,6 +121,16 @@
   </div>
   <audio id="audio" preload="none"></audio>
 </footer>
+
+<div class="keybar" aria-label="Keyboard shortcuts">
+  <span class="kb"><kbd>space</kbd>·Play</span>
+  <span class="kb"><kbd>n</kbd>·Next</span>
+  <span class="kb"><kbd>p</kbd>·Prev</span>
+  <span class="kb"><kbd>/</kbd>·Filter</span>
+  <span class="kb"><kbd>l</kbd>·Lyrics</span>
+  <span class="kb"><kbd>f</kbd>·Full</span>
+  <span class="kb"><kbd>esc</kbd>·Close</span>
+</div>
 
 <script src="/web-static/app.js"></script>
 <script src="/web-static/visualizer.js"></script>

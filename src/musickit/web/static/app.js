@@ -22,6 +22,8 @@
   const nextButton = document.getElementById("next-button");
   const npTitle = document.getElementById("np-title");
   const npArtist = document.getElementById("np-artist");
+  const npAlbum = document.getElementById("np-album");
+  const npAlbumSep = document.getElementById("np-album-sep");
   const npCover = document.getElementById("np-cover");
   const npPos = document.getElementById("np-pos");
   const npDur = document.getElementById("np-dur");
@@ -77,11 +79,17 @@
 
   function buildQueueFromVisibleTracks() {
     const rows = Array.from(tracksPane.querySelectorAll(".track-row"));
+    // The album heading lives in the same fragment — pull title/artist
+    // off it once so each track inherits the right album metadata in
+    // the now-playing card.
+    const headingEl = tracksPane.querySelector(".album-heading");
+    const albumTitle = headingEl?.querySelector(".album-heading-title")?.textContent || "";
     return rows.map((rowEl) => ({
       id: rowEl.dataset.id,
       title: rowEl.dataset.title,
       artist: rowEl.dataset.artist,
       albumId: rowEl.dataset.albumId,
+      albumTitle,
       rowEl,
     }));
   }
@@ -104,6 +112,10 @@
 
     npTitle.textContent = item.title || "—";
     npArtist.textContent = item.artist || "";
+    if (npAlbum) {
+      npAlbum.textContent = item.albumTitle || "";
+      if (npAlbumSep) npAlbumSep.textContent = item.albumTitle ? " · " : "";
+    }
     if (item.albumId) {
       npCover.src = "/rest/getCoverArt?id=" + encodeURIComponent(item.albumId) + "&size=80";
       npCover.style.visibility = "visible";

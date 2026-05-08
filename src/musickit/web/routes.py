@@ -107,7 +107,7 @@ async def logout(request: Request) -> Response:
 
 @router.get("/web", response_class=HTMLResponse, include_in_schema=False)
 async def web_shell(request: Request) -> Response:
-    """Three-pane shell — artists in left pane, empty albums + tracks panes."""
+    """Three-pane shell — Library stats + artists in left, albums + tracks in middle / right."""
     redirect = _require_auth_or_redirect(request)
     if redirect is not None:
         return redirect
@@ -116,10 +116,25 @@ async def web_shell(request: Request) -> Response:
         ((ar_id, name) for ar_id, name in cache.artist_name_by_id.items()),
         key=lambda pair: pair[1].casefold(),
     )
+    # Library stats — counts mirror the TUI's SidebarStats panel.
+    folder_count = len({album.path.parent for album in cache.albums_by_id.values()})
+    stats = {
+        "tracks": cache.track_count,
+        "albums": cache.album_count,
+        "artists": cache.artist_count,
+        "folders": folder_count,
+    }
+    from musickit import __version__
+
     return templates.TemplateResponse(
         request,
         "shell.html",
-        {"artists": artists, "user": request.session.get(SESSION_USER_KEY, "")},
+        {
+            "artists": artists,
+            "stats": stats,
+            "user": request.session.get(SESSION_USER_KEY, ""),
+            "version": __version__,
+        },
     )
 
 
