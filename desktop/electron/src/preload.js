@@ -9,7 +9,7 @@
 // the same async-flavour surface for picker.js's await calls.
 
 const { contextBridge } = require("electron");
-const ElectronStore = require("electron-store").default || require("electron-store");
+const ElectronStore = require("electron-store");
 
 // Single store instance, scoped to a JSON file in app.getPath('userData').
 // The picker uses generic .get('servers') / .set('servers', ...) so the

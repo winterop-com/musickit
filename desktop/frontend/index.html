@@ -19,6 +19,10 @@
       <p class="picker-hint" id="picker-hint">
         Enter the URL of a <code>musickit serve</code> instance — LAN address or Tailscale hostname.
       </p>
+      <p class="picker-hint picker-hint-quiet">
+        This app currently only works against <code>musickit serve</code>. Generic Subsonic
+        servers (Navidrome, Airsonic) speak the same API but don't ship the same web UI.
+      </p>
 
       <form class="picker-form" id="picker-form" autocomplete="off">
         <label class="visually-hidden" for="server-url">Server URL</label>
