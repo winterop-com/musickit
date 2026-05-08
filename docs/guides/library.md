@@ -159,13 +159,13 @@ uvx musickit library index rebuild DIR     # wipe + rebuild from scratch
 
 | Table | Holds |
 |---|---|
-| `meta` | `schema_version`, `library_root_abs`, `last_full_scan_at` |
+| `meta` | `schema_version`, `library_root_abs`, `musickit_version`, `last_full_scan_at` |
 | `albums` | One row per album dir — tags, counts, `dir_mtime`, audit-relevant flags |
 | `tracks` | One row per audio file — tags, ReplayGain, `file_mtime`, `file_size` |
 | `track_genres` | `(track_id, genre)` pairs for multi-genre support |
 | `album_warnings` | `(album_id, warning)` pairs from the audit pass |
 
-Schema changes don't run migrations — `db.py` defines a `SCHEMA_VERSION` constant; if the on-disk version doesn't match, the DB is unlinked and rebuilt from scratch.
+Schema changes don't run migrations — `db.py` defines a `SCHEMA_VERSION` constant; if the on-disk version doesn't match, the DB is unlinked and rebuilt from scratch. The `musickit_version` row records which release wrote the cache; **if the running musickit version differs from the stamp, the DB is also rebuilt**. So upgrading musickit transparently invalidates and refreshes the cache on the next open — you never have to remember to run `library index rebuild` after `uv tool upgrade musickit`.
 
 ### Cold-start flow
 

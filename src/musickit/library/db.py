@@ -2,8 +2,8 @@
 
 The DB at `<library_root>/.musickit/index.db` is a fully-derived cache of
 the filesystem walk + tag read + audit. The filesystem is the source of
-truth, so when the schema changes we unlink the file and rebuild instead
-of running migrations.
+truth, so when the schema changes — or when the running musickit version
+changes — we unlink the file and rebuild instead of running migrations.
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ import logging
 import sqlite3
 from pathlib import Path
 from typing import Final
+
+from musickit import __version__ as MUSICKIT_VERSION
 
 log = logging.getLogger(__name__)
 
@@ -110,7 +112,7 @@ def open_db(root: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     if path.exists() and not _can_use_existing(path, root):
-        log.info("library index: schema/root mismatch at %s; rebuilding", path)
+        log.info("library index: schema/root/version mismatch at %s; rebuilding", path)
         _unlink_db(path)
 
     fresh = not path.exists()
@@ -149,6 +151,10 @@ def _create_schema(conn: sqlite3.Connection, root: Path) -> None:
         "INSERT INTO meta(key, value) VALUES (?, ?)",
         ("library_root_abs", str(root.resolve())),
     )
+    conn.execute(
+        "INSERT INTO meta(key, value) VALUES (?, ?)",
+        ("musickit_version", MUSICKIT_VERSION),
+    )
 
 
 def reclaim_freelist(conn: sqlite3.Connection) -> None:
@@ -181,11 +187,17 @@ def _can_use_existing(path: Path, root: Path) -> bool:
         try:
             schema_row = probe.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
             root_row = probe.execute("SELECT value FROM meta WHERE key='library_root_abs'").fetchone()
+            version_row = probe.execute("SELECT value FROM meta WHERE key='musickit_version'").fetchone()
         except sqlite3.DatabaseError:
             return False
         if schema_row is None or schema_row[0] != str(SCHEMA_VERSION):
             return False
         if root_row is None or root_row[0] != str(root.resolve()):
+            return False
+        # version_row may be missing on DBs created before the
+        # musickit_version stamp existed — treat absence as a mismatch
+        # so they rebuild on first open under a newer musickit.
+        if version_row is None or version_row[0] != MUSICKIT_VERSION:
             return False
         return True
     finally:
