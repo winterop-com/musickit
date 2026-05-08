@@ -1,4 +1,4 @@
-.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots desktop-sync-frontend desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
+.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python desktop-sync-frontend desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -15,6 +15,8 @@ help:
 	@echo "  docs-build   Build static documentation site to ./site"
 	@echo "  docs-screenshots  Regenerate the TUI SVG screenshots in docs/screenshots/"
 	@echo "  docs         Alias for docs-serve"
+	@echo "  build        Build release versions of everything (python wheel + Tauri .app + Electron .dmg)"
+	@echo "  build-python Build Python wheel + sdist via uv build (-> ./dist)"
 	@echo "  desktop-tauri        Alias for desktop-tauri-dev"
 	@echo "  desktop-tauri-dev    Run the Tauri desktop app in dev mode (cargo tauri dev)"
 	@echo "  desktop-tauri-build  Build the Tauri desktop app .app bundle (release)"
@@ -77,6 +79,29 @@ docs: docs-serve
 # is symlinked from `src/musickit/web/static/_palette.css` so colour
 # changes propagate to both web + desktop on save.
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Release builds
+#
+# `make build` produces release versions of every shippable surface:
+#   - Python wheel + sdist          -> ./dist/
+#   - Tauri .app                    -> desktop/tauri/src-tauri/target/release/bundle/macos/
+#   - Electron .dmg                 -> desktop/electron/dist/
+#
+# Each sub-target can also run on its own — useful when you only need
+# one artifact (e.g. CI publishing the Python wheel without touching
+# the desktop apps).
+# ---------------------------------------------------------------------------
+
+build: build-python desktop-tauri-build desktop-electron-build
+	@echo ">>> All release builds complete:"
+	@echo "    - Python:    $$(ls dist/*.whl 2>/dev/null | head -1)"
+	@echo "    - Tauri:     $$(ls desktop/tauri/src-tauri/target/release/bundle/macos/*.app 2>/dev/null | head -1)"
+	@echo "    - Electron:  $$(ls desktop/electron/dist/*.dmg 2>/dev/null | head -1)"
+
+build-python:
+	@echo ">>> Building Python wheel + sdist into ./dist"
+	@$(UV) build
 
 desktop-sync-frontend:
 	@echo ">>> Syncing shared frontend assets into desktop/frontend/"
