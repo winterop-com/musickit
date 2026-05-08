@@ -86,13 +86,15 @@ async function mountLogin(prefill = null) {
     </main>
   `;
 
-  // Pre-fill from last-used if present.
-  if (last) {
-    const hostInput = document.getElementById("login-host");
-    const userInput = document.getElementById("login-user");
-    if (hostInput) hostInput.value = last.host || "";
-    if (userInput) userInput.value = last.user || "";
-  }
+  // Pre-fill from last-used if present, otherwise fall back to the
+  // local-musickit-serve defaults — most first-time users are testing
+  // against `musickit serve <library>` on their own machine.
+  const hostInput = document.getElementById("login-host");
+  const userInput = document.getElementById("login-user");
+  const passInput = document.getElementById("login-pass");
+  if (hostInput) hostInput.value = last?.host || "http://localhost:4533";
+  if (userInput) userInput.value = last?.user || "admin";
+  if (passInput && !last) passInput.value = "admin";
 
   // Render saved-servers list.
   if (saved.length > 0) {
@@ -127,14 +129,11 @@ async function mountLogin(prefill = null) {
     }
   }
 
-  // Focus the right field — host empty? focus host. Otherwise password.
-  const hostInput = document.getElementById("login-host");
-  const passInput = document.getElementById("login-pass");
-  if (hostInput && !hostInput.value) {
-    hostInput.focus();
-  } else {
-    passInput?.focus();
-  }
+  // Focus password (host + user are pre-filled to sane defaults so the
+  // password is the next thing the user actually needs to type — or
+  // press Enter, if first-run defaults are admin/admin against a local
+  // server).
+  passInput?.focus();
 
   document.getElementById("login-form")?.addEventListener("submit", onLoginSubmit);
 }
