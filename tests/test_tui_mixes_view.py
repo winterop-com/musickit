@@ -21,6 +21,7 @@ from textual.widgets import ListItem
 from musickit import library as library_mod
 from musickit.tui.app import MusickitApp
 from musickit.tui.widgets import BrowserList, TrackList
+from tests._tui_wait import wait_for_browser_child
 from tests.test_library import _make_track
 
 
@@ -28,7 +29,12 @@ async def _drill_into_album(pilot: Pilot[None], artist: str) -> None:
     app = pilot.app
     assert isinstance(app, MusickitApp)
     browser = app.query_one(BrowserList)
-    artist_row = next(c for c in browser.children if getattr(c, "entry_data", None) == artist)
+    artist_row = await wait_for_browser_child(
+        pilot,
+        lambda: browser.children,
+        lambda c: getattr(c, "entry_data", None) == artist,
+        description=f"artist row {artist!r}",
+    )
     assert isinstance(artist_row, ListItem)
     app._handle_browser_selection(artist_row)
     await pilot.pause()
@@ -74,7 +80,12 @@ async def test_mixes_browser_entry_lists_saved_m3u8(silent_flac_template: Path, 
         a._populate_browser()
         await pilot.pause()
         browser = a.query_one(BrowserList)
-        mixes_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "mixes")
+        mixes_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "mixes",
+            description="mixes row",
+        )
         assert isinstance(mixes_row, ListItem)
         a._handle_browser_selection(mixes_row)
         await pilot.pause()

@@ -9,20 +9,31 @@ from textual.widgets import Input
 
 from musickit.tui.app import BrowserList, MusickitApp
 from musickit.tui.tag_editor import AlbumTagEditorScreen
+from tests._tui_wait import wait_for_browser_child
 from tests.test_library import _make_track
 
 
-def _drill_into_album(pilot: object, root: Path) -> None:
+async def _drill_into_album(pilot: object, root: Path) -> None:
     app = pilot.app  # type: ignore[attr-defined]
     browser = app.query_one(BrowserList)
-    artist_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+    artist_row = await wait_for_browser_child(
+        pilot,
+        lambda: browser.children,
+        lambda c: getattr(c, "entry_kind", None) == "artist",
+        description="artist row",
+    )
     app._handle_browser_selection(artist_row)
 
 
 async def _open_album_editor(pilot: object) -> AlbumTagEditorScreen:
     app = pilot.app  # type: ignore[attr-defined]
     browser = app.query_one(BrowserList)
-    album_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+    album_row = await wait_for_browser_child(
+        pilot,
+        lambda: browser.children,
+        lambda c: getattr(c, "entry_kind", None) == "album",
+        description="album row",
+    )
     album = album_row.entry_data
     screen = AlbumTagEditorScreen(app, album)
     app.push_screen(screen)
@@ -44,7 +55,7 @@ async def test_album_rename_when_album_title_changes(silent_flac_template: Path,
 
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
-        _drill_into_album(pilot, root)
+        await _drill_into_album(pilot, root)
         await pilot.pause()
         screen = await _open_album_editor(pilot)
 
@@ -73,7 +84,7 @@ async def test_album_rename_across_artists(silent_flac_template: Path, tmp_path:
 
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
-        _drill_into_album(pilot, root)
+        await _drill_into_album(pilot, root)
         await pilot.pause()
         screen = await _open_album_editor(pilot)
 
@@ -99,7 +110,7 @@ async def test_album_no_rename_when_only_genre_changes(silent_flac_template: Pat
 
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
-        _drill_into_album(pilot, root)
+        await _drill_into_album(pilot, root)
         await pilot.pause()
         screen = await _open_album_editor(pilot)
 
@@ -133,7 +144,7 @@ async def test_album_rename_collision_keeps_modal_open(silent_flac_template: Pat
 
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
-        _drill_into_album(pilot, root)
+        await _drill_into_album(pilot, root)
         await pilot.pause()
         screen = await _open_album_editor(pilot)
 

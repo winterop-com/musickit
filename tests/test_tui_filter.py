@@ -8,6 +8,7 @@ import pytest
 from mutagen.mp4 import MP4
 
 from musickit import convert as convert_mod
+from tests._tui_wait import wait_for_browser_child
 
 
 def _make_track(album_dir: Path, silent_flac: Path, *, filename: str, title: str, artist: str) -> Path:
@@ -149,7 +150,12 @@ async def test_drilling_into_artist_clears_browser_filter(silent_flac_template: 
         await pilot.pause()
         # Pick the Radiohead row directly (avoids the input gobbling Enter).
         browser = pilot.app.query_one(BrowserList)
-        radiohead_row = next(c for c in browser.children if getattr(c, "entry_data", None) == "Radiohead")
+        radiohead_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_data", None) == "Radiohead",
+            description="matching entry_data row",
+        )
         pilot.app._handle_browser_selection(radiohead_row)  # type: ignore[attr-defined]
         await pilot.pause()
         # Filter input should be gone, filter string cleared.
@@ -206,10 +212,20 @@ async def test_filtered_tracklist_uses_visible_row_for_cursor(silent_flac_templa
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
-        artist_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        artist_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(artist_row)  # type: ignore[attr-defined]
         await pilot.pause()
-        album_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        album_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "album",
+            description="album row",
+        )
         pilot.app._handle_browser_selection(album_row)  # type: ignore[attr-defined]
         await pilot.pause()
         # Pretend track index 2 (Nude) is the one playing.
@@ -250,10 +266,20 @@ async def test_filter_works_on_tracklist(silent_flac_template: Path, tmp_path: P
         await pilot.pause()
         # Drill into Radiohead → In Rainbows so the tracklist is populated.
         browser = pilot.app.query_one(BrowserList)
-        artist_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        artist_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(artist_row)  # type: ignore[attr-defined]
         await pilot.pause()
-        album_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        album_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "album",
+            description="album row",
+        )
         pilot.app._handle_browser_selection(album_row)  # type: ignore[attr-defined]
         await pilot.pause()
         tracklist = pilot.app.query_one(TrackList)

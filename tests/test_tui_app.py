@@ -8,6 +8,7 @@ import pytest
 from mutagen.mp4 import MP4
 
 from musickit import convert as convert_mod
+from tests._tui_wait import wait_for_browser_child
 
 
 def _make_track(album_dir: Path, silent_flac: Path, *, filename: str, title: str, artist: str) -> Path:
@@ -79,10 +80,20 @@ async def test_tracklist_single_click_only_moves_cursor(silent_flac_template: Pa
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
-        a = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        a = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(a)  # type: ignore[attr-defined]
         await pilot.pause()
-        b = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        b = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "album",
+            description="album row",
+        )
         pilot.app._handle_browser_selection(b)  # type: ignore[attr-defined]
         await pilot.pause()
         tracklist = pilot.app.query_one(TrackList)
@@ -123,10 +134,20 @@ async def test_tracklist_double_click_plays(
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
-        a = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        a = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(a)  # type: ignore[attr-defined]
         await pilot.pause()
-        b = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        b = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "album",
+            description="album row",
+        )
         pilot.app._handle_browser_selection(b)  # type: ignore[attr-defined]
         await pilot.pause()
         tracklist = pilot.app.query_one(TrackList)
@@ -162,10 +183,20 @@ async def test_album_reentry_preserves_playing_state(silent_flac_template: Path,
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
         # Drill into the artist → album list shown in browser.
-        artist = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        artist = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(artist)  # type: ignore[attr-defined]
         await pilot.pause()
-        album_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        album_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "album",
+            description="album row",
+        )
         album_obj = album_row.entry_data  # type: ignore[attr-defined]
         # Drill into the album → tracks shown in tracklist.
         pilot.app._handle_browser_selection(album_row)  # type: ignore[attr-defined]
@@ -213,6 +244,13 @@ async def test_app_renders_empty_library(tmp_path: Path) -> None:
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
+        # Wait for the browser to populate (slow CI runners may take longer).
+        await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "radio",
+            description="radio row",
+        )
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
         # Radio is always present; the second row is the "(no albums)" note.
         assert kinds[0] == "radio"
@@ -227,6 +265,12 @@ async def test_app_radio_only_when_no_root_provided(tmp_path: Path) -> None:
     async with MusickitApp(None).run_test() as pilot:
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
+        await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "radio",
+            description="radio row",
+        )
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
         # Just the Radio entry — no library, no "no albums" note.
         assert kinds == ["radio"]
@@ -260,7 +304,12 @@ async def test_browser_drills_into_artist_and_back(silent_flac_template: Path, t
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
         # Find the artist row — Radio is now pinned at the top, so it's [1].
-        artist_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        artist_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(artist_row)  # type: ignore[attr-defined]
         await pilot.pause()
         kinds = [getattr(c, "entry_kind", None) for c in browser.children]
@@ -322,7 +371,12 @@ async def test_pop_browser_restores_correct_artist_cursor(silent_flac_template: 
         await pilot.pause()
         browser = pilot.app.query_one(BrowserList)
         # Drill into Radiohead (alphabetical: row 0=radio, 1=Metallica, 2=Radiohead).
-        radiohead_row = next(c for c in browser.children if getattr(c, "entry_data", None) == "Radiohead")
+        radiohead_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_data", None) == "Radiohead",
+            description="matching entry_data row",
+        )
         pilot.app._handle_browser_selection(radiohead_row)  # type: ignore[attr-defined]
         await pilot.pause()
         # Now pop out via the `..` row.
@@ -350,7 +404,12 @@ async def test_fullscreen_toggle_restores_focus_to_tracklist(silent_flac_templat
         from musickit.tui.app import BrowserList
 
         browser = pilot.app.query_one(BrowserList)
-        artist_row = next(c for c in browser.children if getattr(c, "entry_data", None) == "A")
+        artist_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_data", None) == "A",
+            description="matching entry_data row",
+        )
         pilot.app._handle_browser_selection(artist_row)  # type: ignore[attr-defined]
         await pilot.pause()
         album_row = browser.children[1]  # row 0 = back, row 1 = album
