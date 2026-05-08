@@ -1,4 +1,4 @@
-# musickit playlist
+# `musickit playlist`
 
 Auto-generated `.m3u8` playlists anchored to a seed track. Tag-based similarity only — no audio fingerprinting, no remote lookups, no play-history dependency. Available since v0.6.0; TUI integration since v0.6.1; saved-mixes browser since v0.6.2.
 
@@ -17,7 +17,7 @@ Generated Mix - Pixies - Debaser (24 tracks, 61.2 min / target 60 min)
 → ~/Music/.musickit/playlists/mix-pixies-debaser.m3u8
 ```
 
-The generated `.m3u8` is a plain extended M3U with `#EXTINF` lines, so VLC, mpv, every Subsonic client, and the musickit TUI all open it directly.
+The generated `.m3u8` is a plain extended M3U with `#EXTINF` lines, so VLC, mpv, every Subsonic client, and the MusicKit TUI all open it directly.
 
 ## Subcommands
 

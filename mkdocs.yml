@@ -1,4 +1,4 @@
-site_name: musickit
+site_name: MusicKit
 site_description: Convert messy audio rips into a clean tagged library; play locally or stream over Tailscale via a Subsonic-compatible server.
 site_url: https://winterop-com.github.io/musickit
 repo_url: https://github.com/winterop-com/musickit
@@ -30,19 +30,21 @@ theme:
 
 nav:
   - Home: index.md
-  - Architecture: architecture.md
-  - Guides:
-      - Quickstart: guides/quickstart.md
-      - musickit convert: guides/convert.md
-      - musickit library: guides/library.md
-      - musickit inspect: guides/inspect.md
-      - musickit tui: guides/tui.md
-      - musickit serve: guides/serve.md
-      - musickit playlist: guides/playlist.md
+  - Quickstart: guides/quickstart.md
+  - Commands:
+      - convert: guides/convert.md
+      - library: guides/library.md
+      - inspect: guides/inspect.md
+      - tui: guides/tui.md
+      - serve: guides/serve.md
+      - playlist: guides/playlist.md
+  - Reference:
+      - Architecture: architecture.md
+      - Edge cases: edge-cases.md
+      - API: api-reference.md
+  - Project:
       - Development: guides/development.md
-  - Edge cases: edge-cases.md
-  - Roadmap: roadmap.md
-  - API Reference: api-reference.md
+      - Roadmap: roadmap.md
 
 markdown_extensions:
   - admonition

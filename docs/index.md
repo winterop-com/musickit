@@ -1,4 +1,4 @@
-# musickit
+# MusicKit
 
 A Python 3.13 CLI that converts arbitrary audio rips (FLAC / MP3 / M4A / WAV / OGG / OPUS) into a clean, tagged, organised library — then lets you browse and play it locally via a Textual TUI or stream it over your LAN / Tailscale via a Subsonic-compatible HTTP server.
 

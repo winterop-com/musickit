@@ -39,7 +39,7 @@ pip install musickit           # plain pip into current env
 
 Either route pulls every Python dep, including the bundled FFmpeg + PortAudio wheels for the TUI / serve audio paths. The rest of this guide uses `uvx musickit ...` for examples — substitute `musickit ...` if you went the persistent-install route.
 
-If you want to hack on musickit itself, see [Development](development.md) for the `git clone` + `uv sync` flow.
+If you want to hack on MusicKit itself, see [Development](development.md) for the `git clone` + `uv sync` flow.
 
 ### Install system ffmpeg
 

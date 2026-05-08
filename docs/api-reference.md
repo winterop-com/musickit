@@ -1,6 +1,6 @@
 # API Reference
 
-Auto-generated from docstrings via [mkdocstrings](https://mkdocstrings.github.io/). The public surface is small — most users only touch the CLI — but if you're embedding musickit in another tool, these are the entry points.
+Auto-generated from docstrings via [mkdocstrings](https://mkdocstrings.github.io/). The public surface is small — most users only touch the CLI — but if you're embedding MusicKit in another tool, these are the entry points.
 
 ## `musickit.metadata`
 

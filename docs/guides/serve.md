@@ -50,7 +50,7 @@ If you don't use Tailscale, the LAN URL works the same way for any device on you
 
 ## Recommended clients (2026)
 
-The original `subsonic.org` is dead/abandoned/paid; the actively-maintained client ecosystem orbits **Navidrome's superset** (the OpenSubsonic spec). Tested-against-musickit clients:
+The original `subsonic.org` is dead/abandoned/paid; the actively-maintained client ecosystem orbits **Navidrome's superset** (the OpenSubsonic spec). Tested-against-MusicKit clients:
 
 **iOS**
 
@@ -69,7 +69,7 @@ The original `subsonic.org` is dead/abandoned/paid; the actively-maintained clie
 - **[Feishin](https://github.com/jeffvli/feishin)** — Electron, modern UI
 - **[Supersonic](https://github.com/dweymouth/supersonic)** — native Go/Fyne, active
 
-The musickit project also runs as a client itself — `musickit tui --subsonic URL` connects to the same API. See [TUI](tui.md) for that.
+The MusicKit project also runs as a client itself — `musickit tui --subsonic URL` connects to the same API. See [TUI](tui.md) for that.
 
 ## Endpoints implemented
 
@@ -254,7 +254,7 @@ The HTTP `Authorization: Basic ...` header is **not** read. If your client has a
 
 ## Response format
 
-Spec default is XML; `?f=json` opts into JSON. We honour both via a middleware that re-serialises the underlying dict per request. Most modern clients (Symfonium, Feishin, the musickit TUI) send `f=json`; older / iOS clients (Amperfy, play:Sub) often don't and get XML.
+Spec default is XML; `?f=json` opts into JSON. We honour both via a middleware that re-serialises the underlying dict per request. Most modern clients (Symfonium, Feishin, the MusicKit TUI) send `f=json`; older / iOS clients (Amperfy, play:Sub) often don't and get XML.
 
 ## Configuration
 
