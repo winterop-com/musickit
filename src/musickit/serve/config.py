@@ -1,8 +1,11 @@
-"""Server config — `~/.config/musickit/serve.toml` with user + password + scrobble forwarders.
+"""Server config — Subsonic credentials + scrobble forwarder shape.
 
-The TOML lives next to `radio.toml` and `state.toml`. CLI flags (`--user`,
-`--password`) override the file values; either source must produce a
-non-empty username/password or the server refuses to start.
+The TOML home moved to `~/.config/musickit/musickit.toml [server]` in
+v0.11; the legacy `~/.config/musickit/serve.toml` is read as a fallback
+via `musickit.config.load_config()`. CLI flags (`--user`, `--password`)
+still override the file values; defaults are admin/admin with a yellow
+warning printed at startup so a fresh install doesn't sit anonymous on
+the LAN.
 
 Optional `[scrobble.webhook]` and `[scrobble.mqtt]` blocks turn the
 `/scrobble` endpoint from a no-op stub into a forwarder — see
@@ -10,10 +13,6 @@ Optional `[scrobble.webhook]` and `[scrobble.mqtt]` blocks turn the
 """
 
 from __future__ import annotations
-
-import tomllib
-from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel
 
@@ -60,92 +59,22 @@ class ServeConfig(BaseModel):
     scrobble: ScrobbleConfig = ScrobbleConfig()
 
 
-def config_path() -> Path:
-    """`~/.config/musickit/serve.toml` — same dir as the TUI's radio + state files."""
-    return Path.home() / ".config" / "musickit" / "serve.toml"
-
-
-def load_config() -> dict[str, Any]:
-    """Read serve.toml. Returns `{}` if missing or malformed.
-
-    Returns the full nested dict so callers (resolve_credentials, scrobble
-    config) can pick out the parts they need.
-    """
-    p = config_path()
-    if not p.exists():
-        return {}
-    try:
-        with p.open("rb") as f:
-            data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
-    # `tomllib.load` already returns a dict at the top level — annotation
-    # makes that explicit so downstream callers don't need a defensive check.
-    return data
-
-
 DEFAULT_USERNAME = "admin"
 DEFAULT_PASSWORD = "admin"  # noqa: S105 — default for first-run convenience; warning emitted when used
 
 
 def resolve_credentials(*, cli_user: str | None, cli_password: str | None) -> tuple[ServeConfig, bool]:
-    """CLI flags win over the TOML. Falls back to admin/admin when nothing is set.
+    """CLI flags win over env vars / TOML. Falls back to admin/admin when nothing is set.
 
-    Returns `(cfg, used_defaults)` so the caller can warn the user when the
-    insecure defaults are in play.
+    Returns `(cfg, used_defaults)` so the caller can warn the user when
+    the insecure defaults are in play. Reads the consolidated config via
+    `musickit.config.load_config` (which itself falls back to the legacy
+    `serve.toml` for one release cycle).
     """
-    file_data = load_config()
-    file_creds: dict[str, str] = {}
-    for key in ("username", "password"):
-        value = file_data.get(key)
-        if isinstance(value, str) and value:
-            file_creds[key] = value
+    from musickit.config import load_config
 
-    username = cli_user or file_creds.get("username") or DEFAULT_USERNAME
-    password = cli_password or file_creds.get("password") or DEFAULT_PASSWORD
+    cfg = load_config()
+    username = cli_user or cfg.server.username
+    password = cli_password or cfg.server.password
     used_defaults = username == DEFAULT_USERNAME and password == DEFAULT_PASSWORD
-
-    scrobble = _parse_scrobble(file_data.get("scrobble"))
-    return ServeConfig(username=username, password=password, scrobble=scrobble), used_defaults
-
-
-def _parse_scrobble(raw: Any) -> ScrobbleConfig:
-    """Build a `ScrobbleConfig` from the `[scrobble]` TOML block, tolerating partial / missing data."""
-    if not isinstance(raw, dict):
-        return ScrobbleConfig()
-    webhook = _parse_webhook(raw.get("webhook"))
-    mqtt = _parse_mqtt(raw.get("mqtt"))
-    include_now_playing = bool(raw.get("include_now_playing", False))
-    return ScrobbleConfig(webhook=webhook, mqtt=mqtt, include_now_playing=include_now_playing)
-
-
-def _parse_webhook(raw: Any) -> ScrobbleWebhookConfig | None:
-    if not isinstance(raw, dict):
-        return None
-    url = raw.get("url")
-    if not isinstance(url, str) or not url:
-        return None
-    secret = raw.get("secret")
-    timeout = raw.get("timeout_s", 5.0)
-    return ScrobbleWebhookConfig(
-        url=url,
-        secret=secret if isinstance(secret, str) and secret else None,
-        timeout_s=float(timeout) if isinstance(timeout, (int, float)) else 5.0,
-    )
-
-
-def _parse_mqtt(raw: Any) -> ScrobbleMqttConfig | None:
-    if not isinstance(raw, dict):
-        return None
-    broker = raw.get("broker")
-    if not isinstance(broker, str) or not broker:
-        return None
-    topic = raw.get("topic")
-    client_id = raw.get("client_id")
-    return ScrobbleMqttConfig(
-        broker=broker,
-        topic=topic if isinstance(topic, str) and topic else "musickit/scrobble",
-        username=raw.get("username") if isinstance(raw.get("username"), str) else None,
-        password=raw.get("password") if isinstance(raw.get("password"), str) else None,
-        client_id=client_id if isinstance(client_id, str) and client_id else "musickit",
-    )
+    return ServeConfig(username=username, password=password, scrobble=cfg.server.scrobble), used_defaults

@@ -90,7 +90,8 @@ def _global_options(
 # those modules register on `library.library_app` and need it defined first.
 # These are side-effect imports — the `_` assignment shuts up pyright's
 # reportUnusedImport without us needing per-line ignores.
-from musickit.cli import convert as _convert_cmd  # noqa: E402, I001
+from musickit.cli import config_cmd as _config_cmd  # noqa: E402, I001
+from musickit.cli import convert as _convert_cmd  # noqa: E402
 from musickit.cli import cover as _cover_cmd  # noqa: E402
 from musickit.cli import cover_pick as _cover_pick_cmd  # noqa: E402
 from musickit.cli import inspect as _inspect_cmd  # noqa: E402
@@ -101,6 +102,7 @@ from musickit.cli import serve as _serve_cmd  # noqa: E402
 from musickit.cli import tui as _tui_cmd  # noqa: E402
 
 _ = (
+    _config_cmd,
     _convert_cmd,
     _cover_cmd,
     _cover_pick_cmd,

@@ -1,6 +1,6 @@
 [project]
 name = "musickit"
-version = "0.10.3"
+version = "0.11.0"
 description = "Self-hosted music toolkit: convert / audit / retag rips into a clean tagged library, browse + play via a Textual TUI (local / internet radio / Subsonic-client / AirPlay), and stream over Tailscale via a Subsonic-compatible HTTP server."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -40,6 +40,7 @@ dependencies = [
   "pillow>=11.0.0",
   "httpx>=0.28.1",
   "pydantic>=2.10.0",
+  "pydantic-settings>=2.6.0",
   "textual>=1.0.0",
   "av>=13.0.0",
   "sounddevice>=0.5.0",
@@ -49,7 +50,6 @@ dependencies = [
   "zeroconf>=0.148.0",
   "pyatv>=0.17.0",
   "watchdog>=6.0.0",
-  "tomli-w>=1.2.0",
   "paho-mqtt>=2.1.0",
   "jinja2>=3.1.6",
   "itsdangerous>=2.2.0",

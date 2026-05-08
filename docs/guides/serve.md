@@ -259,25 +259,30 @@ Spec default is XML; `?f=json` opts into JSON. We honour both via a middleware t
 ## Configuration
 
 ```toml
-# ~/.config/musickit/serve.toml
+# ~/.config/musickit/musickit.toml
+[server]
 username = "mort"
 password = "supersecret"
 ```
 
-Override per-run via `--user` / `--password`. CLI flags win over the TOML.
+Override per-run via `--user` / `--password`; or via env vars (`MUSICKIT_SERVER__USERNAME`, `MUSICKIT_SERVER__PASSWORD`). Resolution order: **CLI flags > env vars > TOML > admin/admin default** (with a yellow warning printed for the default).
+
+Run `musickit config show` to print the resolved config (sensitive values masked) and `musickit config path` to find the file.
+
+**Migrating from `serve.toml` (pre-v0.11):** the old `~/.config/musickit/serve.toml` is still read transparently. Run `musickit config migrate` once to move it to the new format and drop the deprecation hint.
 
 ## Scrobble forwarder
 
-Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) call `/scrobble` after every track. By default that's a no-op. Add a `[scrobble.webhook]` and/or `[scrobble.mqtt]` block to forward each play event:
+Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) call `/scrobble` after every track. By default that's a no-op. Add a `[server.scrobble.webhook]` and/or `[server.scrobble.mqtt]` block to forward each play event:
 
 ```toml
-# ~/.config/musickit/serve.toml
-[scrobble.webhook]
+# ~/.config/musickit/musickit.toml
+[server.scrobble.webhook]
 url = "https://my-bridge.example.com/play"
 secret = "shh"          # optional — sent as `X-Musickit-Secret` header
 timeout_s = 5.0         # optional — defaults to 5s
 
-[scrobble.mqtt]
+[server.scrobble.mqtt]
 broker = "mqtt://homeassistant.local:1883"
 topic = "musickit/scrobble"   # default shown
 username = "musickit"          # optional
@@ -286,6 +291,7 @@ client_id = "musickit"          # optional
 
 # Optional: forward `submission=false` ("now playing") probes too.
 # Default false — Home Assistant "currently playing" automations want true.
+[server.scrobble]
 include_now_playing = false
 ```
 

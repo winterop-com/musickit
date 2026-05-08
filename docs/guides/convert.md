@@ -15,7 +15,7 @@ Roughly in order:
 1. **Discover** — walks the input root, groups audio files by leaf-with-tracks, merges multi-disc layouts (`CD1`/`CD2`, `Disc 1`/`Disc 2`, `Album (CD1)`/`Album (CD2)`, etc.).
 2. **Read source tags** — mutagen via `metadata.read_source(path)` per track. Format-specific readers for FLAC / MP3 / MP4; generic fallback for OGG / Opus / WAV.
 3. **Pre-fill from filename** — if a track is missing title or artist, `_parse_filename_for_va` extracts `Artist - Title` from `NN. Artist - Title.ext` style filenames. Critical for tagless rips.
-4. **AcoustID lookup** (if `--acoustid-key` set) — Chromaprint fingerprint for tracks still missing title/artist, query [acoustid.org](https://acoustid.org). Off by default — requires a free user-supplied API key.
+4. **AcoustID lookup** (if `--acoustid-key` set, or `[acoustid].api_key` in `musickit.toml`) — Chromaprint fingerprint for tracks still missing title/artist, query [acoustid.org](https://acoustid.org). Off by default — requires a free user-supplied API key.
 5. **Summarise** — majority-vote across tracks for album / album_artist / year / genre. Disc-1 biased so bonus-disc tags don't pollute the album-name pick on multi-disc releases.
 6. **Folder fallback** — when no ALBUM tag exists, parse the directory name. Strips codec/quality scene tags (`[FLAC]`, `[16Bit-44.1kHz]`), edition annotations (`(Remastered)`, `(Deluxe Edition)`, `(2018 Reissue)`), keeps live-album annotations (`(Live in Madrid)`) since they're real distinctions.
 7. **Resolve output paths** — `naming.artist_folder` + `naming.album_folder` + `naming.track_filename`. VA → `Various Artists`. Multi-disc → `01-NN - Title.m4a`.
@@ -96,6 +96,6 @@ Both calls go through a polite client: a 1 req/sec throttle per host, a descript
 - `--allow-lossy-recompress` — opt into MP3→AAC tandem encode under `--format aac`
 - `--workers / -w N` (default 4; each worker spawns ffmpeg which is itself multi-threaded)
 - `--cover-max-edge PX` (default 1000)
-- `--acoustid-key TEXT` (or `MUSICKIT_ACOUSTID_KEY` env var; off by default)
+- `--acoustid-key TEXT` (or `MUSICKIT_ACOUSTID_KEY` env var, or `[acoustid].api_key` in `~/.config/musickit/musickit.toml`; off by default)
 
 `-v`/`--verbose` is a top-level callback flag — works in any position (`musickit -v convert …` or `musickit convert … --verbose`).

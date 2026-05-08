@@ -7,7 +7,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-import tomli_w
+from musickit import _toml_dump
 
 
 def state_path() -> Path:
@@ -61,9 +61,7 @@ def save_state(state: dict[str, Any]) -> None:
     """
     p = state_path()
     try:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("wb") as f:
-            tomli_w.dump(state, f)
+        _toml_dump.dump_path(state, p)
         # Tighten perms — best-effort. No-op on Windows / where chmod fails.
         try:
             p.chmod(0o600)
