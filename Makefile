@@ -1,4 +1,4 @@
-.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python desktop-sync-frontend desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
+.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python desktop-sync-frontend desktop-sync-version desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -110,15 +110,22 @@ desktop-sync-frontend:
 	@cp src/musickit/web/static/favicon.svg    desktop/frontend/favicon.svg
 	@cp src/musickit/web/static/visualizer.js  desktop/frontend/js/visualizer.js
 
+desktop-sync-version:
+	@$(UV) run python scripts/sync_desktop_versions.py
+
 desktop-tauri: desktop-tauri-dev
 
 desktop-tauri-dev: desktop-sync-frontend
 	@echo ">>> Tauri dev — opens window pointed at desktop/frontend/index.html"
 	@cd desktop/tauri/src-tauri && cargo tauri dev
 
-desktop-tauri-build: desktop-sync-frontend
+desktop-tauri-build: desktop-sync-frontend desktop-sync-version
 	@echo ">>> Tauri release build — produces a .app under desktop/tauri/src-tauri/target/release/bundle/"
 	@cd desktop/tauri/src-tauri && cargo tauri build
+	@# Tauri 2 has no artifactName option, so post-rename the .dmg /
+	@# .app so they're distinguishable from the Electron sibling
+	@# ('MusicKit_X.Y.Z_arch.dmg' -> 'MusicKit-Tauri-X.Y.Z-arch.dmg').
+	@$(UV) run python scripts/rename_tauri_artifacts.py
 
 desktop-electron: desktop-electron-dev
 
@@ -126,7 +133,7 @@ desktop-electron-dev: desktop-sync-frontend
 	@echo ">>> Electron dev — opens window pointed at desktop/frontend/index.html"
 	@cd desktop/electron && (test -d node_modules || npm install) && npm start
 
-desktop-electron-build: desktop-sync-frontend
+desktop-electron-build: desktop-sync-frontend desktop-sync-version
 	@echo ">>> Electron release build — produces a .dmg under desktop/electron/dist/"
 	@cd desktop/electron && (test -d node_modules || npm install) && npm run build
 
