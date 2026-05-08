@@ -150,12 +150,23 @@ async def test_track_editor_year_validation(silent_flac_template: Path, tmp_path
     async with MusickitApp(root).run_test() as pilot:
         await pilot.pause()
         from musickit.tui.app import BrowserList
+        from tests._tui_wait import wait_for_browser_child
 
         browser = pilot.app.query_one(BrowserList)
-        a = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        a = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(a)  # type: ignore[attr-defined]
         await pilot.pause()
-        b = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        b = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "album",
+            description="album row",
+        )
         pilot.app._handle_browser_selection(b)  # type: ignore[attr-defined]
         await pilot.pause()
 
