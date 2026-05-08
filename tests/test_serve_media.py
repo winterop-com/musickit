@@ -154,20 +154,30 @@ def test_get_cover_art_resizes_when_size_param_given(tmp_path: Path) -> None:
         assert max(img.size) <= 50
 
 
-def test_get_cover_art_no_cover_returns_70(tmp_path: Path) -> None:
+def test_get_cover_art_no_cover_returns_svg_placeholder(tmp_path: Path) -> None:
+    """Albums without embedded artwork get a server-side SVG placeholder.
+
+    Subsonic clients vary widely in how they handle a 404 from getCoverArt —
+    Feishin shows the browser's broken-image marker, play:Sub leaves an
+    empty box. Returning a real image with HTTP 200 (a small ♪ glyph)
+    lets every client render something sensible. Navidrome takes the same
+    approach.
+    """
     album = _real_album_with_one_track(tmp_path, with_sidecar_cover=False)
     client = _client_with_index(tmp_path, [album])
-    body = client.get("/rest/getCoverArt", params=_params(id=album_id(album))).json()["subsonic-response"]
-    assert body["status"] == "failed"
-    assert body["error"]["code"] == 70
+    response = client.get("/rest/getCoverArt", params=_params(id=album_id(album)))
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/svg+xml"
+    assert b"<svg" in response.content
 
 
-def test_get_cover_art_unknown_id_returns_70(tmp_path: Path) -> None:
+def test_get_cover_art_unknown_id_returns_svg_placeholder(tmp_path: Path) -> None:
+    """Same placeholder is returned when the id doesn't resolve at all."""
     album = _real_album_with_one_track(tmp_path)
     client = _client_with_index(tmp_path, [album])
-    body = client.get("/rest/getCoverArt", params=_params(id="al_doesnotexist")).json()["subsonic-response"]
-    assert body["status"] == "failed"
-    assert body["error"]["code"] == 70
+    response = client.get("/rest/getCoverArt", params=_params(id="al_doesnotexist"))
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/svg+xml"
 
 
 def test_get_cover_art_via_track_id_resolves_to_album(tmp_path: Path) -> None:
