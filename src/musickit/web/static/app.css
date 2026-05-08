@@ -352,17 +352,20 @@ button:focus-visible {
 .is-marquee .marquee-inner {
   max-width: none;
   overflow: visible;
-  animation: marquee var(--marquee-duration, 16s) linear infinite;
+  /* Seamless ticker-tape loop. The inner span carries TWO concatenated
+     copies of the text with a separator (set in JS); animating to
+     translateX(-50%) shifts by exactly one copy-width so the second
+     copy lands on the first's starting position. The loop reset is
+     visually identical to the start — no jump or fade-out flash. */
+  animation: marquee-loop var(--marquee-duration, 16s) linear infinite;
 }
 
-@keyframes marquee {
-  0%,
-  8% {
+@keyframes marquee-loop {
+  0% {
     transform: translateX(0);
   }
-  92%,
   100% {
-    transform: translateX(var(--marquee-translate, 0));
+    transform: translateX(-50%);
   }
 }
 

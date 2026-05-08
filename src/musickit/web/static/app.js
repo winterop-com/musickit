@@ -86,10 +86,12 @@
     return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
   }
 
-  // Marquee: replace the text of an element that has a `.marquee-inner`
-  // child, then measure overflow and toggle `is-marquee` on the outer.
-  // The animation scrolls the inner from 0 to a CSS-variable distance
-  // matching the overflow, paused briefly at each end.
+  // Marquee: ticker-tape style. When the text overflows the outer
+  // element, the inner span is replaced with two concatenated copies
+  // separated by a bullet; the CSS animation translates by exactly
+  // -50% so the second copy lands on the first's starting position
+  // and the loop is seamless (no end-pause + jump-back).
+  const MARQUEE_SEP = "   ·   ";
   function setMarqueeText(outer, text) {
     if (!outer) return;
     let inner = outer.querySelector(".marquee-inner");
@@ -98,21 +100,22 @@
       inner.className = "marquee-inner";
       outer.replaceChildren(inner);
     }
+    // Plain text first so measurement reflects only the real text.
     inner.textContent = text;
-    // Measure after layout so scrollWidth / clientWidth are valid.
     requestAnimationFrame(() => {
       const overflow = inner.scrollWidth - outer.clientWidth;
       if (overflow > 4) {
+        // Duplicate so the loop seam is invisible; speed scales with
+        // the (single-copy) overflow so a longer title still finishes
+        // a full cycle in roughly the same perceived time.
+        inner.textContent = text + MARQUEE_SEP + text + MARQUEE_SEP;
         outer.classList.add("is-marquee");
-        // Add a small gap past the overflow distance so the last
-        // character clears the right edge before the loop restart.
-        outer.style.setProperty("--marquee-translate", `-${overflow + 24}px`);
-        // ~60px/sec scroll speed with a sane minimum + padding for the
-        // pause segments at the start/end of the keyframe.
-        const seconds = Math.max(10, overflow / 60 + 8);
+        const oneCopyWidth = inner.scrollWidth / 2;
+        const seconds = Math.max(10, oneCopyWidth / 50);
         outer.style.setProperty("--marquee-duration", `${seconds}s`);
       } else {
         outer.classList.remove("is-marquee");
+        outer.style.removeProperty("--marquee-duration");
       }
     });
   }
@@ -479,13 +482,21 @@
   function applyMarqueeMeasure(outer) {
     const inner = outer.querySelector(".marquee-inner");
     if (!inner) return;
+    // Pull the text out of whatever's inside (template-rendered text
+    // node, or our own duplicated copies from a previous hover).
+    const original =
+      inner.dataset.marqueeText || inner.firstChild?.textContent || inner.textContent;
+    inner.dataset.marqueeText = original;
+    inner.textContent = original;
     const overflow = inner.scrollWidth - outer.clientWidth;
     if (overflow > 4) {
+      inner.textContent = original + MARQUEE_SEP + original + MARQUEE_SEP;
       outer.classList.add("is-marquee");
-      outer.style.setProperty("--marquee-translate", `-${overflow + 24}px`);
-      outer.style.setProperty("--marquee-duration", `${Math.max(8, overflow / 60 + 6)}s`);
+      const oneCopyWidth = inner.scrollWidth / 2;
+      outer.style.setProperty("--marquee-duration", `${Math.max(10, oneCopyWidth / 50)}s`);
     } else {
       outer.classList.remove("is-marquee");
+      outer.style.removeProperty("--marquee-duration");
     }
   }
 
@@ -518,7 +529,10 @@
     if (!button) return;
     const action = button.dataset.action;
     if (action === "load-artist") {
-      markActiveRow(button, ".pane-artists");
+      // Selector is `.pane-sidebar` (the actual class on the left pane);
+      // the previous `.pane-artists` was a typo so the prior active-row
+      // mark never got cleared on subsequent clicks.
+      markActiveRow(button, ".pane-sidebar");
       loadInto("/web/artist/" + encodeURIComponent(button.dataset.id), albumsPane);
       tracksPane.innerHTML = '<p class="empty">Pick an album to see tracks.</p>';
       // Leave radio mode: restore tracks pane + the original titles.
@@ -530,6 +544,9 @@
       // hidden in radio mode (`body.is-radio` collapses the grid to two
       // columns). The Now Playing card up top is the only "currently
       // playing" surface needed for a stream.
+      // Mark the Stations button active and clear any artist-row mark
+      // from a previous Browse click — they share the sidebar pane.
+      markActiveRow(button, ".pane-sidebar");
       document.body.classList.add("is-radio");
       if (albumsPaneTitle) albumsPaneTitle.textContent = "Stations";
       loadInto("/web/radio", albumsPane).then(() => {

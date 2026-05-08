@@ -178,14 +178,34 @@ Stars live OUTSIDE the SQLite library index because the index is fully derived f
 
 ## Browser UI
 
-Open the server URL in any browser to use the bundled three-pane web player. The first slice ships with v0.9.4:
+Open the server URL in any browser to use the bundled web player. The visual language tracks the TUI's `widgets.py` exactly — bordered panels with floating titles, the same palette (cyan headers / blue labels / green for playing / orange for the active track), monospace numerics, slim "round 30%"-style scrollbars, ncmpcpp-style KeyBar.
 
 ```
 http://<host>:4533/login          → sign-in form (same creds as the Subsonic API)
-http://<host>:4533/web            → three-pane browser (artists / albums / tracks)
+http://<host>:4533/web            → three-pane browser
 ```
 
-The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same `/rest/getArtists` / `/rest/getArtist` / `/rest/getAlbum` endpoints the rest of the API uses; audio playback hits `/rest/stream` via a native `<audio>` element. Login sets a signed session cookie so subsequent `<audio src="/rest/stream?id=...">` calls don't need to leak the password into HTML page sources.
+![Browser UI — three-pane shell](../screenshots/web-shell.png)
+
+Click an artist in the left Browse pane to see albums, click an album to see tracks, click a track to start playing. Now Playing card (top-left) shows the active title / artist / album / cover; the Spectrum panel (top-right) is a 48-band FFT bar visualizer driven by the Web Audio API.
+
+![Drilled into an album](../screenshots/web-album-tracks.png)
+
+**Internet radio** lives in the same sidebar. Click the Radio panel's Stations entry to load `/web/radio` — the list comes from [`getInternetRadioStations`](#internet-radio), which is backed by `radio.load_stations()` (defaults + `~/.config/musickit/radio.toml`). The grid collapses to two columns in radio mode, the active station gets the orange `is-playing` highlight, and the Now Playing title flips to the current ICY StreamTitle once the proxy parses one (see below).
+
+![Radio mode — Stations selected, NRK mP3 streaming](../screenshots/web-radio.png)
+
+**Press `f`** to fullscreen the Spectrum visualizer. The Now Playing card stays visible at the top, the panes hide, the bars take the rest of the viewport. Press `f` again to return.
+
+![Fullscreen Spectrum visualizer](../screenshots/web-spectrum-fullscreen.png)
+
+**Press `?`** for a slide-in keys panel; **Cmd/Ctrl+P** opens a Textual-style command palette. Both filter their contents by the current playback mode — the help and palette below were captured while a radio stream was playing, so Next / Prev / Seek / Repeat / Shuffle / Lyrics are absent (they don't apply to a live stream).
+
+![Help panel — radio mode](../screenshots/web-help.png)
+
+![Command palette — radio mode](../screenshots/web-palette.png)
+
+The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same `/rest/getArtists` / `/rest/getArtist` / `/rest/getAlbum` endpoints the rest of the API uses; track playback hits `/rest/stream`, radio playback hits `/web/radio-stream` (a same-origin proxy that strips ICY metadata frames so the Web Audio visualizer keeps working). Login sets a signed session cookie so `<audio src="/rest/stream?id=...">` doesn't have to leak the password into HTML.
 
 Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u=&p=` query params and never see the cookie path — they're untouched by this addition.
 

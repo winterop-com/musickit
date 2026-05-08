@@ -42,7 +42,7 @@ uvx musickit playlist gen ./output --seed <track> --minutes 60 # auto-generate a
 
 ## Screenshots
 
-The TUI: artist browser on the left, drilled into an album, 48-band visualizer at the top.
+The TUI — artist browser on the left, drilled into an album, 48-band visualizer at the top:
 
 ![Drilled-in album view](docs/screenshots/album-tracks.svg)
 
@@ -50,7 +50,15 @@ Fullscreen visualizer (`f`):
 
 ![Fullscreen visualizer](docs/screenshots/fullscreen-viz.svg)
 
-More screenshots in the [TUI guide](https://winterop-com.github.io/musickit/guides/tui/).
+The bundled browser UI tracks the same visual language — bordered panels with floating titles, same palette and KeyBar:
+
+![Browser UI — drilled into an album](docs/screenshots/web-album-tracks.png)
+
+Internet radio mode (Stations panel + ICY metadata in the title):
+
+![Browser UI — radio mode](docs/screenshots/web-radio.png)
+
+More screenshots in the [TUI guide](https://winterop-com.github.io/musickit/guides/tui/) and [serve guide](https://winterop-com.github.io/musickit/guides/serve/#browser-ui).
 
 ## Documentation
 
