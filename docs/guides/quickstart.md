@@ -177,14 +177,17 @@ For anything beyond a private LAN, set proper credentials. The simplest path:
 
 ```bash
 mkdir -p ~/.config/musickit
-cat > ~/.config/musickit/serve.toml <<'EOF'
-[auth]
-user = "your-username"
+cat > ~/.config/musickit/musickit.toml <<'EOF'
+[server]
+username = "your-username"
 password = "your-strong-password"
 EOF
 ```
 
 Restart `musickit serve` — the yellow warning is gone.
+
+(If you're upgrading from a pre-v0.11 install with a `serve.toml`, run
+`musickit config migrate` once to move it to the new format.)
 
 Leave the server running. You can also run it as a background process via
 launchd / systemd; see [Serve](serve.md) for examples.
@@ -234,8 +237,8 @@ Open Amperfy → first-launch screen prompts for a server. Fill in:
 
 - **Server URL**: `http://mlaptop.tail4a4b9a.ts.net:4533` (your Mac's
   Tailscale URL — no trailing slash, no `/rest`).
-- **Username**: `admin` (or whatever you put in `serve.toml`).
-- **Password**: `admin` (or whatever you put in `serve.toml`).
+- **Username**: `admin` (or whatever you put in `musickit.toml`).
+- **Password**: `admin` (or whatever you put in `musickit.toml`).
 
 Tap **Login**. Amperfy probes `/rest/ping`, then `/rest/getMusicFolders`
 and `/rest/getArtists` to populate the library. On first connect with a

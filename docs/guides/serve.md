@@ -256,6 +256,14 @@ The HTTP `Authorization: Basic ...` header is **not** read. If your client has a
 
 Spec default is XML; `?f=json` opts into JSON. We honour both via a middleware that re-serialises the underlying dict per request. Most modern clients (Symfonium, Feishin, the MusicKit TUI) send `f=json`; older / iOS clients (Amperfy, play:Sub) often don't and get XML.
 
+## CORS
+
+Every `/rest/*` response carries `Access-Control-Allow-Origin: *` plus permissive `Allow-Methods` / `Allow-Headers`, so the [MusicKit desktop apps](desktop.md) (and any web-based Subsonic client running in a different origin) can call the API directly from a browser webview.
+
+This is safe because the auth boundary is the request itself, not the origin. Every `/rest/*` call is gated by either a salted token (`?u=user&t=<md5(password+salt)>&s=<salt>`) or plain credentials (`?u=user&p=password`). An attacker who knows the credentials can hit the API from `curl` regardless of CORS; CORS controls only what cross-origin browser JavaScript may *read*. Wildcard `*` doesn't widen the auth surface.
+
+If you expose the server publicly, terminate TLS at a reverse proxy (Caddy / nginx / Tailscale Funnel) and use a strong password. Don't rely on CORS as a defense.
+
 ## Configuration
 
 ```toml
