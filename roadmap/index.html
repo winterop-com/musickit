@@ -858,17 +858,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#done" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Done
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -933,17 +922,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#done" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Done
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -965,10 +943,9 @@
 
 
 <h1 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">&para;</a></h1>
-<p>What's open vs. shipped.</p>
+<p>What's open vs. speculative.</p>
 <h2 id="open-convert-pipeline-polish">Open — convert pipeline polish<a class="headerlink" href="#open-convert-pipeline-polish" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Better folder-fallback for live-venue parens</strong> — currently <code>(Live in Madrid)</code> is preserved (correctly), but <code>Some Album (Live, 2003-04-15, Madrid)</code> could be cleaned up while still preserving the live-ness signal.</li>
 <li><strong>AcoustID auto-enable</strong> — currently you have to pass <code>--acoustid-key</code> per run. Read it from <code>~/.config/musickit/serve.toml</code> once and apply automatically when an album has tagless tracks.</li>
 <li><strong>Album merge tool</strong> — when the same album exists with different tags as two folders, an interactive merge.</li>
 <li><strong><code>--dry-run</code> with rich diff</strong> — show exactly what tags would change, what files would move.</li>
@@ -983,53 +960,6 @@
 <li>Cross-fade between tracks</li>
 <li>Listening rooms / sync-play across clients</li>
 <li>Voice control</li>
-</ul>
-<h2 id="done">Done<a class="headerlink" href="#done" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Convert pipeline — covered in <a href="../guides/convert/">Convert</a></li>
-<li>Library audit + fix — covered in <a href="../guides/library/">Library</a></li>
-<li>TUI: local + radio modes</li>
-<li>TUI: Subsonic-client mode (lazy-loaded)</li>
-<li>TUI: AirPlay output (CLI + in-TUI picker, persists across launches; pause + volume routed to the device)</li>
-<li>TUI: in-place tag editor — <code>e</code> opens a track or album-wide editor that writes via mutagen + patches the in-memory model</li>
-<li>TUI: <code>/</code>-bar filter — diacritic-folded <strong>multi-token AND</strong> substring on the focused pane. <code>daft homework</code> finds <code>Daft Punk - Homework</code> even though the words aren't adjacent in the row; <code>bey</code> still finds <code>Beyoncé</code>; <code>sigur ros</code> still finds <code>Sigur Rós</code>. Per-pane filtering on a 1200-row library remains microseconds — no FTS index needed in the TUI process.</li>
-<li>TUI: single-click cursor / double-click play (Spotify-style); cursor snaps back to playing track on focus loss</li>
-<li>TUI: ReplayGain normalisation on local playback</li>
-<li>TUI: bordered-panel UI polish (boxed sections, now-playing card, warm accent for active playback)</li>
-<li>TUI: dynamic title-column width that re-flows on terminal resize (debounced)</li>
-<li>TUI: audio engine in a separate process — PyAV decoder + sounddevice callback live in their own interpreter, communicate via <code>multiprocessing.Queue</code> + shared memory. UI reflows / focus changes / GC pauses can no longer stall the audio callback into a buffer underrun. Replaces the prior GIL-contention mitigations (500ms / 1s PortAudio buffer, resize-debounce, focus-change short-circuit), now that the engine has its own GIL.</li>
-<li>TUI tag editor folder rename — saving the album-wide editor with a changed <code>Album</code>, <code>Album Artist</code>, or <code>Year</code> field now also moves the on-disk folder to match (<code>&lt;root&gt;/&lt;artist_dir&gt;/YYYY - &lt;Album&gt;</code>). Cross-artist edits move the album under the new artist parent dir. Genre-only edits don't trigger a rename. Collisions stay safe — the modal stays open with a warning instead of partial state.</li>
-<li>Subsonic-compatible serve (~30 endpoints)</li>
-<li>XML response format (Subsonic spec default) + POST + form-body credentials</li>
-<li>ffmpeg-on-the-fly transcoding (<code>format=mp3</code> / <code>maxBitRate</code>)</li>
-<li>OpenSubsonic extensions advertised: <code>formPost</code>, <code>transcodeOffset</code>, <code>multipleGenres</code>, <code>songLyrics</code></li>
-<li>Multi-genre indexing — <code>byGenre</code> and <code>getGenres</code> honour <code>track.genres[]</code>, not just the legacy single-genre field</li>
-<li>Per-track recording MBIDs (one MB <code>release/&lt;mbid&gt;?inc=recordings</code> lookup at enrich time)</li>
-<li>mDNS / Bonjour autodiscovery (server advertises, TUI auto-detects)</li>
-<li>Filesystem watcher with debounced auto-rescan</li>
-<li>Persistent SQLite library index — <code>&lt;root&gt;/.musickit/index.db</code> removes the cold-start filesystem walk + tag read; <code>library.load_or_scan</code> hydrates from rows then runs a delta-validate pass to pick up filesystem changes (added / removed / tag-edited albums); <code>musickit library index status|drop|rebuild</code> for management</li>
-<li>Genre indexing (model + scan + <code>getGenres</code> + <code>byGenre</code>)</li>
-<li>cover-pick semi-automated workflow</li>
-<li>Folder-name edition-annotation strip</li>
-<li>Continuous-numbering across-discs detection</li>
-<li>Real-world tested against Amperfy / Symfonium / play:Sub / Feishin</li>
-<li>Push to GitHub + CI (<code>make check &amp;&amp; make test</code> on push/PR)</li>
-<li>This documentation site (mkdocs + Material)</li>
-<li><code>musickit playlist gen|list|show</code> — tag-based auto-generated <code>.m3u8</code> mixes anchored to a seed track (similarity scorer over artist / genre / year / compilation flag, per-album + per-artist caps; output is standard extended M3U)</li>
-<li>TUI <code>g</code> keybind — generate-and-play a 60-min mix from the highlighted or currently-playing track</li>
-<li>TUI Mixes browser entry — saved <code>.m3u8</code> files appear in the right pane; selecting one resolves paths against the live index and plays it as a virtual album with stale-path graceful degradation</li>
-<li>Persistent stars / favourites — Subsonic clients' heart buttons are now real. <code>/star</code>, <code>/unstar</code>, <code>/getStarred</code>, <code>/getStarred2</code> backed by <code>&lt;root&gt;/.musickit/stars.toml</code> (TOML, hand-editable, survives index rebuilds).</li>
-<li>FTS5 search backend — <code>/search3</code> and <code>/search2</code> use an in-memory SQLite FTS5 index built fresh on every cache reindex. Sub-ms ranked results with prefix matching (<code>bey</code> matches <code>Beyoncé</code>), diacritic folding (<code>unicode61 remove_diacritics 2</code>), bm25 ordering, and multi-token AND across title + album_artist + year body text. Falls back to casefolded substring scan when SQLite was compiled without FTS5.</li>
-<li>Lyrics via LRCLIB — <code>musickit library lyrics fetch &lt;DIR&gt;</code> populates <code>&lt;track&gt;.lrc</code> sidecars from <a href="https://lrclib.net">lrclib.net</a> (free, no API key). Sidecars take precedence over embedded <code>\xa9lyr</code> / <code>USLT</code> / <code>LYRICS</code> tags on the next library scan, so user edits stick. The server's <code>getLyricsBySongId</code> parses LRC bodies and emits <code>synced: true</code> with per-line millisecond offsets — Symfonium / Amperfy display the highlight live. The TUI gains an <code>l</code> keybind that swaps the visualizer for a lyrics pane, with the active line bolded as playback advances.</li>
-<li><code>getCoverArt</code> LRU cache — bytes-bounded (default 64 MiB) in-memory LRU keyed on <code>(id, size)</code>. Mobile clients hammer thumbnails one-per-row when paging through albums; the cache turns the second-through-Nth request into a dict lookup instead of a sidecar read + Pillow decode. Invalidated on every <code>_reindex</code> so a re-cover-picked album doesn't serve stale bytes.</li>
-<li><code>getCoverArt</code> SVG placeholder for missing art — instead of a 404 / error envelope, the server returns a 256x256 <code>♪</code> glyph SVG. Means every Subsonic client (Feishin / play:Sub / others without their own fallback) renders something sensible. Navidrome takes the same approach.</li>
-<li>Anyio thread pool 40 → 256 — Starlette's <code>FileResponse</code> reads each file in a worker thread; one chatty client (play:Sub on iOS opens 30-50 parallel <code>/rest/stream</code> connections) used to exhaust the default 40-thread cap and freeze every other request. 256 leaves room for one chatty client without affecting normal operation.</li>
-<li>Scrobble forwarder — <code>/scrobble</code> is no longer a no-op stub. With <code>[scrobble.webhook]</code> (POST JSON) and/or <code>[scrobble.mqtt]</code> (publish topic) in <code>serve.toml</code>, every Subsonic client's play event is forwarded — usable for Home Assistant, Last.fm bridges, ListenBrainz, custom analytics. Fire-and-forget on a small thread pool; failures are logged + swallowed so a dead bridge can't 500 the client. Defaults to <code>submission=true</code>-only events; flip <code>include_now_playing</code> to receive both kinds.</li>
-<li>Browser UI — full TUI-alike web player at <code>/web</code>, hand-rolled vanilla JS + CSS, no bundler. Bordered panels with floating titles, the same palette and density as the TUI, ncmpcpp-style KeyBar, marquee scroll for long titles. Login + signed session cookie so <code>&lt;audio src="/rest/stream?id=..."&gt;</code> can stream without leaking the password into HTML.</li>
-<li>Browser UI: search, lyrics pane, FFT visualizer (Web Audio API + Canvas), command palette (Cmd/Ctrl+P), help slide-in (<code>?</code>), keybinds for repeat / shuffle / volume / seek / fullscreen / lyrics / palette. Dynamic palette + keybar + help filter their contents by playback mode (track vs. radio) so radio listeners don't see Repeat / Shuffle / Seek that don't apply.</li>
-<li>Browser UI: internet radio. The Subsonic <code>getInternetRadioStations</code> endpoint now serves the same stations the TUI plays (defaults + <code>~/.config/musickit/radio.toml</code>); the web UI lists them in a Radio sidebar panel and plays via a same-origin <code>/web/radio-stream</code> proxy. The proxy parses inline ICY metadata and exposes the current StreamTitle via <code>/web/radio-meta</code> for the Now Playing card to poll. Symfonium / Amperfy / play:Sub also pick up the same station list.</li>
-<li>Browser UI: cover-art <code>♪</code> placeholder — every cover-less album row + Now Playing card renders a centered <code>♪</code> glyph on a slightly-elevated grey square. CSS background under an <code>&lt;img&gt;</code>, with a transparent SVG fallback so Chromium's broken-image marker doesn't show through.</li>
-<li><code>musickit serve --no-web</code> — disables the bundled browser UI when only the Subsonic <code>/rest/*</code> API is wanted (smaller attack surface; headless / embedded deployments).</li>
 </ul>
 
 
