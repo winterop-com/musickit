@@ -15,16 +15,24 @@ Fragments are returned as plain HTML so the page's JS can do
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from musickit import __version__, radio
 from musickit.serve.auth import AuthError, verify
 from musickit.web.session import SESSION_PW_KEY, SESSION_USER_KEY, new_csrf_token
+
+# Per-URL last-seen ICY StreamTitle, populated by the radio-stream proxy as
+# it parses inline ICY metadata frames. The web client polls
+# `/web/radio-meta?url=...` to retrieve the current value. Single-process
+# scope only — multi-worker uvicorn would need a shared store.
+_icy_titles: dict[str, str] = {}
+_ICY_TITLE_RE = re.compile(rb"StreamTitle='([^']*)';")
 
 router = APIRouter()
 
@@ -188,7 +196,15 @@ async def web_radio_stream(request: Request, url: str) -> Response:
 
     client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=None))
     upstream = await client.send(
-        client.build_request("GET", url, headers={"User-Agent": f"musickit/{__version__}"}),
+        client.build_request(
+            "GET",
+            url,
+            # `Icy-MetaData: 1` opts into inline ICY metadata frames so
+            # the proxy can parse "StreamTitle='Artist - Song';" updates
+            # and surface them via /web/radio-meta. The browser cannot
+            # read these frames itself.
+            headers={"User-Agent": f"musickit/{__version__}", "Icy-MetaData": "1"},
+        ),
         stream=True,
         follow_redirects=True,
     )
@@ -197,10 +213,65 @@ async def web_radio_stream(request: Request, url: str) -> Response:
         await client.aclose()
         return Response(f"Upstream {upstream.status_code}", status_code=502)
 
+    metaint_header = upstream.headers.get("icy-metaint")
+    metaint = int(metaint_header) if metaint_header and metaint_header.isdigit() else 0
+
     async def streamer():  # type: ignore[no-untyped-def]
         try:
+            if metaint == 0:
+                # No inline metadata advertised — straight pass-through.
+                async for chunk in upstream.aiter_raw():
+                    yield chunk
+                return
+            # Inline ICY metadata: every `metaint` audio bytes, the upstream
+            # interleaves a metadata frame:
+            #   1 byte: length / 16
+            #   N bytes: padded ASCII (e.g. "StreamTitle='...';").
+            # We forward only the audio bytes to the browser and stash the
+            # parsed StreamTitle in `_icy_titles` for /web/radio-meta to
+            # read.
+            buf = bytearray()
+            state = "audio"  # audio -> meta_len -> meta_body -> audio
+            audio_left = metaint
+            meta_len = 0
             async for chunk in upstream.aiter_raw():
-                yield chunk
+                buf.extend(chunk)
+                # Drain the buffer in whatever states we can satisfy.
+                while True:
+                    if state == "audio":
+                        if not buf:
+                            break
+                        n = min(audio_left, len(buf))
+                        yield bytes(buf[:n])
+                        del buf[:n]
+                        audio_left -= n
+                        if audio_left == 0:
+                            state = "meta_len"
+                        continue
+                    if state == "meta_len":
+                        if not buf:
+                            break
+                        meta_len = buf[0] * 16
+                        del buf[:1]
+                        if meta_len == 0:
+                            audio_left = metaint
+                            state = "audio"
+                        else:
+                            state = "meta_body"
+                        continue
+                    # meta_body
+                    if len(buf) < meta_len:
+                        break  # wait for more bytes
+                    meta_bytes = bytes(buf[:meta_len])
+                    del buf[:meta_len]
+                    text = meta_bytes.rstrip(b"\x00")
+                    match = _ICY_TITLE_RE.search(text)
+                    if match:
+                        title = match.group(1).decode("utf-8", errors="replace").strip()
+                        if title:
+                            _icy_titles[url] = title
+                    audio_left = metaint
+                    state = "audio"
         finally:
             await upstream.aclose()
             await client.aclose()
@@ -209,6 +280,20 @@ async def web_radio_stream(request: Request, url: str) -> Response:
         streamer(),
         media_type=upstream.headers.get("content-type", "audio/mpeg"),
     )
+
+
+@router.get("/web/radio-meta", include_in_schema=False)
+async def web_radio_meta(request: Request, url: str) -> Response:
+    """Return the last-seen ICY StreamTitle for a station, parsed by the proxy.
+
+    Cheap polling endpoint — clients can hit this every few seconds while
+    a stream plays. Returns an empty string when the station hasn't sent
+    metadata yet (or doesn't send any at all, like NRK).
+    """
+    redirect = _require_auth_or_redirect(request)
+    if redirect is not None:
+        return redirect
+    return JSONResponse({"title": _icy_titles.get(url, "")})
 
 
 @router.get("/web/artist/{ar_id}", response_class=HTMLResponse, include_in_schema=False)

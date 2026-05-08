@@ -734,6 +734,19 @@ button:focus-visible {
   font-weight: 600;
 }
 
+/* Currently-playing station row — same orange-and-bold treatment as
+   the active track in the tracks pane. The track-row variant of this
+   already exists below; this rule covers radio-station row buttons,
+   which use `.album-title` for the name. */
+.row-button.is-playing .album-title {
+  color: var(--active);
+  font-weight: 600;
+}
+
+.row-button.is-playing {
+  background: var(--bg-hover);
+}
+
 .album-row {
   display: grid;
   grid-template-columns: 48px 1fr;
@@ -935,6 +948,18 @@ button:focus-visible {
 
 body.viz-idle .viz-panel {
   opacity: 0.55;
+}
+
+/* Radio mode: collapse the tracks pane and let the station list take
+   the rest of the row. Tracks make no sense for a radio stream — the
+   Now Playing card up top is the only "currently playing" surface
+   needed. */
+body.is-radio .three-pane {
+  grid-template-columns: 260px 1fr;
+}
+
+body.is-radio .pane-tracks {
+  display: none;
 }
 
 body.is-viz .now-playing-region {

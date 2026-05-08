@@ -59,6 +59,10 @@
     // track → off; `s` toggles shuffle.
     repeat: "off", // "off" | "album" | "track"
     shuffle: false,
+    // Radio metadata polling (ICY StreamTitle from the proxy).
+    radioMetaTimer: null,
+    radioStationName: "", // remembered separately so we can fall back when
+    // the upstream stops emitting StreamTitle frames.
   };
 
   // -------------------------------------------------------------------- //
@@ -125,13 +129,19 @@
     // the regular Subsonic /rest/stream endpoint.
     if (item.kind === "radio") {
       audio.src = "/web/radio-stream?url=" + encodeURIComponent(item.url);
+      state.radioStationName = item.title || "";
+      startRadioMetaPoll(item.url);
     } else {
       audio.src = "/rest/stream?id=" + encodeURIComponent(item.id) + "&f=raw";
+      stopRadioMetaPoll();
+      state.radioStationName = "";
     }
     audio.play().catch((err) => console.warn("playback failed:", err));
 
-    // Visual: orange-out the playing row.
-    document.querySelectorAll(".track-row.is-playing").forEach((el) => {
+    // Visual: orange-out the playing row. Broadened from `.track-row` to
+    // `.row-button` so both album-track rows AND radio-station rows get
+    // cleared when something new starts playing.
+    document.querySelectorAll(".row-button.is-playing").forEach((el) => {
       el.classList.remove("is-playing");
     });
     if (item.rowEl) {
@@ -139,7 +149,14 @@
     }
 
     npTitle.textContent = item.title || "—";
-    npArtist.textContent = item.artist || "—";
+    // Radio: the station name belongs in the artist line so the
+    // top-right title row can flip to the StreamTitle (current song)
+    // once /web/radio-meta polls return one.
+    if (item.kind === "radio") {
+      npArtist.textContent = item.title || "Radio";
+    } else {
+      npArtist.textContent = item.artist || "—";
+    }
     if (npAlbum) {
       npAlbum.textContent = item.albumTitle || "";
       if (npAlbumSep) npAlbumSep.textContent = item.albumTitle ? " · " : "";
@@ -233,6 +250,45 @@
   function seekBy(seconds) {
     if (!audio.duration || !isFinite(audio.duration)) return;
     audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
+  }
+
+  // -------------------------------------------------------------------- //
+  // Radio ICY metadata polling                                           //
+  //                                                                      //
+  // Browsers strip ICY frames from <audio> before they reach JS. Our     //
+  // /web/radio-stream proxy parses them server-side and stashes the      //
+  // last-seen StreamTitle; this poller just reads that cache.            //
+  // -------------------------------------------------------------------- //
+
+  function stopRadioMetaPoll() {
+    if (state.radioMetaTimer) {
+      clearInterval(state.radioMetaTimer);
+      state.radioMetaTimer = null;
+    }
+  }
+
+  function startRadioMetaPoll(stationUrl) {
+    stopRadioMetaPoll();
+    const poll = async () => {
+      try {
+        const res = await fetch("/web/radio-meta?url=" + encodeURIComponent(stationUrl), {
+          credentials: "same-origin",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const t = (data.title || "").trim();
+        if (!t) return;
+        // Render: title row gets the current song; artist row stays as
+        // the station name so the listener always sees what they tuned
+        // into. StatusBar Album mirrors the song title.
+        npTitle.textContent = t;
+        if (sbAlbum) sbAlbum.textContent = t;
+      } catch (e) {
+        // Network blip — try again on the next tick.
+      }
+    };
+    poll(); // immediate
+    state.radioMetaTimer = setInterval(poll, 8000);
   }
 
   // -------------------------------------------------------------------- //
@@ -359,21 +415,35 @@
       markActiveRow(button, ".pane-artists");
       loadInto("/web/artist/" + encodeURIComponent(button.dataset.id), albumsPane);
       tracksPane.innerHTML = '<p class="empty">Pick an album to see tracks.</p>';
-      // Reset titles in case we were in radio mode previously.
+      // Leave radio mode: restore tracks pane + the original titles.
+      document.body.classList.remove("is-radio");
       if (albumsPaneTitle) albumsPaneTitle.textContent = "Albums";
       if (tracksPaneTitle) tracksPaneTitle.textContent = "Tracks";
     } else if (action === "load-radio") {
-      // Radio list goes into the albums pane (the natural "middle" target
-      // when picking from the left). Tracks pane stays empty until a
-      // station is clicked. Retitle both panes to match the new role —
-      // the empty "Tracks" header next to a radio list reads as a bug.
-      loadInto("/web/radio", albumsPane);
-      tracksPane.innerHTML = '<p class="empty">Pick a station to start streaming.</p>';
+      // Radio list goes into the (renamed) middle pane; tracks pane is
+      // hidden in radio mode (`body.is-radio` collapses the grid to two
+      // columns). The Now Playing card up top is the only "currently
+      // playing" surface needed for a stream.
+      document.body.classList.add("is-radio");
       if (albumsPaneTitle) albumsPaneTitle.textContent = "Stations";
-      if (tracksPaneTitle) tracksPaneTitle.textContent = "Stream";
+      loadInto("/web/radio", albumsPane).then(() => {
+        // The fragment swap blew away any prior is-playing mark; restore
+        // it if a station is currently active. Look up by stream URL —
+        // the data-url attribute is the stable identity for stations.
+        const cur = state.queueIndex >= 0 ? state.queue[state.queueIndex] : null;
+        if (cur && cur.kind === "radio" && cur.url) {
+          const sel =
+            '[data-action="play-radio"][data-url="' + cur.url.replace(/"/g, '\\"') + '"]';
+          const btn = albumsPane.querySelector(sel);
+          if (btn) {
+            btn.classList.add("is-playing");
+            cur.rowEl = btn; // re-bind so subsequent plays clear the right element
+          }
+        }
+      });
     } else if (action === "play-radio") {
-      // Single-item queue. Synthesise a stable id from the station
-      // index so `state.queue.findIndex` in playQueueIndex works.
+      // Single-item queue. The clicked button itself is the rowEl so
+      // playQueueIndex can mark it `is-playing` (same pattern as tracks).
       const station = {
         kind: "radio",
         id: "radio:" + (button.dataset.url || ""),
@@ -383,6 +453,7 @@
         albumId: "",
         albumTitle: "",
         albumYear: "",
+        rowEl: button,
       };
       state.queue = [station];
       playQueueIndex(0);
