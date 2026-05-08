@@ -46,6 +46,8 @@
   const lyricsClose = document.getElementById("lyrics-close");
   const albumsPane = document.getElementById("albums-pane");
   const tracksPane = document.getElementById("tracks-pane");
+  const albumsPaneTitle = document.querySelector(".pane-albums .panel-title");
+  const tracksPaneTitle = document.querySelector(".pane-tracks .panel-title");
 
   const state = {
     queue: [], // [{ id, title, artist, albumId, rowEl }]
@@ -116,10 +118,13 @@
     const item = state.queue[idx];
     state.queueIndex = idx;
 
-    // Radio items carry a direct stream URL; tracks key off the
-    // Subsonic /rest/stream endpoint by id.
+    // Radio items go through the same-origin /web/radio-stream proxy so
+    // the visualizer's `crossOrigin = "anonymous"` doesn't trigger a CORS
+    // preflight against Icecast/SHOUTcast servers (which mostly don't
+    // return CORS headers — playback would fail silently). Tracks ride
+    // the regular Subsonic /rest/stream endpoint.
     if (item.kind === "radio") {
-      audio.src = item.url;
+      audio.src = "/web/radio-stream?url=" + encodeURIComponent(item.url);
     } else {
       audio.src = "/rest/stream?id=" + encodeURIComponent(item.id) + "&f=raw";
     }
@@ -354,12 +359,18 @@
       markActiveRow(button, ".pane-artists");
       loadInto("/web/artist/" + encodeURIComponent(button.dataset.id), albumsPane);
       tracksPane.innerHTML = '<p class="empty">Pick an album to see tracks.</p>';
+      // Reset titles in case we were in radio mode previously.
+      if (albumsPaneTitle) albumsPaneTitle.textContent = "Albums";
+      if (tracksPaneTitle) tracksPaneTitle.textContent = "Tracks";
     } else if (action === "load-radio") {
       // Radio list goes into the albums pane (the natural "middle" target
       // when picking from the left). Tracks pane stays empty until a
-      // station is clicked.
+      // station is clicked. Retitle both panes to match the new role —
+      // the empty "Tracks" header next to a radio list reads as a bug.
       loadInto("/web/radio", albumsPane);
-      tracksPane.innerHTML = '<p class="empty">Pick a station.</p>';
+      tracksPane.innerHTML = '<p class="empty">Pick a station to start streaming.</p>';
+      if (albumsPaneTitle) albumsPaneTitle.textContent = "Stations";
+      if (tracksPaneTitle) tracksPaneTitle.textContent = "Stream";
     } else if (action === "play-radio") {
       // Single-item queue. Synthesise a stable id from the station
       // index so `state.queue.findIndex` in playQueueIndex works.
