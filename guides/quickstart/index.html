@@ -1646,13 +1646,15 @@ dropped.</p>
 <p>Note the <strong>Tailscale</strong> URL — that's what the iPhone will use.</p>
 <p>For anything beyond a private LAN, set proper credentials. The simplest path:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/musickit
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/musickit/serve.toml<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="s">[auth]</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="s">user = &quot;your-username&quot;</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/musickit/musickit.toml<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="s">[server]</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="s">username = &quot;your-username&quot;</span>
 <a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="s">password = &quot;your-strong-password&quot;</span>
 <a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="s">EOF</span>
 </code></pre></div>
 <p>Restart <code>musickit serve</code> — the yellow warning is gone.</p>
+<p>(If you're upgrading from a pre-v0.11 install with a <code>serve.toml</code>, run
+<code>musickit config migrate</code> once to move it to the new format.)</p>
 <p>Leave the server running. You can also run it as a background process via
 launchd / systemd; see <a href="../serve/">Serve</a> for examples.</p>
 <h2 id="5-iphone-setup">5. iPhone setup<a class="headerlink" href="#5-iphone-setup" title="Permanent link">&para;</a></h2>
@@ -1686,8 +1688,8 @@ synced lyrics.)</p>
 <ul>
 <li><strong>Server URL</strong>: <code>http://mlaptop.tail4a4b9a.ts.net:4533</code> (your Mac's
   Tailscale URL — no trailing slash, no <code>/rest</code>).</li>
-<li><strong>Username</strong>: <code>admin</code> (or whatever you put in <code>serve.toml</code>).</li>
-<li><strong>Password</strong>: <code>admin</code> (or whatever you put in <code>serve.toml</code>).</li>
+<li><strong>Username</strong>: <code>admin</code> (or whatever you put in <code>musickit.toml</code>).</li>
+<li><strong>Password</strong>: <code>admin</code> (or whatever you put in <code>musickit.toml</code>).</li>
 </ul>
 <p>Tap <strong>Login</strong>. Amperfy probes <code>/rest/ping</code>, then <code>/rest/getMusicFolders</code>
 and <code>/rest/getArtists</code> to populate the library. On first connect with a

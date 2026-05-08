@@ -750,6 +750,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1500,6 +1511,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1990,6 +2012,10 @@
 <p>The HTTP <code>Authorization: Basic ...</code> header is <strong>not</strong> read. If your client has a "Basic Auth" toggle, leave it off.</p>
 <h2 id="response-format">Response format<a class="headerlink" href="#response-format" title="Permanent link">&para;</a></h2>
 <p>Spec default is XML; <code>?f=json</code> opts into JSON. We honour both via a middleware that re-serialises the underlying dict per request. Most modern clients (Symfonium, Feishin, the MusicKit TUI) send <code>f=json</code>; older / iOS clients (Amperfy, play:Sub) often don't and get XML.</p>
+<h2 id="cors">CORS<a class="headerlink" href="#cors" title="Permanent link">&para;</a></h2>
+<p>Every <code>/rest/*</code> response carries <code>Access-Control-Allow-Origin: *</code> plus permissive <code>Allow-Methods</code> / <code>Allow-Headers</code>, so the <a href="../desktop/">MusicKit desktop apps</a> (and any web-based Subsonic client running in a different origin) can call the API directly from a browser webview.</p>
+<p>This is safe because the auth boundary is the request itself, not the origin. Every <code>/rest/*</code> call is gated by either a salted token (<code>?u=user&amp;t=&lt;md5(password+salt)&gt;&amp;s=&lt;salt&gt;</code>) or plain credentials (<code>?u=user&amp;p=password</code>). An attacker who knows the credentials can hit the API from <code>curl</code> regardless of CORS; CORS controls only what cross-origin browser JavaScript may <em>read</em>. Wildcard <code>*</code> doesn't widen the auth surface.</p>
+<p>If you expose the server publicly, terminate TLS at a reverse proxy (Caddy / nginx / Tailscale Funnel) and use a strong password. Don't rely on CORS as a defense.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># ~/.config/musickit/musickit.toml</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[server]</span>
