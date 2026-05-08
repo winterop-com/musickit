@@ -293,33 +293,47 @@
 
   function stopRadioMetaPoll() {
     if (state.radioMetaTimer) {
-      clearInterval(state.radioMetaTimer);
+      clearTimeout(state.radioMetaTimer);
       state.radioMetaTimer = null;
     }
   }
 
   function startRadioMetaPoll(stationUrl) {
     stopRadioMetaPoll();
+    // Two-phase polling: fast at the start so the first StreamTitle
+    // appears within ~2s of clicking play (the upstream sends an ICY
+    // frame roughly every second of audio at 128kbps), then settles
+    // to 8s for ongoing track-change tracking. Without the fast phase
+    // the user would wait the full slow-tick + the parse delay
+    // (~10s worst case) before seeing the song name.
+    const FAST_INTERVAL_MS = 2000;
+    const SLOW_INTERVAL_MS = 8000;
+    const FAST_TICKS = 8; // ~16s of fast polling, covers the first track
+    let tick = 0;
     const poll = async () => {
       try {
         const res = await fetch("/web/radio-meta?url=" + encodeURIComponent(stationUrl), {
           credentials: "same-origin",
         });
-        if (!res.ok) return;
-        const data = await res.json();
-        const t = (data.title || "").trim();
-        if (!t) return;
-        // Render: title row gets the current song; artist row stays as
-        // the station name so the listener always sees what they tuned
-        // into. StatusBar Album mirrors the song title.
-        setMarqueeText(npTitle, t);
-        if (sbAlbum) sbAlbum.textContent = t;
+        if (res.ok) {
+          const data = await res.json();
+          const t = (data.title || "").trim();
+          if (t) {
+            // Title row gets the current song; artist row stays as the
+            // station name so the listener always sees what they tuned
+            // into. StatusBar Album mirrors the song title.
+            setMarqueeText(npTitle, t);
+            if (sbAlbum) sbAlbum.textContent = t;
+          }
+        }
       } catch (e) {
         // Network blip — try again on the next tick.
       }
+      tick++;
+      const next = tick < FAST_TICKS ? FAST_INTERVAL_MS : SLOW_INTERVAL_MS;
+      state.radioMetaTimer = setTimeout(poll, next);
     };
-    poll(); // immediate
-    state.radioMetaTimer = setInterval(poll, 8000);
+    poll(); // immediate first call kicks off the chain
   }
 
   // -------------------------------------------------------------------- //
