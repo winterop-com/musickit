@@ -59,8 +59,8 @@
     </div>
   </section>
 
-  <section class="panel viz-panel" aria-label="Levels">
-    <h2 class="panel-title">Levels</h2>
+  <section class="panel viz-panel" aria-label="Spectrum">
+    <h2 class="panel-title">Spectrum</h2>
     <canvas class="visualizer-canvas" id="viz-canvas" aria-hidden="true"></canvas>
   </section>
 </section>
@@ -170,14 +170,14 @@
 
 <div class="keybar" aria-label="Keyboard shortcuts">
   <span class="kb"><kbd>space</kbd>·Play</span>
-  <span class="kb"><kbd>n</kbd>·Next</span>
-  <span class="kb"><kbd>p</kbd>·Prev</span>
-  <span class="kb"><kbd>&lt;</kbd>/<kbd>&gt;</kbd>·Seek</span>
+  <span class="kb" data-mode="track"><kbd>n</kbd>·Next</span>
+  <span class="kb" data-mode="track"><kbd>p</kbd>·Prev</span>
+  <span class="kb" data-mode="track"><kbd>&lt;</kbd>/<kbd>&gt;</kbd>·Seek</span>
   <span class="kb"><kbd>9</kbd>/<kbd>0</kbd>·Vol</span>
-  <span class="kb"><kbd>r</kbd>·Repeat</span>
-  <span class="kb"><kbd>s</kbd>·Shuffle</span>
+  <span class="kb" data-mode="track"><kbd>r</kbd>·Repeat</span>
+  <span class="kb" data-mode="track"><kbd>s</kbd>·Shuffle</span>
   <span class="kb"><kbd>/</kbd>·Filter</span>
-  <span class="kb"><kbd>l</kbd>·Lyrics</span>
+  <span class="kb" data-mode="track"><kbd>l</kbd>·Lyrics</span>
   <span class="kb"><kbd>f</kbd>·Full</span>
   <span class="kb"><kbd>?</kbd>·Help</span>
   <span class="kb"><kbd>⌘P</kbd>·Palette</span>
@@ -193,15 +193,15 @@
   <div class="help-body">
     <ul class="help-list">
       <li class="help-row"><span class="help-key"><kbd>space</kbd></span><span class="help-desc">Play / pause</span></li>
-      <li class="help-row"><span class="help-key"><kbd>n</kbd></span><span class="help-desc">Next track</span></li>
-      <li class="help-row"><span class="help-key"><kbd>p</kbd></span><span class="help-desc">Previous track</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>n</kbd></span><span class="help-desc">Next track</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>p</kbd></span><span class="help-desc">Previous track</span></li>
       <li class="help-row"><span class="help-key"><kbd>0</kbd> <kbd>+</kbd></span><span class="help-desc">Volume up</span></li>
       <li class="help-row"><span class="help-key"><kbd>9</kbd> <kbd>-</kbd></span><span class="help-desc">Volume down</span></li>
-      <li class="help-row"><span class="help-key"><kbd>&lt;</kbd></span><span class="help-desc">Seek backward</span></li>
-      <li class="help-row"><span class="help-key"><kbd>&gt;</kbd></span><span class="help-desc">Seek forward</span></li>
-      <li class="help-row"><span class="help-key"><kbd>r</kbd></span><span class="help-desc">Cycle repeat (off / album / track)</span></li>
-      <li class="help-row"><span class="help-key"><kbd>s</kbd></span><span class="help-desc">Toggle shuffle</span></li>
-      <li class="help-row"><span class="help-key"><kbd>l</kbd></span><span class="help-desc">Show / hide lyrics</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>&lt;</kbd></span><span class="help-desc">Seek backward</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>&gt;</kbd></span><span class="help-desc">Seek forward</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>r</kbd></span><span class="help-desc">Cycle repeat (off / album / track)</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>s</kbd></span><span class="help-desc">Toggle shuffle</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>l</kbd></span><span class="help-desc">Show / hide lyrics</span></li>
       <li class="help-row"><span class="help-key"><kbd>f</kbd></span><span class="help-desc">Fullscreen visualizer</span></li>
       <li class="help-row"><span class="help-key"><kbd>/</kbd></span><span class="help-desc">Filter / search</span></li>
       <li class="help-row"><span class="help-key"><kbd>?</kbd></span><span class="help-desc">Toggle help</span></li>

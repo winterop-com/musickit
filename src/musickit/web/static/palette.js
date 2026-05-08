@@ -21,17 +21,22 @@
 
   // Static command catalog. Label is the user-visible string, hint is
   // the keybind shown on the right, action is what happens on invoke.
+  // `modes`: which playback contexts the command applies to. Omit for
+  // "all modes". Modes: "track" (album track playing or idle), "radio"
+  // (radio stream playing). The palette filters by current mode at
+  // open time so radio listeners don't see Repeat / Shuffle / Seek
+  // commands that don't apply to live streams.
   const COMMANDS = [
     { label: "Play / pause", hint: "space", action: { key: " " } },
-    { label: "Next track", hint: "n", action: { key: "n" } },
-    { label: "Previous track", hint: "p", action: { key: "p" } },
+    { label: "Next track", hint: "n", action: { key: "n" }, modes: ["track"] },
+    { label: "Previous track", hint: "p", action: { key: "p" }, modes: ["track"] },
     { label: "Volume up", hint: "0", action: { key: "0" } },
     { label: "Volume down", hint: "9", action: { key: "9" } },
-    { label: "Seek backward 5s", hint: "<", action: { key: "<" } },
-    { label: "Seek forward 5s", hint: ">", action: { key: ">" } },
-    { label: "Cycle repeat (off / album / track)", hint: "r", action: { key: "r" } },
-    { label: "Toggle shuffle", hint: "s", action: { key: "s" } },
-    { label: "Toggle lyrics", hint: "l", action: { key: "l" } },
+    { label: "Seek backward 5s", hint: "<", action: { key: "<" }, modes: ["track"] },
+    { label: "Seek forward 5s", hint: ">", action: { key: ">" }, modes: ["track"] },
+    { label: "Cycle repeat (off / album / track)", hint: "r", action: { key: "r" }, modes: ["track"] },
+    { label: "Toggle shuffle", hint: "s", action: { key: "s" }, modes: ["track"] },
+    { label: "Toggle lyrics", hint: "l", action: { key: "l" }, modes: ["track"] },
     { label: "Toggle visualizer", hint: "f", action: { key: "f" } },
     { label: "Focus search", hint: "/", action: { key: "/" } },
     { label: "Show keyboard shortcuts", hint: "?", action: { key: "?" } },
@@ -39,7 +44,18 @@
     { label: "Sign out", hint: "", action: { submit: "form.logout-form" } },
   ];
 
-  let filtered = COMMANDS.slice();
+  function currentMode() {
+    // Mirrors the `body.is-radio` class set by app.js when the user
+    // loads the radio panel or plays a station.
+    return document.body.classList.contains("is-radio") ? "radio" : "track";
+  }
+
+  function applicableCommands() {
+    const mode = currentMode();
+    return COMMANDS.filter((cmd) => !cmd.modes || cmd.modes.includes(mode));
+  }
+
+  let filtered = applicableCommands();
   let activeIdx = 0;
 
   function render() {
@@ -64,13 +80,14 @@
   }
 
   function applyFilter(q) {
+    const pool = applicableCommands(); // re-evaluate mode each open / keystroke
     const needle = q.trim().toLowerCase();
     if (!needle) {
-      filtered = COMMANDS.slice();
+      filtered = pool;
     } else {
       // Multi-token AND substring match — same UX as the TUI's `/` filter.
       const tokens = needle.split(/\s+/);
-      filtered = COMMANDS.filter((cmd) => {
+      filtered = pool.filter((cmd) => {
         const hay = (cmd.label + " " + cmd.hint).toLowerCase();
         return tokens.every((t) => hay.includes(t));
       });

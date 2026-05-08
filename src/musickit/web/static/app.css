@@ -259,7 +259,7 @@ button:focus-visible {
 
 .now-playing-region {
   display: grid;
-  /* Cap the Now Playing card at 540px so the Levels viz gets the bulk
+  /* Cap the Now Playing card at 540px so the Spectrum viz gets the bulk
      of the horizontal space — matches the TUI where the visualizer is
      a wide rectangle taking ~60% of the main column. The cover (56) +
      meta-lines + transport buttons fit comfortably in 540px. */
@@ -972,10 +972,20 @@ button:focus-visible {
   color: var(--text-muted);
 }
 
+/* Hide track-only keybinds when the user is browsing radio. Seek /
+   prev / next / repeat / shuffle / lyrics don't apply to a live
+   stream — leaving them in the bar is just visual noise. The
+   palette filters the same set; see app.js + palette.js. Help-panel
+   rows are gated by the same selector so they stay in sync. */
+body.is-radio .kb[data-mode="track"],
+body.is-radio .help-row[data-mode="track"] {
+  display: none;
+}
+
 /* ---------------------------------------------------------------------- */
 /* FFT visualizer in the top region                                        */
 /*                                                                          */
-/* Lives inside `.viz-panel` (a regular `.panel` with the "Levels"          */
+/* Lives inside `.viz-panel` (a regular `.panel` with the "Spectrum"        */
 /* title). Idle state: dim background. Fullscreen (`f`): the whole          */
 /* now-playing region grows to fill, three-pane hides.                     */
 /* ---------------------------------------------------------------------- */

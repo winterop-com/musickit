@@ -167,8 +167,8 @@ def test_shell_renders_tui_alike_chrome(tmp_path: Path) -> None:
     # Centered topbar with versioned brand.
     assert 'class="brand"' in text
     assert 'class="version"' in text
-    # Now Playing card + Levels viz panels at the top.
-    assert "Now Playing" in text and "Levels" in text
+    # Now Playing card + Spectrum viz panels at the top.
+    assert "Now Playing" in text and "Spectrum" in text
     # StatusBar with Vol/Repeat/Shuffle/Time.
     assert 'class="status-bar"' in text
     assert "Vol:" in text and "Repeat:" in text and "Shuffle:" in text and "Time:" in text
