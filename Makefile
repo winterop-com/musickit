@@ -80,9 +80,10 @@ docs: docs-serve
 
 desktop-sync-frontend:
 	@echo ">>> Syncing shared frontend assets into desktop/frontend/"
-	@cp src/musickit/web/static/_palette.css desktop/frontend/_palette.css
-	@cp src/musickit/web/static/app.css      desktop/frontend/_app.css
-	@cp src/musickit/web/static/favicon.svg  desktop/frontend/favicon.svg
+	@cp src/musickit/web/static/_palette.css   desktop/frontend/_palette.css
+	@cp src/musickit/web/static/app.css        desktop/frontend/_app.css
+	@cp src/musickit/web/static/favicon.svg    desktop/frontend/favicon.svg
+	@cp src/musickit/web/static/visualizer.js  desktop/frontend/js/visualizer.js
 
 desktop-tauri: desktop-tauri-dev
 
