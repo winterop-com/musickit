@@ -1,7 +1,7 @@
 {
   "name": "musickit-desktop-electron",
-  "version": "0.1.0",
-  "description": "Electron sibling of the MusicKit desktop wrapper — for comparison with the Tauri build.",
+  "version": "0.12.3",
+  "description": "Electron sibling of the MusicKit desktop wrapper \u2014 for comparison with the Tauri build.",
   "main": "src/main.js",
   "private": true,
   "type": "commonjs",
@@ -17,8 +17,9 @@
     "electron-store": "^8.2.0"
   },
   "build": {
-    "appId": "com.winterop.musickit",
+    "appId": "com.winterop.musickit.electron",
     "productName": "MusicKit",
+    "artifactName": "MusicKit-Electron-${version}-${arch}.${ext}",
     "asar": true,
     "directories": {
       "output": "dist"
@@ -37,17 +38,28 @@
       "category": "public.app-category.music",
       "icon": "../tauri/src-tauri/icons/icon.icns",
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ]
     },
     "linux": {
       "category": "Audio",
       "icon": "../tauri/src-tauri/icons/icon.png",
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     },
     "win": {
       "icon": "../tauri/src-tauri/icons/icon.ico",
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     }
   }
 }
