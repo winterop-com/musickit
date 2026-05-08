@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -117,9 +118,15 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_w
 
     # Middleware order is REVERSE of registration — last add_middleware
     # is the outermost wrap. We need:
-    #   request -> Session -> RestQueryAuthFromSession -> PostFormToQuery
-    #            -> SubsonicFormat -> route
+    #   request -> CORS -> Session -> RestQueryAuthFromSession ->
+    #              PostFormToQuery -> SubsonicFormat -> route
     # so that:
+    #   - CORS handles cross-origin preflights + appends headers to
+    #     responses. Required for the MusicKit desktop app (Tauri /
+    #     Electron webviews load from a `tauri://` or `file://` origin
+    #     and fetch `http://server/rest/*` cross-origin — without CORS
+    #     headers the browser blocks the response from JS access even
+    #     though the server returned 200).
     #   - Session sets request.session before RestQueryAuth reads it.
     #   - RestQueryAuth injects ?u=&p= so the existing auth dep works for
     #     browser <audio src='/rest/stream?id=...'> calls.
@@ -138,6 +145,21 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_w
         max_age=30 * 24 * 60 * 60,
         same_site="lax",
         https_only=False,
+    )
+    # CORS — outermost. We allow any origin because the Subsonic auth
+    # token (`?u=&t=&s=`) is the security boundary, not the request
+    # origin. This lets the MusicKit desktop wrappers (Tauri / Electron)
+    # talk to a remote musickit serve from their tauri:// / file://
+    # origin without the webview blocking the response. Other Subsonic
+    # clients (Symfonium / Amperfy / play:Sub) aren't browsers and
+    # don't care about CORS either way; this is purely additive.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
     )
 
     async def require_auth(
