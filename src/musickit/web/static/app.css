@@ -557,10 +557,15 @@ button:focus-visible {
 
 .sb-album {
   color: var(--accent);
+  display: inline-block;
   max-width: 360px;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: bottom;
+  /* Inner `.marquee-inner` owns the ellipsis when not animating; the
+     wrapper is just a clipping window so the marquee can translate
+     the inner span freely once `is-marquee` is set. Same pattern as
+     `.np-title` and `.track-title`. */
 }
 
 /* StatusBar groups that act as buttons (Repeat / Shuffle). Subtle hover

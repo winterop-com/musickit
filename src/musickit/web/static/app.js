@@ -38,8 +38,19 @@
   const sbRepeat = document.getElementById("sb-repeat");
   const sbShuffle = document.getElementById("sb-shuffle");
   const sbAlbum = document.getElementById("sb-album");
+  const sbAlbumLabel = document.getElementById("sb-album-label");
   const sbCursor = document.getElementById("sb-cursor");
   const sbTime = document.getElementById("sb-time");
+
+  function setSbAlbum(text) {
+    // Marquee the StatusBar Album cell when its content overflows the
+    // 360px cap, plus set a native tooltip so hovering always reveals
+    // the full string even if marquee fails to start (e.g. container
+    // not laid out yet).
+    if (!sbAlbum) return;
+    setMarqueeText(sbAlbum, text || "—");
+    sbAlbum.title = (text || "").trim();
+  }
   const searchInput = document.getElementById("search");
   const lyricsPanel = document.getElementById("lyrics-panel");
   const lyricsBody = document.getElementById("lyrics-body");
@@ -194,7 +205,16 @@
     }
     if (npYear) npYear.textContent = item.albumYear || "—";
     if (npFormat) npFormat.textContent = item.kind === "radio" ? "Stream" : "AAC";
-    if (sbAlbum) sbAlbum.textContent = item.albumTitle || "—";
+    // The StatusBar Album cell flips role with the playback mode:
+    //   track  -> "Album: <album-title>"  (the album the track is on)
+    //   radio  -> "Track: <station-name>" (will flip to StreamTitle once
+    //             the ICY-metadata poller returns one)
+    if (sbAlbumLabel) sbAlbumLabel.textContent = item.kind === "radio" ? "Track:" : "Album:";
+    if (item.kind === "radio") {
+      setSbAlbum(item.title || "—");
+    } else {
+      setSbAlbum(item.albumTitle || "—");
+    }
     if (sbCursor) {
       const idx = state.queue.findIndex((q) => q.id === item.id);
       sbCursor.textContent = `${idx + 1}/${state.queue.length}`;
@@ -323,7 +343,7 @@
             // station name so the listener always sees what they tuned
             // into. StatusBar Album mirrors the song title.
             setMarqueeText(npTitle, t);
-            if (sbAlbum) sbAlbum.textContent = t;
+            setSbAlbum(t);
           }
         }
       } catch (e) {
