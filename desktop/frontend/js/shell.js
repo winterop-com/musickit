@@ -69,6 +69,11 @@ export function renderShell(root, client, session, hooks = {}) {
           <span class="np-dur" id="np-dur">00:00</span>
         </div>
       </section>
+
+      <section class="panel viz-panel" aria-label="Spectrum">
+        <h2 class="panel-title">Spectrum</h2>
+        <canvas class="visualizer-canvas" id="viz-canvas" aria-hidden="true"></canvas>
+      </section>
     </section>
 
     <main class="three-pane">
