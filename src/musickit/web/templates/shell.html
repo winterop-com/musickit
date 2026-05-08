@@ -6,7 +6,7 @@
     <input type="search"
            id="search"
            class="search-input"
-           placeholder="filter / search…"
+           placeholder="filter / search…  (/)"
            autocomplete="off"
            spellcheck="false">
   </div>
@@ -20,6 +20,50 @@
     </form>
   </div>
 </header>
+
+<section class="now-playing-region" aria-label="Now playing">
+  <section class="panel np-card" aria-label="Now Playing">
+    <h2 class="panel-title">Now Playing</h2>
+    <div class="np-card-body">
+      <img id="np-cover" class="np-cover" alt="">
+      <div class="np-meta">
+        <span class="np-title" id="np-title">Nothing playing</span>
+        <span class="np-artist-line">
+          <span class="np-artist" id="np-artist">—</span>
+          <span class="np-album-sep" id="np-album-sep"></span>
+          <span class="np-album" id="np-album"></span>
+        </span>
+        <span class="np-extra-line">
+          <span class="np-label">Year:</span> <span id="np-year">—</span>
+          <span class="np-spacer">·</span>
+          <span class="np-label">Format:</span> <span id="np-format">—</span>
+        </span>
+      </div>
+      <div class="np-controls">
+        <button type="button" class="np-button" data-action="prev" id="prev-button" disabled aria-label="Previous track (p)">
+          <span aria-hidden="true">⏮</span>
+        </button>
+        <button type="button" class="play-button" data-action="play-pause" id="play-button" disabled aria-label="Play / pause (space)">
+          <span aria-hidden="true">▶</span>
+        </button>
+        <button type="button" class="np-button" data-action="next" id="next-button" disabled aria-label="Next track (n)">
+          <span aria-hidden="true">⏭</span>
+        </button>
+      </div>
+    </div>
+    <div class="np-progress" id="np-progress">
+      <span class="np-state-icon" id="np-state-icon">■</span>
+      <span class="np-pos" id="np-pos">00:00</span>
+      <progress id="np-bar" max="1" value="0"></progress>
+      <span class="np-dur" id="np-dur">00:00</span>
+    </div>
+  </section>
+
+  <section class="panel viz-panel" aria-label="Levels">
+    <h2 class="panel-title">Levels</h2>
+    <canvas class="visualizer-canvas" id="viz-canvas" aria-hidden="true"></canvas>
+  </section>
+</section>
 
 <main class="three-pane">
   <section class="pane pane-sidebar" aria-label="Library">
@@ -71,8 +115,6 @@
   </section>
 </main>
 
-<canvas class="visualizer-canvas" id="viz-canvas" aria-hidden="true"></canvas>
-
 <aside class="lyrics-panel" id="lyrics-panel" aria-label="Lyrics">
   <div class="lyrics-header">
     <span>Lyrics</span>
@@ -83,44 +125,39 @@
   </div>
 </aside>
 
-<footer class="now-playing" id="now-playing">
-  <img id="np-cover" class="np-cover" alt="" style="visibility: hidden">
-  <div class="np-meta">
-    <span class="np-title" id="np-title">Nothing playing</span>
-    <span class="np-artist-line">
-      <span class="np-artist" id="np-artist"></span>
-      <span class="np-album-sep" id="np-album-sep"></span>
-      <span class="np-album" id="np-album"></span>
-    </span>
-  </div>
-  <div class="np-progress">
-    <span class="np-pos" id="np-pos">00:00</span>
-    <progress id="np-bar" max="1" value="0"></progress>
-    <span class="np-dur" id="np-dur">00:00</span>
-  </div>
-  <div class="np-controls">
-    <button type="button" class="np-button" data-action="prev" id="prev-button" disabled aria-label="Previous track">
-      <span aria-hidden="true">⏮</span>
-    </button>
-    <button type="button" class="play-button" data-action="play-pause" id="play-button" disabled aria-label="Play / pause">
-      <span aria-hidden="true">▶</span>
-    </button>
-    <button type="button" class="np-button" data-action="next" id="next-button" disabled aria-label="Next track">
-      <span aria-hidden="true">⏭</span>
-    </button>
-  </div>
-  <div class="np-volume">
+<div class="status-bar" id="status-bar">
+  <span class="sb-group">
+    <span class="sb-label">Vol:</span>
+    <span class="sb-value sb-vol" id="sb-vol">100%</span>
+    <span class="sb-bar" id="sb-vol-bar">[||||||||||||]</span>
+  </span>
+  <span class="sb-group">
+    <span class="sb-label">Repeat:</span>
+    <span class="sb-value sb-repeat" id="sb-repeat">off</span>
+  </span>
+  <span class="sb-group">
+    <span class="sb-label">Shuffle:</span>
+    <span class="sb-value sb-shuffle" id="sb-shuffle">off</span>
+  </span>
+  <span class="sb-group sb-album-group">
+    <span class="sb-label">Album:</span>
+    <span class="sb-value sb-album" id="sb-album">—</span>
+    <span class="sb-cursor" id="sb-cursor">0/0</span>
+  </span>
+  <span class="sb-group sb-time-group">
+    <span class="sb-label">Time:</span>
+    <span class="sb-value sb-time" id="sb-time">00:00 / 00:00</span>
+  </span>
+  <span class="sb-group sb-toggles">
+    <input type="range" id="np-vol" class="sb-vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume">
     <button type="button" class="np-button" data-action="toggle-viz" aria-label="Toggle visualizer (f)">
       <span aria-hidden="true">▦</span>
     </button>
     <button type="button" class="np-button" data-action="toggle-lyrics" aria-label="Toggle lyrics (l)">
       <span aria-hidden="true">♪</span>
     </button>
-    <label class="visually-hidden" for="np-vol">Volume</label>
-    <input type="range" id="np-vol" min="0" max="1" step="0.01" value="1">
-  </div>
-  <audio id="audio" preload="none"></audio>
-</footer>
+  </span>
+</div>
 
 <div class="keybar" aria-label="Keyboard shortcuts">
   <span class="kb"><kbd>space</kbd>·Play</span>
@@ -131,6 +168,8 @@
   <span class="kb"><kbd>f</kbd>·Full</span>
   <span class="kb"><kbd>esc</kbd>·Close</span>
 </div>
+
+<audio id="audio" preload="none"></audio>
 
 <script src="/web-static/app.js"></script>
 <script src="/web-static/visualizer.js"></script>

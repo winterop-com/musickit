@@ -24,11 +24,20 @@
   const npArtist = document.getElementById("np-artist");
   const npAlbum = document.getElementById("np-album");
   const npAlbumSep = document.getElementById("np-album-sep");
+  const npYear = document.getElementById("np-year");
+  const npFormat = document.getElementById("np-format");
   const npCover = document.getElementById("np-cover");
   const npPos = document.getElementById("np-pos");
   const npDur = document.getElementById("np-dur");
   const npBar = document.getElementById("np-bar");
+  const npStateIcon = document.getElementById("np-state-icon");
   const npVol = document.getElementById("np-vol");
+  // StatusBar
+  const sbVol = document.getElementById("sb-vol");
+  const sbVolBar = document.getElementById("sb-vol-bar");
+  const sbAlbum = document.getElementById("sb-album");
+  const sbCursor = document.getElementById("sb-cursor");
+  const sbTime = document.getElementById("sb-time");
   const searchInput = document.getElementById("search");
   const lyricsPanel = document.getElementById("lyrics-panel");
   const lyricsBody = document.getElementById("lyrics-body");
@@ -84,12 +93,14 @@
     // the now-playing card.
     const headingEl = tracksPane.querySelector(".album-heading");
     const albumTitle = headingEl?.querySelector(".album-heading-title")?.textContent || "";
+    const albumYear = headingEl?.dataset.year || "";
     return rows.map((rowEl) => ({
       id: rowEl.dataset.id,
       title: rowEl.dataset.title,
       artist: rowEl.dataset.artist,
       albumId: rowEl.dataset.albumId,
       albumTitle,
+      albumYear,
       rowEl,
     }));
   }
@@ -111,10 +122,17 @@
     }
 
     npTitle.textContent = item.title || "—";
-    npArtist.textContent = item.artist || "";
+    npArtist.textContent = item.artist || "—";
     if (npAlbum) {
       npAlbum.textContent = item.albumTitle || "";
       if (npAlbumSep) npAlbumSep.textContent = item.albumTitle ? " · " : "";
+    }
+    if (npYear) npYear.textContent = item.albumYear || "—";
+    if (npFormat) npFormat.textContent = "AAC";
+    if (sbAlbum) sbAlbum.textContent = item.albumTitle || "—";
+    if (sbCursor) {
+      const idx = state.queue.findIndex((q) => q.id === item.id);
+      sbCursor.textContent = `${idx + 1}/${state.queue.length}`;
     }
     if (item.albumId) {
       npCover.src = "/rest/getCoverArt?id=" + encodeURIComponent(item.albumId) + "&size=80";
@@ -306,27 +324,37 @@
   // Audio element wiring                                                 //
   // -------------------------------------------------------------------- //
 
+  function setStateIcon(icon) {
+    if (npStateIcon) npStateIcon.textContent = icon;
+  }
+
   audio.addEventListener("play", function () {
     playButton.classList.remove("is-paused");
     playButton.firstElementChild.textContent = "‖";
+    setStateIcon("▶");
   });
 
   audio.addEventListener("pause", function () {
     playButton.classList.add("is-paused");
     playButton.firstElementChild.textContent = "▶";
+    setStateIcon("‖");
   });
 
   audio.addEventListener("ended", function () {
     playButton.classList.remove("is-paused");
     playButton.firstElementChild.textContent = "▶";
+    setStateIcon("■");
     nextTrack();
   });
 
   audio.addEventListener("timeupdate", function () {
-    npPos.textContent = fmtTime(audio.currentTime);
+    const pos = fmtTime(audio.currentTime);
+    npPos.textContent = pos;
     if (audio.duration) {
-      npDur.textContent = fmtTime(audio.duration);
+      const dur = fmtTime(audio.duration);
+      npDur.textContent = dur;
       npBar.value = audio.currentTime / audio.duration;
+      if (sbTime) sbTime.textContent = `${pos} / ${dur}`;
     }
     if (lyricsPanel.classList.contains("is-open") && state.lyricsSynced) {
       renderLyrics(Math.floor(audio.currentTime * 1000));
@@ -344,9 +372,21 @@
     audio.currentTime = ratio * audio.duration;
   });
 
+  function updateVolumeReadout(v) {
+    if (sbVol) sbVol.textContent = `${Math.round(v * 100)}%`;
+    if (sbVolBar) {
+      const filled = Math.round(v * 12);
+      sbVolBar.textContent = "[" + "|".repeat(filled) + "-".repeat(12 - filled) + "]";
+    }
+  }
+
   npVol.addEventListener("input", function () {
-    audio.volume = parseFloat(npVol.value);
+    const v = parseFloat(npVol.value);
+    audio.volume = v;
+    updateVolumeReadout(v);
   });
+  // Initial volume readout
+  updateVolumeReadout(parseFloat(npVol.value));
 
   // -------------------------------------------------------------------- //
   // Search input                                                         //

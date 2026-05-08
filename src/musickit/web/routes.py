@@ -201,6 +201,7 @@ async def web_album(request: Request, al_id: str) -> Response:
             "album_id": al_id,
             "album_title": album.tag_album or album.album_dir,
             "album_artist": album.tag_album_artist or album.artist_dir,
+            "album_year": album.tag_year or "",
         },
     )
 
