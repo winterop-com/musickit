@@ -158,43 +158,6 @@ async def delete_share() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Internet radio stations
-#
-# musickit's TUI has its own radio.toml-driven stations; the Subsonic
-# spec models internet radio differently (per-server stored stations).
-# Returning empty here keeps clients quiet without conflating the two.
-# ---------------------------------------------------------------------------
-
-
-@router.api_route("/getInternetRadioStations", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getInternetRadioStations.view", methods=["GET", "POST", "HEAD"])
-async def get_internet_radio_stations() -> dict:
-    """Empty list — we don't surface TUI radio stations through the spec endpoint."""
-    return envelope("internetRadioStations", {"internetRadioStation": []})
-
-
-@router.api_route("/createInternetRadioStation", methods=["GET", "POST", "HEAD"])
-@router.api_route("/createInternetRadioStation.view", methods=["GET", "POST", "HEAD"])
-async def create_internet_radio_station() -> dict:
-    """No-op — radio stations live in the TUI's local config."""
-    return envelope()
-
-
-@router.api_route("/updateInternetRadioStation", methods=["GET", "POST", "HEAD"])
-@router.api_route("/updateInternetRadioStation.view", methods=["GET", "POST", "HEAD"])
-async def update_internet_radio_station() -> dict:
-    """No-op — radio stations live in the TUI's local config."""
-    return envelope()
-
-
-@router.api_route("/deleteInternetRadioStation", methods=["GET", "POST", "HEAD"])
-@router.api_route("/deleteInternetRadioStation.view", methods=["GET", "POST", "HEAD"])
-async def delete_internet_radio_station() -> dict:
-    """No-op — radio stations live in the TUI's local config."""
-    return envelope()
-
-
-# ---------------------------------------------------------------------------
 # Chat
 # ---------------------------------------------------------------------------
 

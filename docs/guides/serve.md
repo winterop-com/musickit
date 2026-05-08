@@ -156,6 +156,13 @@ These are stubs to keep clients quiet on features we don't track yet. They retur
 
 Lyrics are sourced from a `<track>.lrc` sidecar (preferred) or the file's embedded `\xa9lyr` / `USLT` / `LYRICS` tag. Populate sidecars in bulk with [`musickit library lyrics fetch`](library.md#lyrics--fetch-synced-lyrics-from-lrclib) — pulls from LRCLIB, writes per-track `.lrc` files. Synced lyrics light up automatically the next time the server's index gets reloaded.
 
+### Internet radio
+
+| Endpoint | Returns |
+|---|---|
+| `getInternetRadioStations` | Stations from `radio.load_stations()` — baked-in defaults plus user entries from `~/.config/musickit/radio.toml`. Same source the TUI uses; the web UI renders the same list. Symfonium / Amperfy / play:Sub pick this up automatically. |
+| `createInternetRadioStation` / `updateInternetRadioStation` / `deleteInternetRadioStation` | Success-no-op. Stations are managed by editing `radio.toml` directly, not via the API. |
+
 ### Persistent stars (since v0.7.0)
 
 Heart / star buttons in Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) are now real — toggling one persists in `<root>/.musickit/stars.toml` and survives server restarts, schema bumps, and `library index drop`. The file is plain TOML, hand-editable:
@@ -188,10 +195,18 @@ Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u
 |---|---|
 | Space | Play / pause |
 | `n` / `p` | Next / previous track in the current album queue |
+| `<` / `>` | Seek backward / forward 5s |
+| `9` / `0` | Volume down / up |
+| `r` | Cycle repeat (off / album / track) |
+| `s` | Toggle shuffle |
 | `l` | Toggle the lyrics panel (synced highlight when LRC is available) |
 | `f` | Toggle the FFT visualizer (Web Audio API + Canvas) |
 | `/` | Focus the search bar |
+| `?` | Show keyboard shortcuts (slide-in panel) |
+| Cmd / Ctrl + P | Command palette |
 | Esc | Close lyrics / visualizer / blur search |
+
+**Sidebar Radio panel** — clicking it loads `/web/radio`, which lists the same stations the TUI plays (defaults + `~/.config/musickit/radio.toml`). Click a station to start streaming via `<audio>`; the visualizer keeps working over the live stream.
 
 **Search** uses the same FTS5 index `/search3` does (sub-ms ranked, prefix-matching, diacritic-folded — `bey` finds `Beyoncé`). Results swap into the right pane as artist / album / track sections; click any result to drill in or play.
 

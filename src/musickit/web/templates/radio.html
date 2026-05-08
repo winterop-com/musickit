@@ -1,0 +1,25 @@
+<p class="panel-count">{{ stations|length }} stations</p>
+<ul class="row-list" id="radio-list">
+  {% for station in stations %}
+  <li>
+    <button type="button"
+            class="row-button"
+            data-action="play-radio"
+            data-name="{{ station.name }}"
+            data-url="{{ station.url }}"
+            {% if station.homepage %}data-homepage="{{ station.homepage }}"{% endif %}>
+      <span class="row-icon">📻</span>
+      <span class="album-text">
+        <span class="album-title">{{ station.name }}</span>
+        {% if station.description %}
+        <span class="album-meta">
+          <span class="album-artist">{{ station.description }}</span>
+        </span>
+        {% endif %}
+      </span>
+    </button>
+  </li>
+  {% else %}
+  <li class="empty">No radio stations configured.</li>
+  {% endfor %}
+</ul>

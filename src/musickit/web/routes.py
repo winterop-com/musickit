@@ -153,6 +153,18 @@ async def web_shell(request: Request) -> Response:
     )
 
 
+@router.get("/web/radio", response_class=HTMLResponse, include_in_schema=False)
+async def web_radio(request: Request) -> Response:
+    """HTML fragment: internet radio station list backed by `radio.load_stations()`."""
+    redirect = _require_auth_or_redirect(request)
+    if redirect is not None:
+        return redirect
+    from musickit import radio
+
+    stations = radio.load_stations()
+    return templates.TemplateResponse(request, "radio.html", {"stations": stations})
+
+
 @router.get("/web/artist/{ar_id}", response_class=HTMLResponse, include_in_schema=False)
 async def web_artist(request: Request, ar_id: str) -> Response:
     """HTML fragment: album list for one artist. Returned as a `<ul>` snippet."""

@@ -38,7 +38,8 @@ STUB_ENDPOINTS: list[tuple[str, str | None]] = [
     ("/createShare", "shares"),
     ("/updateShare", None),
     ("/deleteShare", None),
-    ("/getInternetRadioStations", "internetRadioStations"),
+    # /getInternetRadioStations is no longer a stub — see test_serve_radio.py.
+    # The create/update/delete endpoints stay as success-no-ops here.
     ("/createInternetRadioStation", None),
     ("/updateInternetRadioStation", None),
     ("/deleteInternetRadioStation", None),

@@ -116,7 +116,13 @@
     const item = state.queue[idx];
     state.queueIndex = idx;
 
-    audio.src = "/rest/stream?id=" + encodeURIComponent(item.id) + "&f=raw";
+    // Radio items carry a direct stream URL; tracks key off the
+    // Subsonic /rest/stream endpoint by id.
+    if (item.kind === "radio") {
+      audio.src = item.url;
+    } else {
+      audio.src = "/rest/stream?id=" + encodeURIComponent(item.id) + "&f=raw";
+    }
     audio.play().catch((err) => console.warn("playback failed:", err));
 
     // Visual: orange-out the playing row.
@@ -134,13 +140,16 @@
       if (npAlbumSep) npAlbumSep.textContent = item.albumTitle ? " · " : "";
     }
     if (npYear) npYear.textContent = item.albumYear || "—";
-    if (npFormat) npFormat.textContent = "AAC";
+    if (npFormat) npFormat.textContent = item.kind === "radio" ? "Stream" : "AAC";
     if (sbAlbum) sbAlbum.textContent = item.albumTitle || "—";
     if (sbCursor) {
       const idx = state.queue.findIndex((q) => q.id === item.id);
       sbCursor.textContent = `${idx + 1}/${state.queue.length}`;
     }
-    if (item.albumId) {
+    if (item.kind === "radio") {
+      // No cover for stations — keep the slot collapsed.
+      npCover.style.visibility = "hidden";
+    } else if (item.albumId) {
       npCover.src = "/rest/getCoverArt?id=" + encodeURIComponent(item.albumId) + "&size=80";
       npCover.style.visibility = "visible";
     } else {
@@ -150,8 +159,13 @@
     prevButton.disabled = idx === 0;
     nextButton.disabled = idx === state.queue.length - 1;
 
-    // Auto-load lyrics if the panel is open.
-    if (lyricsPanel.classList.contains("is-open")) {
+    // Auto-load lyrics if the panel is open. Radio has no lyrics.
+    if (item.kind === "radio") {
+      lyricsBody.innerHTML = '<p class="empty">Radio streams have no lyrics.</p>';
+      state.lyricsLines = [];
+      state.lyricsSynced = false;
+      state.lyricsTrackId = null;
+    } else if (lyricsPanel.classList.contains("is-open")) {
       loadLyricsFor(item.id);
     } else {
       state.lyricsTrackId = null; // invalidate so a future toggle reloads
@@ -340,6 +354,27 @@
       markActiveRow(button, ".pane-artists");
       loadInto("/web/artist/" + encodeURIComponent(button.dataset.id), albumsPane);
       tracksPane.innerHTML = '<p class="empty">Pick an album to see tracks.</p>';
+    } else if (action === "load-radio") {
+      // Radio list goes into the albums pane (the natural "middle" target
+      // when picking from the left). Tracks pane stays empty until a
+      // station is clicked.
+      loadInto("/web/radio", albumsPane);
+      tracksPane.innerHTML = '<p class="empty">Pick a station.</p>';
+    } else if (action === "play-radio") {
+      // Single-item queue. Synthesise a stable id from the station
+      // index so `state.queue.findIndex` in playQueueIndex works.
+      const station = {
+        kind: "radio",
+        id: "radio:" + (button.dataset.url || ""),
+        title: button.dataset.name || "Radio",
+        artist: "Radio",
+        url: button.dataset.url,
+        albumId: "",
+        albumTitle: "",
+        albumYear: "",
+      };
+      state.queue = [station];
+      playQueueIndex(0);
     } else if (action === "load-album") {
       markActiveRow(button, ".pane-albums");
       loadInto("/web/album/" + encodeURIComponent(button.dataset.id), tracksPane);
@@ -416,9 +451,21 @@
   });
 
   audio.addEventListener("timeupdate", function () {
+    const current = state.queueIndex >= 0 ? state.queue[state.queueIndex] : null;
+    const isRadio = current && current.kind === "radio";
+    if (isRadio) {
+      // Streams have no finite duration. Show only the elapsed listen
+      // time; clear the progress bar and the StatusBar duration cell.
+      const pos = fmtTime(audio.currentTime);
+      npPos.textContent = pos;
+      npDur.textContent = "—";
+      npBar.removeAttribute("value");
+      if (sbTime) sbTime.textContent = `${pos} / —`;
+      return;
+    }
     const pos = fmtTime(audio.currentTime);
     npPos.textContent = pos;
-    if (audio.duration) {
+    if (audio.duration && isFinite(audio.duration)) {
       const dur = fmtTime(audio.duration);
       npDur.textContent = dur;
       npBar.value = audio.currentTime / audio.duration;
