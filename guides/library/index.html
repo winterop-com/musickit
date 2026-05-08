@@ -1456,7 +1456,7 @@
 <tbody>
 <tr>
 <td><code>meta</code></td>
-<td><code>schema_version</code>, <code>library_root_abs</code>, <code>last_full_scan_at</code></td>
+<td><code>schema_version</code>, <code>library_root_abs</code>, <code>musickit_version</code>, <code>last_full_scan_at</code></td>
 </tr>
 <tr>
 <td><code>albums</code></td>
@@ -1476,7 +1476,7 @@
 </tr>
 </tbody>
 </table>
-<p>Schema changes don't run migrations — <code>db.py</code> defines a <code>SCHEMA_VERSION</code> constant; if the on-disk version doesn't match, the DB is unlinked and rebuilt from scratch.</p>
+<p>Schema changes don't run migrations — <code>db.py</code> defines a <code>SCHEMA_VERSION</code> constant; if the on-disk version doesn't match, the DB is unlinked and rebuilt from scratch. The <code>musickit_version</code> row records which release wrote the cache; <strong>if the running musickit version differs from the stamp, the DB is also rebuilt</strong>. So upgrading musickit transparently invalidates and refreshes the cache on the next open — you never have to remember to run <code>library index rebuild</code> after <code>uv tool upgrade musickit</code>.</p>
 <h3 id="cold-start-flow">Cold-start flow<a class="headerlink" href="#cold-start-flow" title="Permanent link">&para;</a></h3>
 <ol>
 <li><code>open_db(root)</code> opens (or creates) <code>&lt;DIR&gt;/.musickit/index.db</code>. Mismatched schema or relocated <code>library_root_abs</code> triggers an unlink + rebuild.</li>
