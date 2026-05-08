@@ -162,7 +162,7 @@ def convert(
         allow_lossy_recompress=allow_lossy_recompress,
         workers=workers if workers > 0 else None,
         cover_max_edge=cover_max_edge,
-        acoustid_key=acoustid_key.strip() or os.environ.get("MUSICKIT_ACOUSTID_KEY") or None,
+        acoustid_key=_resolve_acoustid_key(acoustid_key),
         overwrite=overwrite,
         remove_source=remove_source,
         console=console,
@@ -170,3 +170,27 @@ def convert(
     failed = [r for r in reports if not r.ok]
     if failed:
         raise typer.Exit(code=1)
+
+
+def _resolve_acoustid_key(cli_value: str) -> str | None:
+    """Resolve the AcoustID API key from CLI / env / config — first non-empty wins.
+
+    Order:
+      1. `--acoustid-key` CLI flag
+      2. `MUSICKIT_ACOUSTID_KEY` env var (legacy flat name)
+      3. `[acoustid].api_key` in `~/.config/musickit/musickit.toml`
+         (also covers the `MUSICKIT_ACOUSTID__API_KEY` env var via
+         pydantic-settings).
+
+    Returns `None` when nothing is set so the convert pipeline skips the
+    AcoustID step quietly.
+    """
+    cli = cli_value.strip()
+    if cli:
+        return cli
+    env_legacy = os.environ.get("MUSICKIT_ACOUSTID_KEY")
+    if env_legacy:
+        return env_legacy
+    from musickit.config import load_config
+
+    return load_config(_silent=True).acoustid.api_key or None

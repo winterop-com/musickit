@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
 
-import tomli_w
+from musickit import _toml_dump
 
 log = logging.getLogger(__name__)
 
@@ -127,8 +127,7 @@ class StarStore:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self._path.with_suffix(self._path.suffix + ".tmp")
-            with tmp.open("wb") as f:
-                tomli_w.dump({"items": self._items}, f)
+            tmp.write_text(_toml_dump.dumps({"items": self._items}), encoding="utf-8")
             tmp.replace(self._path)
         except OSError as exc:  # pragma: no cover — read-only mount
             log.warning("stars: failed to write %s (%s); changes lost on restart", self._path, exc)
