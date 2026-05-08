@@ -1,4 +1,4 @@
-.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots clean
+.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -15,6 +15,12 @@ help:
 	@echo "  docs-build   Build static documentation site to ./site"
 	@echo "  docs-screenshots  Regenerate the TUI SVG screenshots in docs/screenshots/"
 	@echo "  docs         Alias for docs-serve"
+	@echo "  desktop-tauri        Alias for desktop-tauri-dev"
+	@echo "  desktop-tauri-dev    Run the Tauri desktop app in dev mode (cargo tauri dev)"
+	@echo "  desktop-tauri-build  Build the Tauri desktop app .app bundle (release)"
+	@echo "  desktop-electron     Alias for desktop-electron-dev"
+	@echo "  desktop-electron-dev Run the Electron desktop app in dev mode (npm start)"
+	@echo "  desktop-electron-build Build the Electron app .dmg under desktop/electron/dist/"
 	@echo "  clean        Remove caches and build artifacts"
 
 install:
@@ -61,6 +67,36 @@ docs-screenshots:
 	@$(UV) run python scripts/gen_screenshots.py
 
 docs: docs-serve
+
+# ---------------------------------------------------------------------------
+# Desktop wrappers
+#
+# `desktop/frontend/` is the shared picker UI (HTML/CSS/JS). Each
+# desktop wrapper (`desktop/tauri/`, future `desktop/electron/`) loads
+# this same frontend in its native webview. The frontend's CSS palette
+# is symlinked from `src/musickit/web/static/_palette.css` so colour
+# changes propagate to both web + desktop on save.
+# ---------------------------------------------------------------------------
+
+desktop-tauri: desktop-tauri-dev
+
+desktop-tauri-dev:
+	@echo ">>> Tauri dev — opens window pointed at desktop/frontend/index.html"
+	@cd desktop/tauri/src-tauri && cargo tauri dev
+
+desktop-tauri-build:
+	@echo ">>> Tauri release build — produces a .app under desktop/tauri/src-tauri/target/release/bundle/"
+	@cd desktop/tauri/src-tauri && cargo tauri build
+
+desktop-electron: desktop-electron-dev
+
+desktop-electron-dev:
+	@echo ">>> Electron dev — opens window pointed at desktop/frontend/index.html"
+	@cd desktop/electron && (test -d node_modules || npm install) && npm start
+
+desktop-electron-build:
+	@echo ">>> Electron release build — produces a .dmg under desktop/electron/dist/"
+	@cd desktop/electron && (test -d node_modules || npm install) && npm run build
 
 clean:
 	@echo ">>> Cleaning up"

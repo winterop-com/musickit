@@ -1,0 +1,54 @@
+{
+  "name": "musickit-desktop-electron",
+  "version": "0.1.0",
+  "description": "Electron sibling of the MusicKit desktop wrapper — for comparison with the Tauri build.",
+  "main": "src/main.js",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --publish=never",
+    "build:linux": "electron-builder --linux --publish=never",
+    "build:win": "electron-builder --win --publish=never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-store": "^10.0.0",
+    "electron-window-state": "^5.0.3"
+  },
+  "build": {
+    "appId": "com.winterop.musickit",
+    "productName": "MusicKit",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "../frontend/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend",
+        "to": "frontend"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "../tauri/src-tauri/icons/icon.icns",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ]
+    },
+    "linux": {
+      "category": "Audio",
+      "icon": "../tauri/src-tauri/icons/icon.png",
+      "target": ["AppImage", "deb"]
+    },
+    "win": {
+      "icon": "../tauri/src-tauri/icons/icon.ico",
+      "target": ["nsis"]
+    }
+  }
+}

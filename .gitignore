@@ -40,3 +40,10 @@ output/*
 
 # mkdocs build output
 site/
+
+# Desktop wrapper build artifacts
+desktop/tauri/src-tauri/target/
+desktop/tauri/src-tauri/gen/
+desktop/electron/node_modules/
+desktop/electron/dist/
+desktop/electron/package-lock.json

@@ -11,23 +11,9 @@
  *   - bottom KeyBar listing keybinds (ncmpcpp-style).
  */
 
-:root {
-  --bg: #16161e;
-  --bg-elevated: #1a1b26;
-  --bg-hover: #24283b;
-  --border: #3a3a3a;
-  --border-soft: #2a2b3a;
-  --text: #c0caf5;
-  --text-muted: #565f89;
-  --header: #7dcfff;
-  --label: #7aa2f7;
-  --playing: #9ece6a;
-  --paused: #e0af68;
-  --active: #ff9e64;
-  --accent: #bb9af7;
-  --peak: #f7768e;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
-}
+/* Palette lives in `_palette.css` so the desktop wrappers can share it
+   via symlink. Don't inline `:root` vars here. */
+@import url("_palette.css");
 
 * {
   box-sizing: border-box;
