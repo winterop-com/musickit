@@ -40,8 +40,44 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Scrollbars — match Textual's slim "round 30%" sidebar scrollbar.       */
+/* Firefox + Chromium both honour `scrollbar-color`; webkit-scrollbar     */
+/* gives more control on Chrome/Safari for the slim track + rounded thumb */
+/* ---------------------------------------------------------------------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+  border: 2px solid var(--bg);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--label);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 body {
@@ -223,23 +259,41 @@ button:focus-visible {
 
 .now-playing-region {
   display: grid;
-  grid-template-columns: minmax(380px, 1.4fr) minmax(280px, 1fr);
-  gap: 0.5rem;
-  padding: 0.5rem 0.5rem 0;
+  /* Cap the Now Playing card at 540px so the Levels viz gets the bulk
+     of the horizontal space — matches the TUI where the visualizer is
+     a wide rectangle taking ~60% of the main column. The cover (56) +
+     meta-lines + transport buttons fit comfortably in 540px. */
+  grid-template-columns: minmax(420px, 540px) 1fr;
+  gap: 0.6rem;
+  padding: 0.85rem 0.5rem 0; /* extra top padding so the floating
+                                panel-titles have room to overlap the
+                                border without being clipped */
   flex-shrink: 0;
   /* Without an explicit cap, the grid row stretches to fill whatever the
-     visualizer canvas's `flex: 1` chooses, which on first paint can be
-     hundreds of pixels (canvases default to 150px tall, then the flex
-     algorithm grows the grid row to match siblings). 150px keeps the
-     Now Playing card snug while still giving the Levels panel a
-     readable bar height. Fullscreen mode (`body.is-viz`) overrides this
-     to grow the region to fill the viewport. */
-  height: 150px;
+     visualizer canvas's `flex: 1` chooses (canvases default to 150px
+     tall and the flex algorithm grows the row to match). 170px is
+     enough for the Now Playing card body (cover 56 + meta lines + the
+     progress row) plus the panel title chrome. Fullscreen mode
+     (`body.is-viz`) overrides this to grow the region to fill the
+     viewport. */
+  height: 170px;
 }
 
 .now-playing-region .panel {
+  /* Don't `overflow: hidden` here — the floating `.panel-title` is
+     positioned negative-top to overlap the border, so a hidden panel
+     would clip its own title. Push the clipping down to the content
+     wrapper instead. */
   min-height: 0;
+}
+
+.np-card-body,
+.np-progress {
   overflow: hidden;
+}
+
+.viz-panel .visualizer-canvas {
+  display: block;
 }
 
 .np-card {
@@ -276,12 +330,12 @@ button:focus-visible {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
 }
 
 .np-artist-line {
   color: var(--label);
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -294,7 +348,7 @@ button:focus-visible {
 
 .np-extra-line {
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-family: var(--mono);
 }
 
@@ -321,7 +375,7 @@ button:focus-visible {
   font-variant-numeric: tabular-nums;
   font-family: var(--mono);
   color: var(--label);
-  font-size: 0.8rem;
+  font-size: 0.88rem;
 }
 
 .np-state-icon {
@@ -416,11 +470,11 @@ button:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 0 1.4rem;
-  padding: 0.35rem 1rem;
+  padding: 0.4rem 1rem;
   background: var(--bg-elevated);
   border-top: 1px solid var(--border);
   font-family: var(--mono);
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   flex-shrink: 0;
 }
 
@@ -440,6 +494,31 @@ button:focus-visible {
 
 .sb-bar,
 .sb-cursor {
+  color: var(--text-muted);
+}
+
+.vol-bracket {
+  /* Use the bright text colour, not text-muted. The muted purple-blue
+     (`#565f89`) sat right next to bright green pipes and simultaneous
+     contrast made it look greenish — even at rgb(192,202,245) the
+     same effect bleeds slightly through font antialiasing. A 1px
+     letter-spacing breaks the visual contact between the bracket and
+     the first/last pipe so the contrast effect can't propagate. The
+     TUI's StatusBar emits bare `[` / `]` in the widget's default text
+     colour (a light tone), so this matches the TUI rendering exactly. */
+  color: var(--text);
+  letter-spacing: 1px;
+}
+
+.vol-filled {
+  /* Slightly toned-down vs the bright `100%` readout — matches the
+     TUI's tone hierarchy where the percent number pops and the meter
+     sits behind. */
+  color: var(--playing);
+  opacity: 0.72;
+}
+
+.vol-unfilled {
   color: var(--text-muted);
 }
 
@@ -487,7 +566,8 @@ button:focus-visible {
 .pane {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.9rem; /* bigger gap so floating panel-titles don't get visually
+                   clipped against the previous panel's bottom border */
   min-width: 0;
   min-height: 0;
 }
@@ -513,16 +593,27 @@ button:focus-visible {
 
 .panel-title {
   position: absolute;
-  top: -0.6em;
+  /* Title's vertical centre lines up with the panel's top border via
+     `transform: translateY(-50%)`. The big vertical padding makes the
+     bg-fill comfortably wider than the glyph extents — fonts have
+     ascenders / descenders that escape `line-height: 1`, and any
+     part of a glyph outside the bg-fill renders against the panel
+     border, looking like the title is cut in half. 0.35rem of
+     padding-y on a 0.78rem font gives ~5px clearance above the cap
+     line and below the baseline, more than enough. */
+  top: 0;
+  transform: translateY(-50%);
   left: 0.8rem;
   margin: 0;
-  padding: 0 0.4rem;
+  padding: 0.35rem 0.45rem;
+  line-height: 1;
   background: var(--bg);
   color: var(--header);
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  z-index: 2;
 }
 
 .panel-title .count {
@@ -554,9 +645,9 @@ button:focus-visible {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.15rem;
   font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: 0.92rem;
 }
 
 .stats-list li {
@@ -600,7 +691,7 @@ button:focus-visible {
   display: flex;
   align-items: baseline;
   gap: 0.6rem;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .row-button:hover {
@@ -786,11 +877,11 @@ button:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 0 1.4rem;
-  padding: 0.3rem 1rem;
+  padding: 0.35rem 1rem;
   background: var(--bg-elevated);
   border-top: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-family: var(--mono);
   flex-shrink: 0;
 }

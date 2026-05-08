@@ -376,7 +376,14 @@
     if (sbVol) sbVol.textContent = `${Math.round(v * 100)}%`;
     if (sbVolBar) {
       const filled = Math.round(v * 12);
-      sbVolBar.textContent = "[" + "|".repeat(filled) + "-".repeat(12 - filled) + "]";
+      // Wrap each segment in its own span so the bracket / filled /
+      // unfilled portions can be coloured independently. Matches the
+      // TUI's `[<green>|||...</green><dim>---</dim>]` rendering exactly.
+      sbVolBar.innerHTML =
+        '<span class="vol-bracket">[</span>' +
+        '<span class="vol-filled">' + "|".repeat(filled) + "</span>" +
+        '<span class="vol-unfilled">' + "-".repeat(12 - filled) + "</span>" +
+        '<span class="vol-bracket">]</span>';
     }
   }
 

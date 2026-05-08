@@ -159,9 +159,11 @@ def test_shell_renders_tui_alike_chrome(tmp_path: Path) -> None:
     # Library stats panel + counts.
     assert "Library" in text
     assert "Tracks" in text and "Albums" in text and "Artists" in text and "Folders" in text
-    # KeyBar at the bottom.
+    # KeyBar at the bottom — desktop-style key hints; no `esc` advertised
+    # because that's not a web convention.
     assert 'class="keybar"' in text
     assert "·Play" in text
+    assert "esc" not in text.lower() or "·close" not in text.lower()
     # Centered topbar with versioned brand.
     assert 'class="brand"' in text
     assert 'class="version"' in text
