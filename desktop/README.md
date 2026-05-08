@@ -1,52 +1,71 @@
 # MusicKit Desktop
 
-Native desktop wrappers around the MusicKit web UI. Two parallel
-implementations under `tauri/` and `electron/` so we can compare bundle
-size, launch time, memory footprint, and audio-codec consistency
-side-by-side.
-
-## What this is (and isn't)
-
-This is **a desktop wrapper for `musickit serve`** — it loads the
-web UI the server already ships (`/web`) into a chromeless window. It
-is NOT a generic Subsonic client today; most other Subsonic servers
-(Navidrome, Airsonic, etc.) don't expose a `/web` endpoint with our
-shape, so the desktop app currently only works against `musickit
-serve` instances.
-
-Becoming a true generic Subsonic client (i.e. embedding the UI inside
-the desktop app and talking to any Subsonic-compatible server via the
-`/rest/*` API only) is a future direction — not in this slice.
+Generic Subsonic clients for the desktop. Two parallel implementations
+under `tauri/` and `electron/` both load the same SPA from
+`desktop/frontend/`. The SPA talks to **any spec-compliant Subsonic
+server** (musickit serve, Navidrome, Airsonic, Gonic, …) via the
+`/rest/*` JSON API; the password never crosses the wire after login
+because we use the spec's salted-token auth (`token = md5(password +
+salt)`).
 
 ## Layout
 
 ```
 desktop/
-├── frontend/                 ← shared picker UI (HTML/CSS/JS)
-│   ├── index.html               server-URL input page
-│   ├── picker.css               @imports _palette.css
-│   ├── picker.js                host-agnostic (Tauri OR Electron)
-│   ├── _palette.css           → symlink to ../../src/musickit/web/static/_palette.css
-│   └── favicon.svg            → symlink to ../../src/musickit/web/static/favicon.svg
-├── tauri/
-│   └── src-tauri/               Rust backend
-└── electron/
-    └── src/                     Node main + preload bridge
+├── frontend/                 ← shared SPA (HTML/CSS/JS, host-agnostic)
+│   ├── index.html               entry — boots into login or shell
+│   ├── shell.css                desktop-specific styles (login + tweaks)
+│   ├── _app.css              → ../../src/musickit/web/static/app.css   (symlink)
+│   ├── _palette.css          → ../../src/musickit/web/static/_palette.css
+│   ├── favicon.svg           → ../../src/musickit/web/static/favicon.svg
+│   └── js/
+│       ├── app.js               state machine: login OR shell
+│       ├── api.js               Subsonic API client (token auth, fetch wrapper)
+│       ├── store.js             host-agnostic persistence (Tauri / Electron)
+│       ├── shell.js             main browser (artists / albums / tracks / now-playing)
+│       └── md5.js               pure-JS MD5 for salted-token computation
+├── tauri/                    Rust backend
+│   └── src-tauri/
+└── electron/                 Node main + preload bridge
+    └── src/
 ```
 
-The picker is the only UI either wrapper renders by itself. After the
-user enters a URL the webview navigates to `<URL>/web` and the server
-delivers everything from there — login form, three-pane player,
-visualizer, radio, lyrics. Cookies set by the server's login form
-persist in the webview's cookie jar, so subsequent launches skip the
-form and land on `/web` directly.
+The login page accepts **URL + Username + Password**. On submit:
+
+1. Generates a fresh salt + computes `token = md5(password + salt)`
+2. Calls `<URL>/rest/ping?u=&t=&s=` to verify the server speaks
+   Subsonic and the credentials work
+3. Persists `{host, user, token, salt}` via the host store
+4. Mounts the main shell
+
+The raw password is never persisted; only the token is. Future
+launches load the session and skip the login form.
+
+## Run
+
+```bash
+make desktop-tauri              # alias for desktop-tauri-dev
+make desktop-tauri-dev          # cargo tauri dev
+make desktop-tauri-build        # release .app
+
+make desktop-electron           # alias for desktop-electron-dev
+make desktop-electron-dev       # electron .  (npm install on first run)
+make desktop-electron-build     # release .dmg
+```
+
+You'll need a Subsonic-compatible server running somewhere — the
+login form asks for its URL. For local testing:
+
+```bash
+musickit serve /path/to/library     # in another terminal
+make desktop-tauri-dev
+```
+
+Then in the login form: `http://localhost:4533` + `admin` / `admin`.
 
 ## Tauri vs Electron
 
-Both consume the same `desktop/frontend/` so the picker UX is
-identical. Differences kick in once the user is connected:
-
-|  | Tauri | Electron |
+| | Tauri | Electron |
 |---|---|---|
 | Installed size | 10-20 MB | 150-200 MB |
 | RAM (idle) | 50-100 MB | 200-400 MB |
@@ -55,69 +74,32 @@ identical. Differences kick in once the user is connected:
 | Linux audio quirks | WebKitGTK has known AAC gaps | Chromium uniform |
 | Maturity | Newer ecosystem | Larger / older |
 
-Ship target is Tauri; Electron is here for empirical comparison and as
-a fallback if Tauri's macOS WebKit hits a wall (e.g. unexpected `<audio>`
-behaviour with our radio proxy or visualizer).
+Both share the SPA so the client UX is identical. The Tauri-vs-Electron
+comparison is about platform integration (system Now Playing widget,
+auto-update, signing, Linux codec consistency).
 
-## Run
+## Phase status (v0.12.0)
 
-```bash
-make desktop-tauri-dev          # opens window, hot-reloads on frontend/ changes
-make desktop-tauri-build        # release .app under tauri/src-tauri/target/release/bundle/
+**Phase A — Login + auth: done.** Server URL + credentials login,
+salted-token persisted, sign-out wipes session.
 
-make desktop-electron-dev       # opens window via electron .
-make desktop-electron-build     # release .dmg under electron/dist/
-```
+**Phase B — Browse: done.** Three-pane shell. Artists from
+`getArtists`, albums from `getArtist`, tracks from `getAlbum`. Cover
+art via `getCoverArt`.
 
-First run downloads + compiles deps:
-- Tauri: ~2-5 min for the Rust crates
-- Electron: ~1-2 min for `npm install`
+**Phase C — Playback: done.** Track click plays via `/rest/stream`;
+auto-advance through the visible album; play/pause/next/prev buttons
++ space/n/p keybinds; Now Playing card with cover + metadata.
 
-You'll need a `musickit serve` instance running somewhere — the picker
-asks for its URL. For local testing:
+**Phase D — Polish: TODO** for v0.12.1+. Search, lyrics panel,
+visualizer, command palette, repeat/shuffle, marquee titles.
 
-```bash
-musickit serve /path/to/library     # in another terminal
-make desktop-tauri-dev              # then http://localhost:4533 in the picker
-```
+**Phase E — Internet radio: TODO.** `getInternetRadioStations` is
+already returned by musickit serve; click-to-play directly via
+`<audio src="<station-url>">` should "just work".
 
-## Shared assets
-
-The picker shares two files with the web UI via symlinks:
-
-- `frontend/_palette.css → src/musickit/web/static/_palette.css` —
-  the colour palette (Tokyo Night `night`). Editing it in either
-  place updates both the browser and the desktop pickers.
-- `frontend/favicon.svg → src/musickit/web/static/favicon.svg` —
-  the `♪`-on-grey icon. Used by the web UI as `<link rel="icon">` and
-  by the Tauri build as the source for its derived `.icns` / `.ico`.
-
-Symlinks committed to git work fine on macOS + Linux; Windows requires
-admin perms to create them, which is why the Tauri icon files are
-checked in as derivatives (generated via `cargo tauri icon
-icons/icon.png`) rather than symlinked from the web/static SVG.
-
-## Phase status
-
-**Phase 1 — done in this PR:**
-- Tauri + Electron scaffolds compile / launch
-- Server URL picker with persistent saved-servers list (Tauri's
-  `tauri-plugin-store` and Electron's `electron-store` both expose the
-  same `.get / .set / .save` surface to the picker)
-- Window state (position, size) persisted across launches
-- Webview navigates to `<URL>/web` on connect
-
-**Phase 2 — next:** MediaSession metadata for the macOS Now Playing
-widget, global media keys (Bluetooth headphone play/pause, etc.),
-mDNS LAN discovery so the picker can pre-populate from
-`musickit serve` advertisements.
-
-**Phase 3 — distribution:** Apple Developer ID + notarization wired
-into Tauri Action; auto-updater pointed at GitHub Releases. Apple
-Developer ID is $99/yr; without it the `.app` opens with a scary
-warning.
-
-**Phase 4 — Linux + Windows matrix builds.**
+**Phase F — Distribution: TODO.** Apple Developer ID + notarization
+in the Tauri Action; Linux/Windows matrix builds.
 
 ## Move-out triggers
 
@@ -127,5 +109,4 @@ This stays in the monorepo until one of these fires:
 3. External contributor on the desktop side
 4. README balance tipping (desktop dwarfing the rest)
 
-Then `git subtree split --prefix=desktop -b desktop-only` produces a
-clean history for the new repo.
+Then `git subtree split --prefix=desktop -b desktop-only` extracts.
