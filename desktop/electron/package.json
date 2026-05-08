@@ -1,6 +1,6 @@
 {
   "name": "musickit-desktop-electron",
-  "version": "0.12.4",
+  "version": "0.13.0",
   "description": "Electron sibling of the MusicKit desktop wrapper \u2014 for comparison with the Tauri build.",
   "main": "src/main.js",
   "private": true,
