@@ -22,6 +22,8 @@ from tests.test_library import _make_track
 
 def test_open_db_creates_schema_and_meta(tmp_path: Path) -> None:
     """A fresh root gets `.musickit/index.db` with v1 schema + meta rows."""
+    from musickit import __version__ as MUSICKIT_VERSION
+
     root = tmp_path / "lib"
     root.mkdir()
 
@@ -32,6 +34,7 @@ def test_open_db_creates_schema_and_meta(tmp_path: Path) -> None:
         meta = dict(conn.execute("SELECT key, value FROM meta"))
         assert meta["schema_version"] == str(library.SCHEMA_VERSION)
         assert meta["library_root_abs"] == str(root.resolve())
+        assert meta["musickit_version"] == MUSICKIT_VERSION
     finally:
         conn.close()
 
@@ -187,6 +190,48 @@ def test_open_db_rebuilds_when_schema_version_row_missing(tmp_path: Path) -> Non
     try:
         sv = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0]
         assert sv == str(library.SCHEMA_VERSION)
+        assert library.is_empty(conn)
+    finally:
+        conn.close()
+
+
+def test_open_db_rebuilds_on_musickit_version_mismatch(tmp_path: Path) -> None:
+    """A DB stamped with an older musickit version triggers a clean rebuild."""
+    root = tmp_path / "lib"
+    root.mkdir()
+
+    # Open once at the current version, then tamper the stamp to look
+    # like an older release wrote it.
+    conn = library.open_db(root)
+    conn.execute("UPDATE meta SET value='0.0.0' WHERE key='musickit_version'")
+    conn.close()
+
+    # Reopening should detect the version mismatch and rebuild from scratch.
+    from musickit import __version__ as MUSICKIT_VERSION
+
+    conn = library.open_db(root)
+    try:
+        v = conn.execute("SELECT value FROM meta WHERE key='musickit_version'").fetchone()[0]
+        assert v == MUSICKIT_VERSION
+        assert library.is_empty(conn)
+    finally:
+        conn.close()
+
+
+def test_open_db_rebuilds_when_musickit_version_row_missing(tmp_path: Path) -> None:
+    """Pre-stamp DBs (created before the musickit_version row existed) get rebuilt on next open."""
+    root = tmp_path / "lib"
+    root.mkdir()
+
+    conn = library.open_db(root)
+    conn.execute("DELETE FROM meta WHERE key='musickit_version'")
+    conn.close()
+
+    conn = library.open_db(root)
+    try:
+        # Row exists again after rebuild.
+        v = conn.execute("SELECT value FROM meta WHERE key='musickit_version'").fetchone()
+        assert v is not None
         assert library.is_empty(conn)
     finally:
         conn.close()

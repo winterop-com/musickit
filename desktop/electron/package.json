@@ -1,13 +1,14 @@
 {
   "name": "musickit-desktop-electron",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Electron sibling of the MusicKit desktop wrapper \u2014 for comparison with the Tauri build.",
   "main": "src/main.js",
   "private": true,
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --mac --publish=never",
+    "build": "electron-builder --publish=never",
+    "build:mac": "electron-builder --mac --publish=never",
     "build:linux": "electron-builder --linux --publish=never",
     "build:win": "electron-builder --win --publish=never"
   },
@@ -41,8 +42,7 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "arm64"
           ]
         }
       ]

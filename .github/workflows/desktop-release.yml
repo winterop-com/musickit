@@ -71,6 +71,10 @@ jobs:
 
       - name: Build Tauri bundle
         uses: tauri-apps/tauri-action@v0
+        env:
+          # tauri-action needs GITHUB_TOKEN to interact with the release
+          # endpoint (attach artifacts).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: desktop/tauri/src-tauri
           # We attach to the release that release.yml created — never
