@@ -222,14 +222,15 @@
       const idx = state.queue.findIndex((q) => q.id === item.id);
       sbCursor.textContent = `${idx + 1}/${state.queue.length}`;
     }
-    if (item.kind === "radio") {
-      // No cover for stations — keep the slot collapsed.
-      npCover.style.visibility = "hidden";
-    } else if (item.albumId) {
+    // Setting a real cover for a track loads it on top of the CSS bg
+    // placeholder (♪ glyph). For radio + cover-less items we point at
+    // a 1x1 transparent SVG so the <img> "succeeds" with nothing
+    // visible — bare `removeAttribute('src')` would leave Chromium
+    // rendering a broken-image marker in the corner.
+    if (item.kind !== "radio" && item.albumId) {
       npCover.src = "/rest/getCoverArt?id=" + encodeURIComponent(item.albumId) + "&size=80";
-      npCover.style.visibility = "visible";
     } else {
-      npCover.style.visibility = "hidden";
+      npCover.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>";
     }
     playButton.disabled = false;
     prevButton.disabled = idx === 0;
