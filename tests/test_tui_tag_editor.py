@@ -9,6 +9,7 @@ import pytest
 from mutagen.mp4 import MP4
 
 from musickit import convert as convert_mod
+from tests._tui_wait import wait_for_browser_child
 
 
 def _make_track(album_dir: Path, silent_flac: Path, *, filename: str, title: str, artist: str) -> Path:
@@ -107,10 +108,20 @@ async def test_track_editor_saves_changed_fields(silent_flac_template: Path, tmp
         from musickit.tui.app import BrowserList
 
         browser = pilot.app.query_one(BrowserList)
-        artist_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        artist_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(artist_row)  # type: ignore[attr-defined]
         await pilot.pause()
-        album_row = next(c for c in browser.children if getattr(c, "entry_kind", None) == "album")
+        album_row = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "album",
+            description="album row",
+        )
         pilot.app._handle_browser_selection(album_row)  # type: ignore[attr-defined]
         await pilot.pause()
 
@@ -215,7 +226,12 @@ async def test_e_opens_album_editor_from_browser_before_playback(silent_flac_tem
                 break
             await pilot.pause(0.05)
         # Drill into the artist so the browser shows an album row.
-        a = next(c for c in browser.children if getattr(c, "entry_kind", None) == "artist")
+        a = await wait_for_browser_child(
+            pilot,
+            lambda: browser.children,
+            lambda c: getattr(c, "entry_kind", None) == "artist",
+            description="artist row",
+        )
         pilot.app._handle_browser_selection(a)  # type: ignore[attr-defined]
         await pilot.pause()
         # Highlight the album row + focus the browser.
