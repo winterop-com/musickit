@@ -15,7 +15,10 @@
 
 const { app, BrowserWindow, session } = require("electron");
 const path = require("path");
-const Store = require("electron-store").default || require("electron-store");
+// electron-store pinned to ^8 (last CJS version). v9+ are pure ESM and
+// require either dynamic `await import()` or converting this whole
+// file to ESM, neither of which buys anything for our usage.
+const Store = require("electron-store");
 const windowStateKeeper = require("electron-window-state");
 
 // Persistence file is named identically to Tauri's so a user could in

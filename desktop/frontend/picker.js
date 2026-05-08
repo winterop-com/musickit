@@ -109,10 +109,77 @@
     el.classList.toggle("is-error", !!opts.error);
   }
 
-  /** Hop the webview to the server's /web entry point. */
-  function navigateToServer(url) {
+  /** Probe the server: confirm Subsonic + MusicKit's /web before navigating.
+   *
+   * Two probes:
+   *   1. `<URL>/rest/ping?...&f=json` — Subsonic spec endpoint. Returns
+   *      a subsonic-response envelope with `status: "ok"` (auth happy)
+   *      or `status: "failed"` + error code 40 (auth required). Either
+   *      response shape proves the URL IS a Subsonic server.
+   *   2. `<URL>/web` — confirms MusicKit specifically. Other Subsonic
+   *      servers (Navidrome, Airsonic) return 404 here. MusicKit
+   *      either returns the HTML or a 303 redirect to /login.
+   *
+   * On success we navigate to /web (which auto-redirects to /login if
+   * no session cookie is present yet). On failure we surface a
+   * distinct error per cause so the user knows what's wrong.
+   */
+  async function probeAndConnect(url) {
+    setStatus(`Probing ${url}…`);
+    // Step 1: Subsonic-spec ping. Throwaway creds — we only care about
+    // the response shape, not whether they auth correctly.
+    const pingUrl =
+      url +
+      "/rest/ping?u=probe&p=probe&v=1.16.1&c=musickit-desktop&f=json";
+    let pingBody;
+    try {
+      const resp = await fetch(pingUrl, { method: "GET", credentials: "omit" });
+      if (!resp.ok && resp.status !== 401) {
+        // 4xx/5xx that isn't 401 — server is reachable but isn't speaking Subsonic.
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      pingBody = await resp.json();
+    } catch (e) {
+      const msg = e?.message || String(e);
+      if (msg === "Failed to fetch") {
+        setStatus(`Could not reach ${url} — is the server running?`, { error: true });
+      } else {
+        setStatus(`${url} doesn't speak Subsonic (${msg})`, { error: true });
+      }
+      return false;
+    }
+    if (!pingBody || !pingBody["subsonic-response"]) {
+      setStatus(`${url} responded but isn't a Subsonic-compatible server.`, {
+        error: true,
+      });
+      return false;
+    }
+    // Step 2: confirm the MusicKit web UI specifically. Non-MusicKit
+    // Subsonic servers (Navidrome / Airsonic / etc.) return 404 here.
+    setStatus("Subsonic server reached — checking for MusicKit UI…");
+    try {
+      const resp = await fetch(url + "/web", {
+        method: "GET",
+        credentials: "omit",
+        redirect: "manual", // /web 303-redirects to /login when not authed; both are fine
+      });
+      const ok = resp.ok || resp.status === 303 || resp.type === "opaqueredirect";
+      if (!ok) {
+        setStatus(
+          `Subsonic server detected, but it doesn't have the MusicKit web UI ` +
+            `(this desktop app currently only works against musickit serve).`,
+          { error: true },
+        );
+        return false;
+      }
+    } catch (e) {
+      // Some webviews surface CORS / redirect probes differently; treat
+      // a fetch error here as "probably MusicKit" and try anyway.
+      console.warn("/web probe inconclusive; navigating optimistically:", e);
+    }
     setStatus(`Connecting to ${url}…`);
     window.location.href = url + "/web";
+    return true;
   }
 
   function renderSavedList(servers, lastUsed) {
@@ -135,8 +202,13 @@
       connect.type = "button";
       connect.className = "saved-action";
       connect.textContent = "Connect";
-      connect.addEventListener("click", () => {
-        saveServer(s.url).finally(() => navigateToServer(s.url));
+      connect.addEventListener("click", async () => {
+        connect.disabled = true;
+        const ok = await probeAndConnect(s.url);
+        if (ok) {
+          await saveServer(s.url);
+        }
+        connect.disabled = false;
       });
       const remove = document.createElement("button");
       remove.type = "button";
@@ -156,6 +228,7 @@
   async function onSubmit(event) {
     event.preventDefault();
     const input = document.getElementById("server-url");
+    const button = event.target.querySelector('button[type="submit"]');
     const url = normaliseUrl(input?.value);
     if (!url) {
       setStatus("Enter a URL like http://localhost:4533", { error: true });
@@ -167,12 +240,16 @@
       setStatus(e.message || "Invalid URL", { error: true });
       return;
     }
-    try {
-      await saveServer(url);
-    } catch (e) {
-      console.warn("saveServer failed:", e);
+    if (button) button.disabled = true;
+    const ok = await probeAndConnect(url);
+    if (ok) {
+      try {
+        await saveServer(url);
+      } catch (e) {
+        console.warn("saveServer failed:", e);
+      }
     }
-    navigateToServer(url);
+    if (button) button.disabled = false;
   }
 
   async function init() {

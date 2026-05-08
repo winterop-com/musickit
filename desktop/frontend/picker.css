@@ -81,6 +81,12 @@ body {
   max-width: 480px;
 }
 
+.picker-hint.picker-hint-quiet {
+  font-size: 0.82rem;
+  color: var(--border);
+  max-width: 520px;
+}
+
 .picker-hint code {
   color: var(--label);
   font-family: var(--mono);
