@@ -17,6 +17,23 @@ from musickit.serve.payloads import content_type
 
 router = APIRouter()
 
+# Placeholder cover served when an album has no embedded artwork. A 256x256
+# SVG with a single ♪ glyph centred on the same `--border-soft` colour the
+# web UI uses for its cover cells. Why a placeholder rather than 404:
+# Subsonic clients vary widely in how they handle missing covers — Feishin
+# (Electron) shows the browser's broken-image marker, play:Sub leaves an
+# empty box, only Symfonium / Amperfy ship integrated fallbacks. Returning
+# a real image with HTTP 200 means *every* client renders something
+# sensible. Navidrome takes the same approach.
+_COVER_PLACEHOLDER = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
+    b'<rect width="256" height="256" fill="#2a2b3a"/>'
+    b'<text x="128" y="172" text-anchor="middle" font-family="sans-serif" '
+    b'font-size="160" font-weight="600" fill="#565f89">\xe2\x99\xaa</text>'
+    b"</svg>"
+)
+_COVER_PLACEHOLDER_MIME = "image/svg+xml"
+
 # Subsonic spec: transcoding default target is MP3. 192k is a reasonable
 # quality/size compromise; clients can lower it via `maxBitRate`.
 _DEFAULT_TRANSCODE_BITRATE_KBPS = 192
@@ -196,7 +213,10 @@ async def get_cover_art(
         return JSONResponse(error_envelope(70, f"Unknown id format: {id}"))
 
     if album is None:
-        return JSONResponse(error_envelope(70, f"Cover not found: {id}"))
+        # ID didn't resolve — treat as missing cover, not a hard error.
+        # Returning the placeholder keeps the row rendering sensibly across
+        # every Subsonic client.
+        return Response(content=_COVER_PLACEHOLDER, media_type=_COVER_PLACEHOLDER_MIME)
 
     # Key on the URL `id` directly. Two different track IDs from the same
     # album yield two cache entries — fine. The point is to short-circuit
@@ -210,7 +230,12 @@ async def get_cover_art(
 
     cover = load_album_cover(album)
     if cover is None:
-        return JSONResponse(error_envelope(70, "no cover art for this album"))
+        # No embedded art on this album — serve the SVG placeholder so
+        # clients that don't render their own fallback (Feishin, play:Sub,
+        # the bundled web UI before v0.10.1) still get something sensible.
+        # We DON'T cache the placeholder under `cache_key` because adding
+        # cover art later should clear the miss without touching the cache.
+        return Response(content=_COVER_PLACEHOLDER, media_type=_COVER_PLACEHOLDER_MIME)
 
     data, mime = cover
     if size is not None:

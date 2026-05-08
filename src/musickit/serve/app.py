@@ -8,6 +8,8 @@ shaped the same way with `status="failed"` + an error code/message.
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +57,26 @@ def error_envelope(code: int, message: str) -> dict[str, Any]:
     }
 
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+    """App lifespan: bump anyio's thread limiter, yield, no shutdown work.
+
+    The default 40-thread cap is too small under chatty Subsonic clients.
+    Starlette's FileResponse reads each file in a worker thread, and
+    play:Sub on iOS is known to open 30-50 parallel `/rest/stream`
+    connections for a single track (aggressive prefetch). With 40 threads
+    those alone exhaust the pool and every other request — web UI / TUI /
+    other clients — blocks. 256 threads sleeping on disk I/O are cheap;
+    the OS handles them comfortably. We bump in `lifespan` rather than at
+    `create_app` time because the limiter is per-event-loop and only
+    accessible once the loop is running.
+    """
+    import anyio.to_thread
+
+    anyio.to_thread.current_default_thread_limiter().total_tokens = 256
+    yield
+
+
 def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_web: bool = True) -> FastAPI:
     """Build the FastAPI app for `root` with the given credentials.
 
@@ -73,6 +95,7 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_w
         version=SERVER_VERSION,
         docs_url=None,  # the OpenAPI docs collide with `?u=&p=` — keep them off for now
         redoc_url=None,
+        lifespan=_lifespan,
     )
     app.state.root = root
     app.state.cfg = cfg
