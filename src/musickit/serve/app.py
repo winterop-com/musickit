@@ -55,11 +55,17 @@ def error_envelope(code: int, message: str) -> dict[str, Any]:
     }
 
 
-def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastAPI:
+def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_web: bool = True) -> FastAPI:
     """Build the FastAPI app for `root` with the given credentials.
 
     `use_cache=False` disables the persistent `<root>/.musickit/index.db`
     and falls back to in-memory scan on every rebuild.
+
+    `enable_web=False` skips mounting the browser UI (/login, /web/*,
+    /web-static/*). The Subsonic `/rest/*` API stays fully available.
+    Useful when you only want the Subsonic surface on a host (smaller
+    attack area) or when running headless on a TV/embedded box where
+    nobody will visit / in a browser.
     """
     app = FastAPI(
         title="musickit",
@@ -156,19 +162,22 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
 
     # Web UI — login + three-pane browse + audio player. Lives at /login,
     # /web, /web/artist/{id}, /web/album/{id}. Static assets served via
-    # the StaticFiles mount below.
-    from musickit.web.routes import router as web_router
+    # the StaticFiles mount below. Skipped entirely when `enable_web=False`.
+    if enable_web:
+        from musickit.web.routes import router as web_router
 
-    app.include_router(web_router)
-    web_static_dir = Path(__file__).resolve().parents[1] / "web" / "static"
-    app.mount("/web-static", StaticFiles(directory=str(web_static_dir)), name="web-static")
+        app.include_router(web_router)
+        web_static_dir = Path(__file__).resolve().parents[1] / "web" / "static"
+        app.mount("/web-static", StaticFiles(directory=str(web_static_dir)), name="web-static")
 
     # Root probe — JSON for Subsonic clients (Amperfy hits / pre-login
     # to confirm the host is reachable), HTML redirect for browsers.
+    # When the web UI is disabled, browsers also get the JSON body
+    # (there's no /login to redirect to).
     @app.get("/")
     async def server_info(request: Request) -> Response:
         accept = request.headers.get("accept", "")
-        if "text/html" in accept:
+        if "text/html" in accept and enable_web:
             return RedirectResponse(url="/login", status_code=303)
         return JSONResponse(
             {

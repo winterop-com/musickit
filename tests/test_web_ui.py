@@ -331,6 +331,24 @@ def test_logout_clears_session(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_serve_with_enable_web_false_drops_web_routes(tmp_path: Path) -> None:
+    """`create_app(enable_web=False)` mounts no /login, /web, or /web-static routes."""
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg, enable_web=False)
+    client = TestClient(app)
+    # Web surfaces are gone (FastAPI returns 404).
+    assert client.get("/login").status_code == 404
+    assert client.get("/web").status_code == 404
+    assert client.get("/web-static/app.css").status_code == 404
+    # Subsonic API still works (the root probe returns JSON).
+    root = client.get("/", headers={"Accept": "text/html"}).json()
+    assert root["type"] == "subsonic-compatible"
+    # /rest endpoints still respond (auth-gated as ever).
+    rest = client.get("/rest/ping", params={"u": "mort", "p": "secret", "f": "json"})
+    assert rest.status_code == 200
+    assert rest.json()["subsonic-response"]["status"] == "ok"
+
+
 def test_subsonic_query_auth_unaffected_by_session_middleware(tmp_path: Path) -> None:
     """An existing Subsonic client sends ?u=&p= and never touches /login."""
     client = _client(tmp_path)

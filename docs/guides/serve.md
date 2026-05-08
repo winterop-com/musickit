@@ -3,7 +3,7 @@
 A Subsonic-compatible HTTP server. Any modern Subsonic client (Symfonium, Amperfy, play:Sub, Feishin, Supersonic, DSub) connects, browses, searches, streams, and seeks. Works equally well over LAN and over Tailscale.
 
 ```bash
-uvx musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [--no-mdns] [--no-watch] [--no-cache] [--full-rescan]
+uvx musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [--no-mdns] [--no-watch] [--no-cache] [--full-rescan] [--no-web]
 ```
 
 `TARGET_DIR` is required. `--host 0.0.0.0`, `--port 4533`, credentials default to `admin`/`admin` with a yellow warning. `--no-cache` skips the persistent SQLite index at `<TARGET_DIR>/.musickit/index.db`; `--full-rescan` rebuilds it from scratch on startup. See [`musickit library index`](library.md#index-manage-the-persistent-sqlite-cache) for index management.
@@ -188,6 +188,8 @@ http://<host>:4533/web            → three-pane browser (artists / albums / tra
 The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same `/rest/getArtists` / `/rest/getArtist` / `/rest/getAlbum` endpoints the rest of the API uses; audio playback hits `/rest/stream` via a native `<audio>` element. Login sets a signed session cookie so subsequent `<audio src="/rest/stream?id=...">` calls don't need to leak the password into HTML page sources.
 
 Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u=&p=` query params and never see the cookie path — they're untouched by this addition.
+
+**Disable the web UI** with `--no-web`. With the flag, `/login`, `/web`, and `/web-static/*` are not mounted — `/` returns the JSON probe to browsers as well as Subsonic clients. The `/rest/*` API stays fully available. Useful when you only want the Subsonic surface on a host (smaller attack area) or running headless on an embedded box where nobody hits the URL in a browser.
 
 **Keybinds:**
 
