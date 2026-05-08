@@ -1868,20 +1868,23 @@
 <h2 id="response-format">Response format<a class="headerlink" href="#response-format" title="Permanent link">&para;</a></h2>
 <p>Spec default is XML; <code>?f=json</code> opts into JSON. We honour both via a middleware that re-serialises the underlying dict per request. Most modern clients (Symfonium, Feishin, the MusicKit TUI) send <code>f=json</code>; older / iOS clients (Amperfy, play:Sub) often don't and get XML.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># ~/.config/musickit/serve.toml</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># ~/.config/musickit/musickit.toml</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[server]</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span>
 </code></pre></div>
-<p>Override per-run via <code>--user</code> / <code>--password</code>. CLI flags win over the TOML.</p>
+<p>Override per-run via <code>--user</code> / <code>--password</code>; or via env vars (<code>MUSICKIT_SERVER__USERNAME</code>, <code>MUSICKIT_SERVER__PASSWORD</code>). Resolution order: <strong>CLI flags &gt; env vars &gt; TOML &gt; admin/admin default</strong> (with a yellow warning printed for the default).</p>
+<p>Run <code>musickit config show</code> to print the resolved config (sensitive values masked) and <code>musickit config path</code> to find the file.</p>
+<p><strong>Migrating from <code>serve.toml</code> (pre-v0.11):</strong> the old <code>~/.config/musickit/serve.toml</code> is still read transparently. Run <code>musickit config migrate</code> once to move it to the new format and drop the deprecation hint.</p>
 <h2 id="scrobble-forwarder">Scrobble forwarder<a class="headerlink" href="#scrobble-forwarder" title="Permanent link">&para;</a></h2>
-<p>Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) call <code>/scrobble</code> after every track. By default that's a no-op. Add a <code>[scrobble.webhook]</code> and/or <code>[scrobble.mqtt]</code> block to forward each play event:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># ~/.config/musickit/serve.toml</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">[scrobble.webhook]</span>
+<p>Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) call <code>/scrobble</code> after every track. By default that's a no-op. Add a <code>[server.scrobble.webhook]</code> and/or <code>[server.scrobble.mqtt]</code> block to forward each play event:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># ~/.config/musickit/musickit.toml</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">[server.scrobble.webhook]</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://my-bridge.example.com/play&quot;</span>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shh&quot;</span><span class="w">          </span><span class="c1"># optional — sent as `X-Musickit-Secret` header</span>
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">timeout_s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">5.0</span><span class="w">         </span><span class="c1"># optional — defaults to 5s</span>
 <a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">[scrobble.mqtt]</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">[server.scrobble.mqtt]</span>
 <a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">broker</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mqtt://homeassistant.local:1883&quot;</span>
 <a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">topic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit/scrobble&quot;</span><span class="w">   </span><span class="c1"># default shown</span>
 <a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="w">          </span><span class="c1"># optional</span>
@@ -1890,7 +1893,8 @@
 <a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
 <a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="c1"># Optional: forward `submission=false` (&quot;now playing&quot;) probes too.</span>
 <a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="c1"># Default false — Home Assistant &quot;currently playing&quot; automations want true.</span>
-<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="n">include_now_playing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="k">[server.scrobble]</span>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="n">include_now_playing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
 </code></pre></div>
 <p>Each event is JSON like:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
