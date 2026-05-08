@@ -722,6 +722,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#internet-radio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internet radio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#persistent-stars-since-v070" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1171,6 +1182,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#internet-radio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internet radio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#persistent-stars-since-v070" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1307,7 +1329,7 @@
 
 <h1 id="musickit-serve"><code>musickit serve</code><a class="headerlink" href="#musickit-serve" title="Permanent link">&para;</a></h1>
 <p>A Subsonic-compatible HTTP server. Any modern Subsonic client (Symfonium, Amperfy, play:Sub, Feishin, Supersonic, DSub) connects, browses, searches, streams, and seeks. Works equally well over LAN and over Tailscale.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>TARGET_DIR<span class="w"> </span><span class="o">[</span>--host<span class="w"> </span>H<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--user<span class="w"> </span>U<span class="o">]</span><span class="w"> </span><span class="o">[</span>--password<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-mdns<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-watch<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-cache<span class="o">]</span><span class="w"> </span><span class="o">[</span>--full-rescan<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>TARGET_DIR<span class="w"> </span><span class="o">[</span>--host<span class="w"> </span>H<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--user<span class="w"> </span>U<span class="o">]</span><span class="w"> </span><span class="o">[</span>--password<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-mdns<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-watch<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-cache<span class="o">]</span><span class="w"> </span><span class="o">[</span>--full-rescan<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-web<span class="o">]</span>
 </code></pre></div>
 <p><code>TARGET_DIR</code> is required. <code>--host 0.0.0.0</code>, <code>--port 4533</code>, credentials default to <code>admin</code>/<code>admin</code> with a yellow warning. <code>--no-cache</code> skips the persistent SQLite index at <code>&lt;TARGET_DIR&gt;/.musickit/index.db</code>; <code>--full-rescan</code> rebuilds it from scratch on startup. See <a href="../library/#index-manage-the-persistent-sqlite-cache"><code>musickit library index</code></a> for index management.</p>
 <h2 id="startup-banner">Startup banner<a class="headerlink" href="#startup-banner" title="Permanent link">&para;</a></h2>
@@ -1589,6 +1611,25 @@
 </tbody>
 </table>
 <p>Lyrics are sourced from a <code>&lt;track&gt;.lrc</code> sidecar (preferred) or the file's embedded <code>\xa9lyr</code> / <code>USLT</code> / <code>LYRICS</code> tag. Populate sidecars in bulk with <a href="../library/#lyrics--fetch-synced-lyrics-from-lrclib"><code>musickit library lyrics fetch</code></a> — pulls from LRCLIB, writes per-track <code>.lrc</code> files. Synced lyrics light up automatically the next time the server's index gets reloaded.</p>
+<h3 id="internet-radio">Internet radio<a class="headerlink" href="#internet-radio" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>getInternetRadioStations</code></td>
+<td>Stations from <code>radio.load_stations()</code> — baked-in defaults plus user entries from <code>~/.config/musickit/radio.toml</code>. Same source the TUI uses; the web UI renders the same list. Symfonium / Amperfy / play:Sub pick this up automatically.</td>
+</tr>
+<tr>
+<td><code>createInternetRadioStation</code> / <code>updateInternetRadioStation</code> / <code>deleteInternetRadioStation</code></td>
+<td>Success-no-op. Stations are managed by editing <code>radio.toml</code> directly, not via the API.</td>
+</tr>
+</tbody>
+</table>
 <h3 id="persistent-stars-since-v070">Persistent stars (since v0.7.0)<a class="headerlink" href="#persistent-stars-since-v070" title="Permanent link">&para;</a></h3>
 <p>Heart / star buttons in Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) are now real — toggling one persists in <code>&lt;root&gt;/.musickit/stars.toml</code> and survives server restarts, schema bumps, and <code>library index drop</code>. The file is plain TOML, hand-editable:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[items]</span>
@@ -1598,12 +1639,23 @@
 </code></pre></div>
 <p>Stars live OUTSIDE the SQLite library index because the index is fully derived from the filesystem (delete / rebuild = safe), but stars are real user data. Both files sit under <code>.musickit/</code> so <code>rm -rf &lt;root&gt;/.musickit/index.db*</code> is still a safe "rebuild the cache, keep my favourites" operation.</p>
 <h2 id="browser-ui">Browser UI<a class="headerlink" href="#browser-ui" title="Permanent link">&para;</a></h2>
-<p>Open the server URL in any browser to use the bundled three-pane web player. The first slice ships with v0.9.4:</p>
+<p>Open the server URL in any browser to use the bundled web player. The visual language tracks the TUI's <code>widgets.py</code> exactly — bordered panels with floating titles, the same palette (cyan headers / blue labels / green for playing / orange for the active track), monospace numerics, slim "round 30%"-style scrollbars, ncmpcpp-style KeyBar.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>http://&lt;host&gt;:4533/login          → sign-in form (same creds as the Subsonic API)
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>http://&lt;host&gt;:4533/web            → three-pane browser (artists / albums / tracks)
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>http://&lt;host&gt;:4533/web            → three-pane browser
 </code></pre></div>
-<p>The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same <code>/rest/getArtists</code> / <code>/rest/getArtist</code> / <code>/rest/getAlbum</code> endpoints the rest of the API uses; audio playback hits <code>/rest/stream</code> via a native <code>&lt;audio&gt;</code> element. Login sets a signed session cookie so subsequent <code>&lt;audio src="/rest/stream?id=..."&gt;</code> calls don't need to leak the password into HTML page sources.</p>
+<p><img alt="Browser UI — three-pane shell" src="../../screenshots/web-shell.png" /></p>
+<p>Click an artist in the left Browse pane to see albums, click an album to see tracks, click a track to start playing. Now Playing card (top-left) shows the active title / artist / album / cover; the Spectrum panel (top-right) is a 48-band FFT bar visualizer driven by the Web Audio API.</p>
+<p><img alt="Drilled into an album" src="../../screenshots/web-album-tracks.png" /></p>
+<p><strong>Internet radio</strong> lives in the same sidebar. Click the Radio panel's Stations entry to load <code>/web/radio</code> — the list comes from <a href="#internet-radio"><code>getInternetRadioStations</code></a>, which is backed by <code>radio.load_stations()</code> (defaults + <code>~/.config/musickit/radio.toml</code>). The grid collapses to two columns in radio mode, the active station gets the orange <code>is-playing</code> highlight, and the Now Playing title flips to the current ICY StreamTitle once the proxy parses one (see below).</p>
+<p><img alt="Radio mode — Stations selected, NRK mP3 streaming" src="../../screenshots/web-radio.png" /></p>
+<p><strong>Press <code>f</code></strong> to fullscreen the Spectrum visualizer. The Now Playing card stays visible at the top, the panes hide, the bars take the rest of the viewport. Press <code>f</code> again to return.</p>
+<p><img alt="Fullscreen Spectrum visualizer" src="../../screenshots/web-spectrum-fullscreen.png" /></p>
+<p><strong>Press <code>?</code></strong> for a slide-in keys panel; <strong>Cmd/Ctrl+P</strong> opens a Textual-style command palette. Both filter their contents by the current playback mode — the help and palette below were captured while a radio stream was playing, so Next / Prev / Seek / Repeat / Shuffle / Lyrics are absent (they don't apply to a live stream).</p>
+<p><img alt="Help panel — radio mode" src="../../screenshots/web-help.png" /></p>
+<p><img alt="Command palette — radio mode" src="../../screenshots/web-palette.png" /></p>
+<p>The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same <code>/rest/getArtists</code> / <code>/rest/getArtist</code> / <code>/rest/getAlbum</code> endpoints the rest of the API uses; track playback hits <code>/rest/stream</code>, radio playback hits <code>/web/radio-stream</code> (a same-origin proxy that strips ICY metadata frames so the Web Audio visualizer keeps working). Login sets a signed session cookie so <code>&lt;audio src="/rest/stream?id=..."&gt;</code> doesn't have to leak the password into HTML.</p>
 <p>Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using <code>?u=&amp;p=</code> query params and never see the cookie path — they're untouched by this addition.</p>
+<p><strong>Disable the web UI</strong> with <code>--no-web</code>. With the flag, <code>/login</code>, <code>/web</code>, and <code>/web-static/*</code> are not mounted — <code>/</code> returns the JSON probe to browsers as well as Subsonic clients. The <code>/rest/*</code> API stays fully available. Useful when you only want the Subsonic surface on a host (smaller attack area) or running headless on an embedded box where nobody hits the URL in a browser.</p>
 <p><strong>Keybinds:</strong></p>
 <table>
 <thead>
@@ -1622,6 +1674,22 @@
 <td>Next / previous track in the current album queue</td>
 </tr>
 <tr>
+<td><code>&lt;</code> / <code>&gt;</code></td>
+<td>Seek backward / forward 5s</td>
+</tr>
+<tr>
+<td><code>9</code> / <code>0</code></td>
+<td>Volume down / up</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>Cycle repeat (off / album / track)</td>
+</tr>
+<tr>
+<td><code>s</code></td>
+<td>Toggle shuffle</td>
+</tr>
+<tr>
 <td><code>l</code></td>
 <td>Toggle the lyrics panel (synced highlight when LRC is available)</td>
 </tr>
@@ -1634,11 +1702,20 @@
 <td>Focus the search bar</td>
 </tr>
 <tr>
+<td><code>?</code></td>
+<td>Show keyboard shortcuts (slide-in panel)</td>
+</tr>
+<tr>
+<td>Cmd / Ctrl + P</td>
+<td>Command palette</td>
+</tr>
+<tr>
 <td>Esc</td>
 <td>Close lyrics / visualizer / blur search</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Sidebar Radio panel</strong> — clicking it loads <code>/web/radio</code>, which lists the same stations the TUI plays (defaults + <code>~/.config/musickit/radio.toml</code>). Click a station to start streaming via <code>&lt;audio&gt;</code>; the visualizer keeps working over the live stream.</p>
 <p><strong>Search</strong> uses the same FTS5 index <code>/search3</code> does (sub-ms ranked, prefix-matching, diacritic-folded — <code>bey</code> finds <code>Beyoncé</code>). Results swap into the right pane as artist / album / track sections; click any result to drill in or play.</p>
 <p><strong>Cover art</strong> thumbnails appear in album rows + the now-playing card; sourced from <code>/rest/getCoverArt</code> with the LRU cache from v0.9.1.</p>
 <p><strong>Queue</strong> is the visible album. Click a track → play from there; auto-advance through remaining tracks; <code>n</code>/<code>p</code> step. (Cross-album queueing comes later.)</p>
