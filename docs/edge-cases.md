@@ -121,8 +121,6 @@ Edition annotations (added in a later commit):
 - `(2018 Reissue)`, `(Reissue)`
 - `(Special Edition)`, `(Limited Edition)`, `(Collector's Edition)`
 
-Live annotations are **kept** — `(Live)`, `(Live in Madrid)`, `(Live at Budokan 1979)` — since live albums are distinct works from their studio counterparts.
-
 ## Filesystem-safe sanitisation
 
 - `/`, `:`, `*`, `?`, `"`, `<`, `>`, `|` all replaced with `_`
