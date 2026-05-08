@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MusicKit",
+  "version": "0.1.0",
+  "identifier": "com.winterop.musickit",
+  "build": {
+    "frontendDist": "../../frontend"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "MusicKit",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 720,
+        "minHeight": 480,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "transparent": false,
+        "decorations": true,
+        "url": "index.html"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "app",
+    "category": "Music",
+    "shortDescription": "MusicKit desktop client",
+    "longDescription": "Native desktop wrapper around the MusicKit web UI. Connects to a musickit serve instance over LAN or Tailscale and plays your library."
+  },
+  "plugins": {}
+}

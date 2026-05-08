@@ -1,0 +1,29 @@
+/*
+ * MusicKit visual palette — single source of truth for both the web UI
+ * (`app.css`) and the desktop wrappers (Tauri / Electron pickers).
+ *
+ * Hex values track Tokyo Night's `night` variant, the same scheme the
+ * TUI's `widgets.py` uses (cyan headers / blue labels / green for the
+ * playing state / orange for the active track / purple accent).
+ *
+ * Don't edit this file in isolation — the desktop pickers symlink it
+ * via `desktop/frontend/_palette.css`. Drift here ripples both ways.
+ */
+
+:root {
+  --bg: #16161e;
+  --bg-elevated: #1a1b26;
+  --bg-hover: #24283b;
+  --border: #3a3a3a;
+  --border-soft: #2a2b3a;
+  --text: #c0caf5;
+  --text-muted: #565f89;
+  --header: #7dcfff;
+  --label: #7aa2f7;
+  --playing: #9ece6a;
+  --paused: #e0af68;
+  --active: #ff9e64;
+  --accent: #bb9af7;
+  --peak: #f7768e;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+}
