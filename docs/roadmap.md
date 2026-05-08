@@ -4,7 +4,7 @@ What's open vs. speculative.
 
 ## Open — convert pipeline polish
 
-- **AcoustID auto-enable** — currently you have to pass `--acoustid-key` per run. Read it from `~/.config/musickit/serve.toml` once and apply automatically when an album has tagless tracks.
+- **AcoustID auto-enable** — currently you have to pass `--acoustid-key` per run. Read it from `~/.config/musickit/musickit.toml` (`[acoustid].api_key`) once and apply automatically when an album has tagless tracks.
 - **Album merge tool** — when the same album exists with different tags as two folders, an interactive merge.
 - **`--dry-run` with rich diff** — show exactly what tags would change, what files would move.
 
