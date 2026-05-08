@@ -193,7 +193,7 @@ class Visualizer(Static):
     """
 
     def on_mount(self) -> None:  # noqa: D102
-        self.border_title = "Levels"
+        self.border_title = "Spectrum"
 
     _PARTIAL_BLOCKS = "▁▂▃▄▅▆▇█"  # 1/8th increments
 

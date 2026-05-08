@@ -2,52 +2,125 @@
 {% block title %}musickit{% endblock %}
 {% block body %}
 <header class="topbar">
-  <span class="brand">musickit</span>
-  <input type="search"
-         id="search"
-         class="search-input"
-         placeholder="Search artists, albums, tracks…  (/)"
-         autocomplete="off"
-         spellcheck="false">
-  <span class="user">{{ user }}</span>
-  <form method="post" action="/logout" class="logout-form">
-    <button type="submit" class="ghost-button">Sign out</button>
-  </form>
+  <div class="topbar-left">
+    <input type="search"
+           id="search"
+           class="search-input"
+           placeholder="filter / search…  (/)"
+           autocomplete="off"
+           spellcheck="false">
+  </div>
+  <div class="topbar-center">
+    <span class="brand">musickit</span><span class="version">v{{ version }}</span>
+  </div>
+  <div class="topbar-right">
+    <span class="user">{{ user }}</span>
+    <form method="post" action="/logout" class="logout-form">
+      <button type="submit" class="ghost-button">Sign out</button>
+    </form>
+  </div>
 </header>
 
-<main class="three-pane">
-  <section class="pane pane-artists" aria-label="Artists">
-    <h2>Artists <span class="count">({{ artists|length }})</span></h2>
-    <ul class="row-list" id="artists-list">
-      {% for ar_id, name in artists %}
-      <li>
-        <button type="button"
-                class="row-button"
-                data-action="load-artist"
-                data-id="{{ ar_id }}">
-          {{ name }}
+<section class="now-playing-region" aria-label="Now playing">
+  <section class="panel np-card" aria-label="Now Playing">
+    <h2 class="panel-title">Now Playing</h2>
+    <div class="np-card-body">
+      <img id="np-cover" class="np-cover" alt="">
+      <div class="np-meta">
+        <span class="np-title" id="np-title"><span class="marquee-inner">Nothing playing</span></span>
+        <span class="np-artist-line">
+          <span class="np-artist" id="np-artist">—</span>
+          <span class="np-album-sep" id="np-album-sep"></span>
+          <span class="np-album" id="np-album"></span>
+        </span>
+        <span class="np-extra-line">
+          <span class="np-label">Year:</span> <span id="np-year">—</span>
+          <span class="np-spacer">·</span>
+          <span class="np-label">Format:</span> <span id="np-format">—</span>
+        </span>
+      </div>
+      <div class="np-controls">
+        <button type="button" class="np-button" data-action="prev" id="prev-button" disabled aria-label="Previous track (p)">
+          <span aria-hidden="true">⏮</span>
         </button>
-      </li>
-      {% else %}
-      <li class="empty">No artists in library yet.</li>
-      {% endfor %}
-    </ul>
+        <button type="button" class="play-button" data-action="play-pause" id="play-button" disabled aria-label="Play / pause (space)">
+          <span aria-hidden="true">▶</span>
+        </button>
+        <button type="button" class="np-button" data-action="next" id="next-button" disabled aria-label="Next track (n)">
+          <span aria-hidden="true">⏭</span>
+        </button>
+      </div>
+    </div>
+    <div class="np-progress" id="np-progress">
+      <span class="np-state-icon" id="np-state-icon">■</span>
+      <span class="np-pos" id="np-pos">00:00</span>
+      <progress id="np-bar" max="1" value="0"></progress>
+      <span class="np-dur" id="np-dur">00:00</span>
+    </div>
+  </section>
+
+  <section class="panel viz-panel" aria-label="Spectrum">
+    <h2 class="panel-title">Spectrum</h2>
+    <canvas class="visualizer-canvas" id="viz-canvas" aria-hidden="true"></canvas>
+  </section>
+</section>
+
+<main class="three-pane">
+  <section class="pane pane-sidebar" aria-label="Library">
+    <section class="panel" aria-label="Library stats">
+      <h2 class="panel-title">Library</h2>
+      <ul class="stats-list">
+        <li><span class="stat-icon">♪</span> Tracks   <span class="stat-num">{{ "%5d"|format(stats.tracks) }}</span></li>
+        <li><span class="stat-icon">◉</span> Albums   <span class="stat-num">{{ "%5d"|format(stats.albums) }}</span></li>
+        <li><span class="stat-icon">◆</span> Artists  <span class="stat-num">{{ "%5d"|format(stats.artists) }}</span></li>
+        <li><span class="stat-icon">▦</span> Folders  <span class="stat-num">{{ "%5d"|format(stats.folders) }}</span></li>
+      </ul>
+    </section>
+
+    <section class="panel" aria-label="Radio">
+      <h2 class="panel-title">Radio</h2>
+      <button type="button" class="row-button" data-action="load-radio">
+        <span class="row-icon">📻</span> Stations
+      </button>
+    </section>
+
+    <section class="panel panel-grow" aria-label="Browse">
+      <h2 class="panel-title">Browse <span class="count">({{ artists|length }})</span></h2>
+      <ul class="row-list" id="artists-list">
+        {% for ar_id, name in artists %}
+        <li>
+          <button type="button"
+                  class="row-button"
+                  data-action="load-artist"
+                  data-id="{{ ar_id }}">
+            {{ name }}
+          </button>
+        </li>
+        {% else %}
+        <li class="empty">No artists in library yet.</li>
+        {% endfor %}
+      </ul>
+    </section>
   </section>
 
   <section class="pane pane-albums" aria-label="Albums">
-    <div id="albums-pane">
-      <p class="empty">Pick an artist to see albums.</p>
-    </div>
+    <section class="panel panel-grow">
+      <h2 class="panel-title">Albums</h2>
+      <div id="albums-pane">
+        <p class="empty">Pick an artist to see albums.</p>
+      </div>
+    </section>
   </section>
 
   <section class="pane pane-tracks" aria-label="Tracks">
-    <div id="tracks-pane">
-      <p class="empty">Pick an album to see tracks.</p>
-    </div>
+    <section class="panel panel-grow">
+      <h2 class="panel-title">Tracks</h2>
+      <div id="tracks-pane">
+        <p class="empty">Pick an album to see tracks.</p>
+      </div>
+    </section>
   </section>
 </main>
-
-<canvas class="visualizer-canvas" id="viz-canvas" aria-hidden="true"></canvas>
 
 <aside class="lyrics-panel" id="lyrics-panel" aria-label="Lyrics">
   <div class="lyrics-header">
@@ -59,41 +132,98 @@
   </div>
 </aside>
 
-<footer class="now-playing" id="now-playing">
-  <img id="np-cover" class="np-cover" alt="" style="visibility: hidden">
-  <div class="np-controls">
-    <button type="button" class="np-button" data-action="prev" id="prev-button" disabled aria-label="Previous track">
-      <span aria-hidden="true">⏮</span>
-    </button>
-    <button type="button" class="play-button" data-action="play-pause" id="play-button" disabled aria-label="Play / pause">
-      <span aria-hidden="true">▶</span>
-    </button>
-    <button type="button" class="np-button" data-action="next" id="next-button" disabled aria-label="Next track">
-      <span aria-hidden="true">⏭</span>
-    </button>
-  </div>
-  <div class="np-meta">
-    <span class="np-title" id="np-title">Nothing playing</span>
-    <span class="np-artist" id="np-artist"></span>
-  </div>
-  <div class="np-progress">
-    <span class="np-pos" id="np-pos">00:00</span>
-    <progress id="np-bar" max="1" value="0"></progress>
-    <span class="np-dur" id="np-dur">00:00</span>
-  </div>
-  <div class="np-volume">
+<div class="status-bar" id="status-bar">
+  <span class="sb-group">
+    <span class="sb-label">Vol:</span>
+    <span class="sb-value sb-vol" id="sb-vol">100%</span>
+    <span class="sb-bar" id="sb-vol-bar">[||||||||||||]</span>
+  </span>
+  <span class="sb-group sb-clickable" data-action="cycle-repeat" role="button" tabindex="0"
+        title="Cycle repeat mode (r)">
+    <span class="sb-label">Repeat:</span>
+    <span class="sb-value sb-repeat" id="sb-repeat">off</span>
+  </span>
+  <span class="sb-group sb-clickable" data-action="toggle-shuffle" role="button" tabindex="0"
+        title="Toggle shuffle (s)">
+    <span class="sb-label">Shuffle:</span>
+    <span class="sb-value sb-shuffle" id="sb-shuffle">off</span>
+  </span>
+  <span class="sb-group sb-album-group">
+    <span class="sb-label" id="sb-album-label">Album:</span>
+    <span class="sb-value sb-album" id="sb-album"><span class="marquee-inner">—</span></span>
+    <span class="sb-cursor" id="sb-cursor">0/0</span>
+  </span>
+  <span class="sb-group sb-time-group">
+    <span class="sb-label">Time:</span>
+    <span class="sb-value sb-time" id="sb-time">00:00 / 00:00</span>
+  </span>
+  <span class="sb-group sb-toggles">
+    <input type="range" id="np-vol" class="sb-vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume">
     <button type="button" class="np-button" data-action="toggle-viz" aria-label="Toggle visualizer (f)">
       <span aria-hidden="true">▦</span>
     </button>
     <button type="button" class="np-button" data-action="toggle-lyrics" aria-label="Toggle lyrics (l)">
       <span aria-hidden="true">♪</span>
     </button>
-    <label class="visually-hidden" for="np-vol">Volume</label>
-    <input type="range" id="np-vol" min="0" max="1" step="0.01" value="1">
-  </div>
-  <audio id="audio" preload="none"></audio>
-</footer>
+  </span>
+</div>
 
-<script src="/web-static/app.js"></script>
-<script src="/web-static/visualizer.js"></script>
+<div class="keybar" aria-label="Keyboard shortcuts">
+  <span class="kb"><kbd>space</kbd>·Play</span>
+  <span class="kb" data-mode="track"><kbd>n</kbd>·Next</span>
+  <span class="kb" data-mode="track"><kbd>p</kbd>·Prev</span>
+  <span class="kb" data-mode="track"><kbd>&lt;</kbd>/<kbd>&gt;</kbd>·Seek</span>
+  <span class="kb"><kbd>9</kbd>/<kbd>0</kbd>·Vol</span>
+  <span class="kb" data-mode="track"><kbd>r</kbd>·Repeat</span>
+  <span class="kb" data-mode="track"><kbd>s</kbd>·Shuffle</span>
+  <span class="kb"><kbd>/</kbd>·Filter</span>
+  <span class="kb" data-mode="track"><kbd>l</kbd>·Lyrics</span>
+  <span class="kb"><kbd>f</kbd>·Full</span>
+  <span class="kb"><kbd>?</kbd>·Help</span>
+  <span class="kb"><kbd>⌘P</kbd>·Palette</span>
+</div>
+
+<audio id="audio" preload="none"></audio>
+
+<aside class="help-panel" id="help-panel" aria-label="Keyboard shortcuts">
+  <div class="help-header">
+    <span>Keys</span>
+    <button type="button" class="ghost-button" id="help-close" aria-label="Close help">×</button>
+  </div>
+  <div class="help-body">
+    <ul class="help-list">
+      <li class="help-row"><span class="help-key"><kbd>space</kbd></span><span class="help-desc">Play / pause</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>n</kbd></span><span class="help-desc">Next track</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>p</kbd></span><span class="help-desc">Previous track</span></li>
+      <li class="help-row"><span class="help-key"><kbd>0</kbd> <kbd>+</kbd></span><span class="help-desc">Volume up</span></li>
+      <li class="help-row"><span class="help-key"><kbd>9</kbd> <kbd>-</kbd></span><span class="help-desc">Volume down</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>&lt;</kbd></span><span class="help-desc">Seek backward</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>&gt;</kbd></span><span class="help-desc">Seek forward</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>r</kbd></span><span class="help-desc">Cycle repeat (off / album / track)</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>s</kbd></span><span class="help-desc">Toggle shuffle</span></li>
+      <li class="help-row" data-mode="track"><span class="help-key"><kbd>l</kbd></span><span class="help-desc">Show / hide lyrics</span></li>
+      <li class="help-row"><span class="help-key"><kbd>f</kbd></span><span class="help-desc">Fullscreen visualizer</span></li>
+      <li class="help-row"><span class="help-key"><kbd>/</kbd></span><span class="help-desc">Filter / search</span></li>
+      <li class="help-row"><span class="help-key"><kbd>?</kbd></span><span class="help-desc">Toggle help</span></li>
+      <li class="help-row"><span class="help-key"><kbd>⌘P</kbd></span><span class="help-desc">Open the command palette</span></li>
+      <li class="help-row"><span class="help-key"><kbd>esc</kbd></span><span class="help-desc">Close panel</span></li>
+    </ul>
+  </div>
+</aside>
+
+<div class="palette-backdrop" id="palette-backdrop" hidden>
+  <div class="palette" id="palette" role="dialog" aria-label="Command palette">
+    <input type="text"
+           id="palette-input"
+           class="palette-input"
+           placeholder="type a command…"
+           autocomplete="off"
+           spellcheck="false">
+    <ul class="palette-list" id="palette-list" role="listbox"></ul>
+  </div>
+</div>
+
+<script src="/web-static/app.js?v={{ asset_version }}"></script>
+<script src="/web-static/visualizer.js?v={{ asset_version }}"></script>
+<script src="/web-static/palette.js?v={{ asset_version }}"></script>
 {% endblock %}

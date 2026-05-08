@@ -15,14 +15,24 @@ Fragments are returned as plain HTML so the page's JS can do
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
+from musickit import __version__, radio
 from musickit.serve.auth import AuthError, verify
 from musickit.web.session import SESSION_PW_KEY, SESSION_USER_KEY, new_csrf_token
+
+# Per-URL last-seen ICY StreamTitle, populated by the radio-stream proxy as
+# it parses inline ICY metadata frames. The web client polls
+# `/web/radio-meta?url=...` to retrieve the current value. Single-process
+# scope only — multi-worker uvicorn would need a shared store.
+_icy_titles: dict[str, str] = {}
+_ICY_TITLE_RE = re.compile(rb"StreamTitle='([^']*)';")
 
 router = APIRouter()
 
@@ -58,7 +68,11 @@ async def login_form(request: Request) -> Response:
         return RedirectResponse(url="/web", status_code=303)
     csrf = new_csrf_token()
     request.session["csrf"] = csrf
-    return templates.TemplateResponse(request, "login.html", {"csrf": csrf, "error": None})
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {"csrf": csrf, "error": None, "asset_version": __version__},
+    )
 
 
 @router.post("/login", response_class=HTMLResponse, include_in_schema=False)
@@ -74,7 +88,11 @@ async def login_submit(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {"csrf": new_csrf_token(), "error": "Session expired — please try again."},
+            {
+                "csrf": new_csrf_token(),
+                "error": "Session expired — please try again.",
+                "asset_version": __version__,
+            },
             status_code=400,
         )
     cfg = request.app.state.cfg
@@ -84,7 +102,11 @@ async def login_submit(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {"csrf": new_csrf_token(), "error": "Wrong username or password."},
+            {
+                "csrf": new_csrf_token(),
+                "error": "Wrong username or password.",
+                "asset_version": __version__,
+            },
             status_code=401,
         )
     request.session[SESSION_USER_KEY] = username
@@ -107,7 +129,7 @@ async def logout(request: Request) -> Response:
 
 @router.get("/web", response_class=HTMLResponse, include_in_schema=False)
 async def web_shell(request: Request) -> Response:
-    """Three-pane shell — artists in left pane, empty albums + tracks panes."""
+    """Three-pane shell — Library stats + artists in left, albums + tracks in middle / right."""
     redirect = _require_auth_or_redirect(request)
     if redirect is not None:
         return redirect
@@ -116,11 +138,162 @@ async def web_shell(request: Request) -> Response:
         ((ar_id, name) for ar_id, name in cache.artist_name_by_id.items()),
         key=lambda pair: pair[1].casefold(),
     )
+    # Library stats — counts mirror the TUI's SidebarStats panel.
+    folder_count = len({album.path.parent for album in cache.albums_by_id.values()})
+    stats = {
+        "tracks": cache.track_count,
+        "albums": cache.album_count,
+        "artists": cache.artist_count,
+        "folders": folder_count,
+    }
     return templates.TemplateResponse(
         request,
         "shell.html",
-        {"artists": artists, "user": request.session.get(SESSION_USER_KEY, "")},
+        {
+            "artists": artists,
+            "stats": stats,
+            "user": request.session.get(SESSION_USER_KEY, ""),
+            "version": __version__,
+            # `asset_version` cache-busts /web-static/{app.css,app.js,...}
+            # links so a `make` -> reload picks up CSS / JS changes
+            # without forcing the user into Cmd+Shift+R every time.
+            "asset_version": __version__,
+        },
     )
+
+
+@router.get("/web/radio", response_class=HTMLResponse, include_in_schema=False)
+async def web_radio(request: Request) -> Response:
+    """HTML fragment: internet radio station list backed by `radio.load_stations()`."""
+    redirect = _require_auth_or_redirect(request)
+    if redirect is not None:
+        return redirect
+    stations = radio.load_stations()
+    return templates.TemplateResponse(request, "radio.html", {"stations": stations})
+
+
+@router.get("/web/radio-stream", include_in_schema=False)
+async def web_radio_stream(request: Request, url: str) -> Response:
+    """Same-origin proxy for a radio station's upstream stream.
+
+    Why: the visualizer sets `audio.crossOrigin = "anonymous"` so Web
+    Audio can read samples for the FFT. Once that's set, browsers issue
+    a CORS preflight for any cross-origin `audio.src`, and most radio
+    servers (Icecast / SHOUTcast) don't return CORS headers — playback
+    fails silently. Routing the stream through the same origin
+    sidesteps CORS entirely; the visualizer keeps working over the
+    live stream.
+
+    Security: the URL must match a station from `radio.load_stations()`.
+    Without that gate this endpoint would be an open proxy.
+    """
+    redirect = _require_auth_or_redirect(request)
+    if redirect is not None:
+        return redirect
+    allowed = {s.url for s in radio.load_stations()}
+    if url not in allowed:
+        return Response("Unknown station", status_code=403)
+
+    client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=None))
+    upstream = await client.send(
+        client.build_request(
+            "GET",
+            url,
+            # `Icy-MetaData: 1` opts into inline ICY metadata frames so
+            # the proxy can parse "StreamTitle='Artist - Song';" updates
+            # and surface them via /web/radio-meta. The browser cannot
+            # read these frames itself.
+            headers={"User-Agent": f"musickit/{__version__}", "Icy-MetaData": "1"},
+        ),
+        stream=True,
+        follow_redirects=True,
+    )
+    if upstream.status_code >= 400:
+        await upstream.aclose()
+        await client.aclose()
+        return Response(f"Upstream {upstream.status_code}", status_code=502)
+
+    metaint_header = upstream.headers.get("icy-metaint")
+    metaint = int(metaint_header) if metaint_header and metaint_header.isdigit() else 0
+
+    async def streamer():  # type: ignore[no-untyped-def]
+        try:
+            if metaint == 0:
+                # No inline metadata advertised — straight pass-through.
+                async for chunk in upstream.aiter_raw():
+                    yield chunk
+                return
+            # Inline ICY metadata: every `metaint` audio bytes, the upstream
+            # interleaves a metadata frame:
+            #   1 byte: length / 16
+            #   N bytes: padded ASCII (e.g. "StreamTitle='...';").
+            # We forward only the audio bytes to the browser and stash the
+            # parsed StreamTitle in `_icy_titles` for /web/radio-meta to
+            # read.
+            buf = bytearray()
+            state = "audio"  # audio -> meta_len -> meta_body -> audio
+            audio_left = metaint
+            meta_len = 0
+            async for chunk in upstream.aiter_raw():
+                buf.extend(chunk)
+                # Drain the buffer in whatever states we can satisfy.
+                while True:
+                    if state == "audio":
+                        if not buf:
+                            break
+                        n = min(audio_left, len(buf))
+                        yield bytes(buf[:n])
+                        del buf[:n]
+                        audio_left -= n
+                        if audio_left == 0:
+                            state = "meta_len"
+                        continue
+                    if state == "meta_len":
+                        if not buf:
+                            break
+                        meta_len = buf[0] * 16
+                        del buf[:1]
+                        if meta_len == 0:
+                            audio_left = metaint
+                            state = "audio"
+                        else:
+                            state = "meta_body"
+                        continue
+                    # meta_body
+                    if len(buf) < meta_len:
+                        break  # wait for more bytes
+                    meta_bytes = bytes(buf[:meta_len])
+                    del buf[:meta_len]
+                    text = meta_bytes.rstrip(b"\x00")
+                    match = _ICY_TITLE_RE.search(text)
+                    if match:
+                        title = match.group(1).decode("utf-8", errors="replace").strip()
+                        if title:
+                            _icy_titles[url] = title
+                    audio_left = metaint
+                    state = "audio"
+        finally:
+            await upstream.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        streamer(),
+        media_type=upstream.headers.get("content-type", "audio/mpeg"),
+    )
+
+
+@router.get("/web/radio-meta", include_in_schema=False)
+async def web_radio_meta(request: Request, url: str) -> Response:
+    """Return the last-seen ICY StreamTitle for a station, parsed by the proxy.
+
+    Cheap polling endpoint — clients can hit this every few seconds while
+    a stream plays. Returns an empty string when the station hasn't sent
+    metadata yet (or doesn't send any at all, like NRK).
+    """
+    redirect = _require_auth_or_redirect(request)
+    if redirect is not None:
+        return redirect
+    return JSONResponse({"title": _icy_titles.get(url, "")})
 
 
 @router.get("/web/artist/{ar_id}", response_class=HTMLResponse, include_in_schema=False)
@@ -186,6 +359,7 @@ async def web_album(request: Request, al_id: str) -> Response:
             "album_id": al_id,
             "album_title": album.tag_album or album.album_dir,
             "album_artist": album.tag_album_artist or album.artist_dir,
+            "album_year": album.tag_year or "",
         },
     )
 

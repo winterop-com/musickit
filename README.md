@@ -42,7 +42,7 @@ uvx musickit playlist gen ./output --seed <track> --minutes 60 # auto-generate a
 
 ## Screenshots
 
-The TUI: artist browser on the left, drilled into an album, 48-band visualizer at the top.
+The TUI — artist browser on the left, drilled into an album, 48-band visualizer at the top:
 
 ![Drilled-in album view](docs/screenshots/album-tracks.svg)
 
@@ -50,7 +50,15 @@ Fullscreen visualizer (`f`):
 
 ![Fullscreen visualizer](docs/screenshots/fullscreen-viz.svg)
 
-More screenshots in the [TUI guide](https://winterop-com.github.io/musickit/guides/tui/).
+The bundled browser UI tracks the same visual language — bordered panels with floating titles, same palette and KeyBar:
+
+![Browser UI — drilled into an album](docs/screenshots/web-album-tracks.png)
+
+Internet radio mode (Stations panel + ICY metadata in the title):
+
+![Browser UI — radio mode](docs/screenshots/web-radio.png)
+
+More screenshots in the [TUI guide](https://winterop-com.github.io/musickit/guides/tui/) and [serve guide](https://winterop-com.github.io/musickit/guides/serve/#browser-ui).
 
 ## Documentation
 
@@ -75,7 +83,7 @@ Or jump straight to:
 
 ## Status
 
-v0.9.8 · ruff + mypy + pyright clean, full pytest suite green. Six top-level commands — `convert`, `library`, `inspect`, `tui`, `serve`, `playlist` — with `library` carrying the read / mutate / manage subcommands (`tree`, `audit`, `fix`, `cover`, `cover-pick`, `retag`, `lyrics`, `index`) and `playlist` carrying `gen` / `list` / `show`. The TUI ships local-library playback, internet radio, Subsonic-client mode (with persistent token-auth credentials), AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, a diacritic-folded `/`-filter, in-place tag editing (`e` for track / album-wide), auto-generated Mixes (`g` to create, browseable view of saved `.m3u8`), a 48-band FFT visualiser with `f` / `v` toggles, synced lyrics via `l` (parsed `[mm:ss.xx]` markers, active line bolded as playback advances), and click-to-seek on the progress bar. Audio decoder + sounddevice callback run in a separate process so UI work in the main interpreter can't stall playback. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions), backs heart / star buttons with a persistent `<root>/.musickit/stars.toml`, returns sub-ms FTS5-ranked `/search3` results, promotes LRC lyrics to `synced: true`, and is tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop. A persistent SQLite library index at `<root>/.musickit/index.db` makes cold starts skip the filesystem walk + tag read; the filesystem watcher does per-album incremental rescans.
+v0.10.0 · browser UI tracks the TUI's visual language (bordered panels, palette, keybinds for repeat / shuffle / volume / seek, slide-in help, command palette via Cmd/Ctrl+P, internet radio via the existing `radio.toml`) — ruff + mypy + pyright clean, full pytest suite green. Six top-level commands — `convert`, `library`, `inspect`, `tui`, `serve`, `playlist` — with `library` carrying the read / mutate / manage subcommands (`tree`, `audit`, `fix`, `cover`, `cover-pick`, `retag`, `lyrics`, `index`) and `playlist` carrying `gen` / `list` / `show`. The TUI ships local-library playback, internet radio, Subsonic-client mode (with persistent token-auth credentials), AirPlay output (incl. pause + volume routing), mDNS discovery, ReplayGain normalisation, a diacritic-folded `/`-filter, in-place tag editing (`e` for track / album-wide), auto-generated Mixes (`g` to create, browseable view of saved `.m3u8`), a 48-band FFT visualiser with `f` / `v` toggles, synced lyrics via `l` (parsed `[mm:ss.xx]` markers, active line bolded as playback advances), and click-to-seek on the progress bar. Audio decoder + sounddevice callback run in a separate process so UI work in the main interpreter can't stall playback. The server is OpenSubsonic-compatible (`multipleGenres`, `transcodeOffset`, `songLyrics` extensions), backs heart / star buttons with a persistent `<root>/.musickit/stars.toml`, returns sub-ms FTS5-ranked `/search3` results, promotes LRC lyrics to `synced: true`, and is tested against Symfonium / Amperfy / play:Sub / Feishin clients on iOS / Android / desktop. A persistent SQLite library index at `<root>/.musickit/index.db` makes cold starts skip the filesystem walk + tag read; the filesystem watcher does per-album incremental rescans.
 
 ## License
 

@@ -1,5 +1,14 @@
-<h2>{{ album_title }}</h2>
-<p class="album-subtitle">{{ album_artist }}</p>
+<div class="album-heading" data-year="{{ album_year }}">
+  <span class="album-heading-title">{{ album_title }}</span>
+  <span class="album-heading-artist">{{ album_artist }}</span>
+</div>
+<div class="track-table-header">
+  <span class="th-no">#</span>
+  <span class="th-title">Title</span>
+  <span class="th-artist">Artist</span>
+  <span class="th-time">Time</span>
+</div>
+<div class="track-table-rule"></div>
 <ul class="row-list track-list">
   {% for track in tracks %}
   <li>
@@ -11,7 +20,7 @@
             data-title="{{ track.title|e }}"
             data-artist="{{ track.artist|e }}">
       <span class="track-no">{{ "%2d" % track.track_no }}</span>
-      <span class="track-title">{{ track.title }}</span>
+      <span class="track-title"><span class="marquee-inner">{{ track.title }}</span></span>
       <span class="track-artist">{{ track.artist }}</span>
       <span class="track-time">{{ track.duration }}</span>
     </button>

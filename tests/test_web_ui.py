@@ -140,13 +140,41 @@ def test_successful_login_sets_session_cookie(tmp_path: Path) -> None:
     # The session cookie is now in the client jar; subsequent /web hit succeeds.
     response = client.get("/web", follow_redirects=False)
     assert response.status_code == 200
-    assert "<h2>Artists" in response.text
+    # The TUI-aligned shell uses panel-titled sections — "Library" + "Browse".
+    assert "Library" in response.text
+    assert "Browse" in response.text
     assert "ABBA" in response.text
 
 
 # ---------------------------------------------------------------------------
 # Authenticated browsing
 # ---------------------------------------------------------------------------
+
+
+def test_shell_renders_tui_alike_chrome(tmp_path: Path) -> None:
+    """The shell carries the TUI-style chrome: Library stats, KeyBar, version brand, palette."""
+    client = _client(tmp_path)
+    _login(client)
+    text = client.get("/web", follow_redirects=False).text
+    # Library stats panel + counts.
+    assert "Library" in text
+    assert "Tracks" in text and "Albums" in text and "Artists" in text and "Folders" in text
+    # KeyBar at the bottom — desktop-style key hints; no `esc` advertised
+    # because that's not a web convention.
+    assert 'class="keybar"' in text
+    assert "·Play" in text
+    assert "esc" not in text.lower() or "·close" not in text.lower()
+    # Centered topbar with versioned brand.
+    assert 'class="brand"' in text
+    assert 'class="version"' in text
+    # Now Playing card + Spectrum viz panels at the top.
+    assert "Now Playing" in text and "Spectrum" in text
+    # StatusBar with Vol/Repeat/Shuffle/Time.
+    assert 'class="status-bar"' in text
+    assert "Vol:" in text and "Repeat:" in text and "Shuffle:" in text and "Time:" in text
+    # Command palette modal + script.
+    assert 'id="palette"' in text
+    assert "palette.js" in text
 
 
 def test_artist_fragment_returns_album_list(tmp_path: Path) -> None:
@@ -301,6 +329,24 @@ def test_logout_clears_session(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Subsonic clients still work via query auth (cookie is irrelevant)
 # ---------------------------------------------------------------------------
+
+
+def test_serve_with_enable_web_false_drops_web_routes(tmp_path: Path) -> None:
+    """`create_app(enable_web=False)` mounts no /login, /web, or /web-static routes."""
+    cfg = ServeConfig(username="mort", password="secret")
+    app = create_app(root=tmp_path, cfg=cfg, enable_web=False)
+    client = TestClient(app)
+    # Web surfaces are gone (FastAPI returns 404).
+    assert client.get("/login").status_code == 404
+    assert client.get("/web").status_code == 404
+    assert client.get("/web-static/app.css").status_code == 404
+    # Subsonic API still works (the root probe returns JSON).
+    root = client.get("/", headers={"Accept": "text/html"}).json()
+    assert root["type"] == "subsonic-compatible"
+    # /rest endpoints still respond (auth-gated as ever).
+    rest = client.get("/rest/ping", params={"u": "mort", "p": "secret", "f": "json"})
+    assert rest.status_code == 200
+    assert rest.json()["subsonic-response"]["status"] == "ok"
 
 
 def test_subsonic_query_auth_unaffected_by_session_middleware(tmp_path: Path) -> None:

@@ -55,11 +55,17 @@ def error_envelope(code: int, message: str) -> dict[str, Any]:
     }
 
 
-def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastAPI:
+def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_web: bool = True) -> FastAPI:
     """Build the FastAPI app for `root` with the given credentials.
 
     `use_cache=False` disables the persistent `<root>/.musickit/index.db`
     and falls back to in-memory scan on every rebuild.
+
+    `enable_web=False` skips mounting the browser UI (/login, /web/*,
+    /web-static/*). The Subsonic `/rest/*` API stays fully available.
+    Useful when you only want the Subsonic surface on a host (smaller
+    attack area) or when running headless on a TV/embedded box where
+    nobody will visit / in a browser.
     """
     app = FastAPI(
         title="musickit",
@@ -137,6 +143,7 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     from musickit.serve.endpoints.extras import router as extras_router
     from musickit.serve.endpoints.lyrics import router as lyrics_router
     from musickit.serve.endpoints.media import router as media_router
+    from musickit.serve.endpoints.radio import router as radio_router
     from musickit.serve.endpoints.scan import router as scan_router
     from musickit.serve.endpoints.search import router as search_router
     from musickit.serve.endpoints.stubs import router as stubs_router
@@ -150,23 +157,27 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     app.include_router(search_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(extras_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(lyrics_router, prefix="/rest", dependencies=auth_dep)
+    app.include_router(radio_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(stubs_router, prefix="/rest", dependencies=auth_dep)
 
     # Web UI — login + three-pane browse + audio player. Lives at /login,
     # /web, /web/artist/{id}, /web/album/{id}. Static assets served via
-    # the StaticFiles mount below.
-    from musickit.web.routes import router as web_router
+    # the StaticFiles mount below. Skipped entirely when `enable_web=False`.
+    if enable_web:
+        from musickit.web.routes import router as web_router
 
-    app.include_router(web_router)
-    web_static_dir = Path(__file__).resolve().parents[1] / "web" / "static"
-    app.mount("/web-static", StaticFiles(directory=str(web_static_dir)), name="web-static")
+        app.include_router(web_router)
+        web_static_dir = Path(__file__).resolve().parents[1] / "web" / "static"
+        app.mount("/web-static", StaticFiles(directory=str(web_static_dir)), name="web-static")
 
     # Root probe — JSON for Subsonic clients (Amperfy hits / pre-login
     # to confirm the host is reachable), HTML redirect for browsers.
+    # When the web UI is disabled, browsers also get the JSON body
+    # (there's no /login to redirect to).
     @app.get("/")
     async def server_info(request: Request) -> Response:
         accept = request.headers.get("accept", "")
-        if "text/html" in accept:
+        if "text/html" in accept and enable_web:
             return RedirectResponse(url="/login", status_code=303)
         return JSONResponse(
             {
