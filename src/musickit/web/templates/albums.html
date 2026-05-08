@@ -10,7 +10,7 @@
            src="/rest/getCoverArt?id={{ album.id }}&size=64"
            alt=""
            loading="lazy"
-           onerror="this.style.visibility='hidden'">
+           onerror="this.removeAttribute('src')">
       <span class="album-text">
         <span class="album-title">{{ album.title }}</span>
         <span class="album-meta">

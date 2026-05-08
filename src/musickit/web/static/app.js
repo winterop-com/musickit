@@ -222,14 +222,14 @@
       const idx = state.queue.findIndex((q) => q.id === item.id);
       sbCursor.textContent = `${idx + 1}/${state.queue.length}`;
     }
-    if (item.kind === "radio") {
-      // No cover for stations — keep the slot collapsed.
-      npCover.style.visibility = "hidden";
-    } else if (item.albumId) {
+    // Clear the src so the CSS background placeholder (♪ glyph) shows
+    // through. Setting a new src for tracks-with-an-album loads the
+    // real cover on top of the placeholder; radio + cover-less albums
+    // keep the placeholder visible.
+    if (item.kind !== "radio" && item.albumId) {
       npCover.src = "/rest/getCoverArt?id=" + encodeURIComponent(item.albumId) + "&size=80";
-      npCover.style.visibility = "visible";
     } else {
-      npCover.style.visibility = "hidden";
+      npCover.removeAttribute("src");
     }
     playButton.disabled = false;
     prevButton.disabled = idx === 0;

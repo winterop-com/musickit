@@ -314,7 +314,14 @@ button:focus-visible {
   height: 56px;
   object-fit: cover;
   border-radius: 2px;
-  background: var(--border);
+  /* Same placeholder pattern as `.album-thumb` — the loaded cover sits
+     on top of the bg via `object-fit: cover`; when there's no cover,
+     the bg ♪ glyph shows. */
+  background-color: var(--border-soft);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text x='32' y='46' text-anchor='middle' font-family='sans-serif' font-size='42' font-weight='600' fill='%23565f89'>♪</text></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 60%;
 }
 
 .np-meta {
@@ -801,7 +808,17 @@ button:focus-visible {
   height: 48px;
   object-fit: cover;
   border-radius: 2px;
-  background: var(--border);
+  /* Placeholder painted as the cell background — the loaded cover (if
+     any) sits on top via `object-fit: cover`. When the upstream
+     /rest/getCoverArt returns 404 or the file has no embedded art,
+     the img content is empty and the bg shows through. The glyph is
+     a single ♪ in `--text-muted`, matching the TUI's placeholder
+     vocabulary. */
+  background-color: var(--border-soft);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text x='32' y='46' text-anchor='middle' font-family='sans-serif' font-size='42' font-weight='600' fill='%23565f89'>♪</text></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 60%;
   flex-shrink: 0;
 }
 
