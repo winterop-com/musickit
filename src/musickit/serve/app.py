@@ -139,6 +139,7 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     from musickit.serve.endpoints.media import router as media_router
     from musickit.serve.endpoints.scan import router as scan_router
     from musickit.serve.endpoints.search import router as search_router
+    from musickit.serve.endpoints.stubs import router as stubs_router
     from musickit.serve.endpoints.system import router as system_router
 
     auth_dep = [Depends(require_auth)]
@@ -149,6 +150,7 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     app.include_router(search_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(extras_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(lyrics_router, prefix="/rest", dependencies=auth_dep)
+    app.include_router(stubs_router, prefix="/rest", dependencies=auth_dep)
 
     # Web UI — login + three-pane browse + audio player. Lives at /login,
     # /web, /web/artist/{id}, /web/album/{id}. Static assets served via

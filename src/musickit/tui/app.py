@@ -274,6 +274,12 @@ class MusickitApp(App[None]):
             tracklist = self.query_one(TrackList)
         except NoMatches:
             return
+        # If the tracklist is hidden (fullscreen mode), `size.width` reads 0
+        # and we'd bake a zero-width label into every row — leaving stale
+        # clipped titles after fullscreen exits. Skip; `action_toggle_fullscreen`
+        # re-triggers reflow on exit.
+        if tracklist.size.width <= 0:
+            return
         title_width = compute_title_width(tracklist.size.width, header_padding=2)
         if self._in_radio_view:
             for child in tracklist.children:
@@ -1612,6 +1618,12 @@ class MusickitApp(App[None]):
                     saved.focus()
                 except Exception:  # pragma: no cover — widget may have been removed
                     pass
+            # Re-flow track-row labels now that the tracklist is visible
+            # again. While fullscreen was active any resize fired a reflow
+            # that no-op'd (size.width was 0), so the rows still hold the
+            # pre-fullscreen title widths — which may be wrong if the
+            # window resized while fullscreen.
+            self.call_after_refresh(self._reflow_track_rows)
         else:
             self._focus_before_fullscreen = self.focused
             self.screen.add_class("fullscreen")
