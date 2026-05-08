@@ -116,7 +116,39 @@ export function renderShell(root, client, session, hooks = {}) {
     queueIndex: -1,
     currentArtistId: null,
     currentAlbumId: null,
+    currentTrackId: null,
   };
+
+  // -----------------------------------------------------------------
+  // Refresh-restore (URL hash + localStorage).
+  //
+  // Same pattern as the web UI's app.js: the URL hash mirrors the
+  // navigation (`#a=&l=&t=`) so hitting Cmd+R lands the user back
+  // where they were. localStorage holds the volume slider position
+  // (TODO: + repeat/shuffle once we add those keybinds in Phase D).
+  // -----------------------------------------------------------------
+
+  const LS_VOLUME = "mk_desktop_volume";
+
+  function updateHash() {
+    const parts = [];
+    if (state.currentArtistId) parts.push("a=" + encodeURIComponent(state.currentArtistId));
+    if (state.currentAlbumId) parts.push("l=" + encodeURIComponent(state.currentAlbumId));
+    if (state.currentTrackId) parts.push("t=" + encodeURIComponent(state.currentTrackId));
+    const h = parts.length ? "#" + parts.join("&") : "";
+    history.replaceState(null, "", window.location.pathname + h);
+  }
+
+  function parseHash() {
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return {};
+    const params = new URLSearchParams(hash);
+    return {
+      artistId: params.get("a"),
+      albumId: params.get("l"),
+      trackId: params.get("t"),
+    };
+  }
 
   const audio = document.getElementById("audio");
   const playButton = document.getElementById("play-button");
@@ -124,9 +156,61 @@ export function renderShell(root, client, session, hooks = {}) {
   const nextButton = document.getElementById("next-button");
 
   // -----------------------------------------------------------------
-  // Artist list — fetched once per session, the spine of the browser.
+  // Boot: restore volume + artist list, then replay the URL hash.
   // -----------------------------------------------------------------
-  loadArtists();
+  try {
+    const v = parseFloat(localStorage.getItem(LS_VOLUME));
+    if (!Number.isNaN(v) && v >= 0 && v <= 1) audio.volume = v;
+  } catch (e) {
+    // localStorage unavailable.
+  }
+
+  loadArtists().then(() => restoreFromHash());
+
+  /** Replay the artist → album → track drill-down from window.location.hash. */
+  async function restoreFromHash() {
+    const { artistId, albumId, trackId } = parseHash();
+    if (!artistId) return;
+    const artistBtn = document.querySelector(
+      `[data-action], .row-button[data-artist-id="${cssEscape(artistId)}"]`,
+    );
+    // The artist buttons aren't tagged with data-action in shell.js;
+    // we look up by the artist id we stamped on the button itself.
+    const target = document.querySelector(
+      `.pane-sidebar .row-button[data-artist-id="${cssEscape(artistId)}"]`,
+    );
+    if (!target) return;
+    target.click();
+    if (!albumId) return;
+    const albumBtn = await waitForElement(
+      `.pane-albums .row-button[data-album-id="${cssEscape(albumId)}"]`,
+    );
+    if (!albumBtn) return;
+    albumBtn.click();
+    if (!trackId) return;
+    const trackBtn = await waitForElement(
+      `.pane-tracks .row-button[data-track-id="${cssEscape(trackId)}"]`,
+    );
+    if (trackBtn) trackBtn.scrollIntoView({ block: "center" });
+    // Don't auto-play — browser autoplay rules require a user gesture.
+  }
+
+  function waitForElement(selector, root = document, maxMs = 3000) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      function tick() {
+        const el = root.querySelector(selector);
+        if (el) return resolve(el);
+        if (Date.now() - start > maxMs) return resolve(null);
+        setTimeout(tick, 40);
+      }
+      tick();
+    });
+  }
+
+  function cssEscape(s) {
+    return String(s).replace(/"/g, '\\"');
+  }
 
   async function loadArtists() {
     try {
@@ -171,6 +255,8 @@ export function renderShell(root, client, session, hooks = {}) {
   async function loadArtist(artistId, btn) {
     state.currentArtistId = artistId;
     state.currentAlbumId = null;
+    state.currentTrackId = null;
+    updateHash();
     markActive(".pane-sidebar", btn);
     const pane = document.getElementById("albums-pane");
     pane.innerHTML = `<p class="empty">Loading albums…</p>`;
@@ -221,6 +307,8 @@ export function renderShell(root, client, session, hooks = {}) {
   // -----------------------------------------------------------------
   async function loadAlbum(albumId, btn) {
     state.currentAlbumId = albumId;
+    state.currentTrackId = null;
+    updateHash();
     markActive(".pane-albums", btn);
     const pane = document.getElementById("tracks-pane");
     pane.innerHTML = `<p class="empty">Loading tracks…</p>`;
@@ -305,7 +393,11 @@ export function renderShell(root, client, session, hooks = {}) {
       item.rowEl = rowButtons[i];
     });
     const idx = state.queue.findIndex((q) => q.id === button.dataset.trackId);
-    if (idx >= 0) playQueueIndex(idx);
+    if (idx >= 0) {
+      state.currentTrackId = button.dataset.trackId;
+      updateHash();
+      playQueueIndex(idx);
+    }
   }
 
   function playQueueIndex(idx) {
