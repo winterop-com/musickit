@@ -5,51 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MusicKit</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="picker.css">
+  <link rel="stylesheet" href="_palette.css">
+  <link rel="stylesheet" href="shell.css">
 </head>
 <body>
-  <main class="picker" id="picker">
-    <header class="picker-header">
-      <span class="brand">MusicKit</span>
-      <span class="version" id="version">desktop</span>
-    </header>
-
-    <section class="picker-body">
-      <h1 class="picker-title" id="picker-title">Connect to a server</h1>
-      <p class="picker-hint" id="picker-hint">
-        Enter the URL of a <code>musickit serve</code> instance — LAN address or Tailscale hostname.
-      </p>
-      <p class="picker-hint picker-hint-quiet">
-        This app currently only works against <code>musickit serve</code>. Generic Subsonic
-        servers (Navidrome, Airsonic) speak the same API but don't ship the same web UI.
-      </p>
-
-      <form class="picker-form" id="picker-form" autocomplete="off">
-        <label class="visually-hidden" for="server-url">Server URL</label>
-        <input
-          type="url"
-          id="server-url"
-          class="picker-input"
-          placeholder="http://hostname:4533"
-          autocomplete="off"
-          spellcheck="false"
-          required>
-        <button type="submit" class="picker-submit">Connect</button>
-      </form>
-
-      <section class="picker-saved" id="picker-saved" hidden>
-        <h2 class="picker-section-heading">Saved servers</h2>
-        <ul class="saved-list" id="saved-list"></ul>
-      </section>
-
-      <p class="picker-status" id="picker-status" hidden></p>
-    </section>
-
-    <footer class="picker-footer">
-      <span>Need a server? <code>musickit serve /path/to/library</code></span>
-    </footer>
-  </main>
-
-  <script src="picker.js"></script>
+  <div id="root"></div>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

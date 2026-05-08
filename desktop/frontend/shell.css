@@ -1,0 +1,228 @@
+/*
+ * MusicKit desktop — additional styling on top of the shared web UI.
+ *
+ * The main shell after login uses the same class names + layout as
+ * the browser web UI (`.topbar`, `.panel`, `.row-list`, etc.), so
+ * `_app.css` (symlinked from `src/musickit/web/static/app.css`) is
+ * imported wholesale. This file only adds:
+ *
+ *   - Login page layout (no equivalent in the web UI — the server
+ *     renders its own login.html template)
+ *   - Saved-servers list styling for the login picker
+ *   - A handful of desktop-specific tweaks (the version label shows
+ *     the connected server's reported type/version instead of the
+ *     server's own brand)
+ *
+ * Future direction: when we extract `_layout.css` (a subset of
+ * app.css that's truly shared layout primitives), this file
+ * @imports that instead of all of _app.css.
+ */
+
+@import url("_app.css");
+
+/* Login page — only rendered when there's no active session.
+   The login-shell takes over the whole viewport; no topbar yet. */
+.login-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.login-brand .brand-name {
+  color: var(--header);
+  font-weight: 700;
+  font-size: 1.8rem;
+  letter-spacing: 0.04em;
+}
+
+.login-brand .brand-tag {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.5rem;
+}
+
+.login-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.login-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.login-hint code {
+  color: var(--label);
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 0.5rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--label);
+  font-size: 0.85rem;
+}
+
+.login-field input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+}
+
+.login-field input:focus {
+  outline: none;
+  border-color: var(--label);
+}
+
+.login-submit {
+  background: var(--label);
+  color: var(--bg);
+  border: 0;
+  border-radius: 3px;
+  padding: 0.6rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.4rem;
+}
+
+.login-submit:hover:not(:disabled) {
+  background: var(--header);
+}
+
+.login-submit:disabled {
+  background: var(--border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.login-status {
+  margin: 0;
+  color: var(--label);
+  font-size: 0.85rem;
+}
+
+.login-status.is-error {
+  color: var(--active);
+}
+
+/* Saved servers — pre-populated from prior successful logins. */
+.saved-servers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.saved-heading {
+  margin: 0;
+  color: var(--header);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.saved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.saved-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.saved-row .saved-host {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-row .saved-user {
+  color: var(--text-muted);
+}
+
+.saved-action {
+  background: transparent;
+  color: var(--label);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.18rem 0.55rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.saved-action:hover {
+  border-color: var(--label);
+  color: var(--text);
+}
+
+.saved-action.danger:hover {
+  border-color: var(--active);
+  color: var(--active);
+}
+
+/* Topbar tweak: show the connected server's reported type+version in
+   the version slot. The web UI puts musickit's own version there;
+   the desktop client prefers to show what server it's talking to. */
+.version {
+  font-family: var(--mono);
+}
