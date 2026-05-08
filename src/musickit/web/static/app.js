@@ -74,7 +74,152 @@
     radioMetaTimer: null,
     radioStationName: "", // remembered separately so we can fall back when
     // the upstream stops emitting StreamTitle frames.
+    // Refresh-restore: track which artist/album/track the user has
+    // drilled into so we can persist it to the URL hash and restore
+    // on reload (`#a=&l=&t=`). Stale unless updated explicitly by the
+    // click handlers — DO NOT read these for "what's playing now",
+    // use state.queue + state.queueIndex for that.
+    currentArtistId: null,
+    currentAlbumId: null,
+    currentTrackId: null,
   };
+
+  // -------------------------------------------------------------------- //
+  // Refresh-restore helpers                                              //
+  //                                                                      //
+  // The shell at /web is a single route — drill-ins are JS-driven HTML   //
+  // fragment swaps that don't change the URL. Without intervention, a   //
+  // page reload sends you back to the bare artist list. We mirror the   //
+  // current navigation into the URL hash (`#a=&l=&t=&r=1`) on every    //
+  // click so reload re-plays the same drill-down. Volume / repeat /    //
+  // shuffle / lyrics-open ride in localStorage — they're not              //
+  // navigation state but the same "should survive reload" intent.       //
+  // -------------------------------------------------------------------- //
+
+  const LS_KEYS = {
+    volume: "mk_volume",
+    repeat: "mk_repeat",
+    shuffle: "mk_shuffle",
+    lyricsOpen: "mk_lyrics_open",
+  };
+
+  function updateHash() {
+    const parts = [];
+    if (document.body.classList.contains("is-radio")) {
+      parts.push("r=1");
+      // In radio mode the "track" identity is the station URL; encode
+      // it under `s` (station) so callers don't confuse it with a
+      // real Subsonic track id.
+      const cur = state.queueIndex >= 0 ? state.queue[state.queueIndex] : null;
+      if (cur && cur.kind === "radio" && cur.url) {
+        parts.push("s=" + encodeURIComponent(cur.url));
+      }
+    } else {
+      if (state.currentArtistId) parts.push("a=" + encodeURIComponent(state.currentArtistId));
+      if (state.currentAlbumId) parts.push("l=" + encodeURIComponent(state.currentAlbumId));
+      if (state.currentTrackId) parts.push("t=" + encodeURIComponent(state.currentTrackId));
+    }
+    const h = parts.length ? "#" + parts.join("&") : "";
+    history.replaceState(null, "", window.location.pathname + h);
+  }
+
+  function parseHash() {
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return {};
+    const params = new URLSearchParams(hash);
+    return {
+      artistId: params.get("a"),
+      albumId: params.get("l"),
+      trackId: params.get("t"),
+      radio: params.get("r") === "1",
+      stationUrl: params.get("s"),
+    };
+  }
+
+  function persistPrefs() {
+    try {
+      localStorage.setItem(LS_KEYS.volume, String(audio.volume));
+      localStorage.setItem(LS_KEYS.repeat, state.repeat);
+      localStorage.setItem(LS_KEYS.shuffle, state.shuffle ? "1" : "0");
+      localStorage.setItem(
+        LS_KEYS.lyricsOpen,
+        lyricsPanel.classList.contains("is-open") ? "1" : "0",
+      );
+    } catch (e) {
+      // Quota / private browsing — non-fatal.
+    }
+  }
+
+  function restorePrefs() {
+    try {
+      const vol = parseFloat(localStorage.getItem(LS_KEYS.volume));
+      if (!Number.isNaN(vol) && vol >= 0 && vol <= 1) {
+        audio.volume = vol;
+        if (npVol) npVol.value = vol;
+        updateVolumeReadout(vol);
+      }
+      const rep = localStorage.getItem(LS_KEYS.repeat);
+      if (rep === "off" || rep === "album" || rep === "track") state.repeat = rep;
+      if (localStorage.getItem(LS_KEYS.shuffle) === "1") state.shuffle = true;
+      updateRepeatShuffleReadout();
+    } catch (e) {
+      // localStorage unavailable — accept defaults.
+    }
+  }
+
+  /** Poll for an element to appear; resolves null after `maxMs`. */
+  function waitForElement(selector, root = document, maxMs = 3000) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      function tick() {
+        const el = root.querySelector(selector);
+        if (el) return resolve(el);
+        if (Date.now() - start > maxMs) return resolve(null);
+        setTimeout(tick, 40);
+      }
+      tick();
+    });
+  }
+
+  /** On boot: replay the artist → album → track drill-down from `#`. */
+  async function restoreFromHash() {
+    const { artistId, albumId, trackId, radio, stationUrl } = parseHash();
+    if (radio) {
+      const radioBtn = document.querySelector('[data-action="load-radio"]');
+      if (radioBtn) radioBtn.click();
+      if (stationUrl) {
+        const sel =
+          '[data-action="play-radio"][data-url="' + stationUrl.replace(/"/g, '\\"') + '"]';
+        const btn = await waitForElement(sel, albumsPane);
+        // Don't auto-play radio either — but mark it so the visual is
+        // restored. `playQueueIndex` handles is-playing on click.
+        if (btn) btn.scrollIntoView({ block: "center" });
+      }
+      return;
+    }
+    if (!artistId) return;
+    const artistBtn = document.querySelector(
+      '[data-action="load-artist"][data-id="' + artistId.replace(/"/g, '\\"') + '"]',
+    );
+    if (!artistBtn) return;
+    artistBtn.click();
+    if (!albumId) return;
+    const albumBtn = await waitForElement(
+      '[data-action="load-album"][data-id="' + albumId.replace(/"/g, '\\"') + '"]',
+      albumsPane,
+    );
+    if (!albumBtn) return;
+    albumBtn.click();
+    if (!trackId) return;
+    const trackRow = await waitForElement(
+      '[data-action="play-track"][data-id="' + trackId.replace(/"/g, '\\"') + '"]',
+      tracksPane,
+    );
+    if (trackRow) trackRow.scrollIntoView({ block: "center" });
+    // Deliberately NOT auto-playing — modern browsers block autoplay
+    // without a user gesture, and silently-failing-play is a worse UX
+    // than asking the user to press space.
+  }
 
   // -------------------------------------------------------------------- //
   // Helpers                                                              //
@@ -277,11 +422,13 @@
     const order = ["off", "album", "track"];
     state.repeat = order[(order.indexOf(state.repeat) + 1) % order.length];
     updateRepeatShuffleReadout();
+    persistPrefs();
   }
 
   function toggleShuffle() {
     state.shuffle = !state.shuffle;
     updateRepeatShuffleReadout();
+    persistPrefs();
   }
 
   function updateRepeatShuffleReadout() {
@@ -300,6 +447,7 @@
     audio.volume = v;
     npVol.value = v;
     updateVolumeReadout(v);
+    persistPrefs();
   }
 
   function seekBy(seconds) {
@@ -368,6 +516,7 @@
     const wasOpen = lyricsPanel.classList.contains("is-open");
     if (wasOpen) {
       lyricsPanel.classList.remove("is-open");
+      persistPrefs();
       return;
     }
     lyricsPanel.classList.add("is-open");
@@ -376,6 +525,7 @@
     } else {
       lyricsBody.innerHTML = '<p class="empty">No track playing.</p>';
     }
+    persistPrefs();
   }
 
   async function loadLyricsFor(trackId) {
@@ -540,6 +690,11 @@
       document.body.classList.remove("is-radio");
       if (albumsPaneTitle) albumsPaneTitle.textContent = "Albums";
       if (tracksPaneTitle) tracksPaneTitle.textContent = "Tracks";
+      // Refresh-restore: reload should bring us back to this artist.
+      state.currentArtistId = button.dataset.id;
+      state.currentAlbumId = null;
+      state.currentTrackId = null;
+      updateHash();
     } else if (action === "load-radio") {
       // Radio list goes into the (renamed) middle pane; tracks pane is
       // hidden in radio mode (`body.is-radio` collapses the grid to two
@@ -550,6 +705,12 @@
       markActiveRow(button, ".pane-sidebar");
       document.body.classList.add("is-radio");
       if (albumsPaneTitle) albumsPaneTitle.textContent = "Stations";
+      // Refresh-restore: clear the artist/album/track navigation
+      // (radio mode owns the URL hash via `r=1` + station URL).
+      state.currentArtistId = null;
+      state.currentAlbumId = null;
+      state.currentTrackId = null;
+      updateHash();
       loadInto("/web/radio", albumsPane).then(() => {
         // The fragment swap blew away any prior is-playing mark; restore
         // it if a station is currently active. Look up by stream URL —
@@ -581,15 +742,23 @@
       };
       state.queue = [station];
       playQueueIndex(0);
+      // Refresh-restore: hash now includes station URL via the radio
+      // branch in `updateHash`.
+      updateHash();
     } else if (action === "load-album") {
       markActiveRow(button, ".pane-albums");
       loadInto("/web/album/" + encodeURIComponent(button.dataset.id), tracksPane);
+      state.currentAlbumId = button.dataset.id;
+      state.currentTrackId = null;
+      updateHash();
     } else if (action === "play-track") {
       // Defer queue construction until after the click bubbles, so the
       // .is-playing class set inside playQueueIndex applies cleanly.
       state.queue = buildQueueFromVisibleTracks();
       const idx = state.queue.findIndex((q) => q.id === button.dataset.id);
       playQueueIndex(idx);
+      state.currentTrackId = button.dataset.id;
+      updateHash();
     } else if (action === "play-pause") {
       togglePause();
     } else if (action === "next") {
@@ -712,6 +881,7 @@
     const v = parseFloat(npVol.value);
     audio.volume = v;
     updateVolumeReadout(v);
+    persistPrefs();
   });
   // Initial volume readout
   updateVolumeReadout(parseFloat(npVol.value));
@@ -821,4 +991,24 @@
       helpPanel.classList.remove("is-open");
     }
   });
+
+  // -------------------------------------------------------------------- //
+  // Boot: restore prefs + replay the navigation hash.                    //
+  // -------------------------------------------------------------------- //
+  restorePrefs();
+  // Defer hash-restore one tick so the DOM is fully painted (artist
+  // list rendered, click delegate wired up). The waitForElement
+  // polling inside `restoreFromHash` then has a stable starting point.
+  setTimeout(() => {
+    restoreFromHash().catch((e) => console.warn("restoreFromHash failed:", e));
+    // If lyrics-open was 1 in localStorage, open the panel — but only
+    // after a track is selected (otherwise the panel is empty).
+    try {
+      if (localStorage.getItem(LS_KEYS.lyricsOpen) === "1") {
+        lyricsPanel.classList.add("is-open");
+      }
+    } catch (e) {
+      // localStorage unavailable.
+    }
+  }, 0);
 })();
