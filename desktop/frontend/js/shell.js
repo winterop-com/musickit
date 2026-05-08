@@ -73,6 +73,13 @@ export function renderShell(root, client, session, hooks = {}) {
 
     <main class="three-pane">
       <section class="pane pane-sidebar" aria-label="Artists">
+        <section class="panel" aria-label="Radio">
+          <h2 class="panel-title">Radio</h2>
+          <button type="button" class="row-button" id="radio-toggle">
+            <span class="row-icon">📻</span> Stations
+          </button>
+        </section>
+
         <section class="panel panel-grow" aria-label="Browse">
           <h2 class="panel-title">Artists <span class="count" id="artists-count"></span></h2>
           <ul class="row-list" id="artists-list">
@@ -212,6 +219,110 @@ export function renderShell(root, client, session, hooks = {}) {
     return String(s).replace(/"/g, '\\"');
   }
 
+  // -----------------------------------------------------------------
+  // Radio mode — `getInternetRadioStations` + click-to-play.
+  //
+  // Spec endpoint, supported by every Subsonic-compatible server.
+  // musickit serve returns the ~/.config/musickit/radio.toml list;
+  // Navidrome returns whatever its admins configured. Both work the
+  // same here because the response shape is canonical.
+  // -----------------------------------------------------------------
+  document.getElementById("radio-toggle")?.addEventListener("click", () => loadRadio());
+
+  async function loadRadio() {
+    const radioBtn = document.getElementById("radio-toggle");
+    markActive(".pane-sidebar", radioBtn);
+    state.currentArtistId = null;
+    state.currentAlbumId = null;
+    state.currentTrackId = null;
+    updateHash();
+    document.body.classList.add("is-radio");
+
+    const albumsTitle = document.getElementById("albums-title");
+    if (albumsTitle) albumsTitle.textContent = "Stations";
+    const pane = document.getElementById("albums-pane");
+    pane.innerHTML = `<p class="empty">Loading stations…</p>`;
+    document.getElementById("tracks-pane").innerHTML =
+      `<p class="empty">Pick a station to start streaming.</p>`;
+    try {
+      const inner = await client.query("getInternetRadioStations");
+      const stations = inner?.internetRadioStations?.internetRadioStation || [];
+      if (stations.length === 0) {
+        pane.innerHTML = `<p class="empty">No internet radio stations on this server.</p>`;
+        return;
+      }
+      const list = document.createElement("ul");
+      list.className = "row-list";
+      for (const s of stations) {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "row-button";
+        button.dataset.streamUrl = s.streamUrl;
+        button.dataset.stationName = s.name;
+        button.innerHTML = `
+          <span class="row-icon">📻</span>
+          <span class="album-text">
+            <span class="album-title">${escapeHtml(s.name || "—")}</span>
+            ${
+              s.homepageUrl
+                ? `<span class="album-meta"><span class="album-artist">${escapeHtml(s.homepageUrl)}</span></span>`
+                : ""
+            }
+          </span>
+        `;
+        button.addEventListener("click", () => playStation(s, button));
+        li.appendChild(button);
+        list.appendChild(li);
+      }
+      pane.innerHTML = "";
+      pane.appendChild(list);
+    } catch (e) {
+      pane.innerHTML = `<p class="empty">Failed: ${escapeHtml(e?.message || String(e))}</p>`;
+    }
+  }
+
+  function playStation(s, button) {
+    audio.src = s.streamUrl;
+    audio.play().catch((err) => console.warn("station playback failed:", err));
+
+    document.querySelectorAll(".row-button.is-playing").forEach((el) => {
+      el.classList.remove("is-playing");
+    });
+    button.classList.add("is-playing");
+
+    state.queue = [
+      {
+        id: "radio:" + s.streamUrl,
+        title: s.name || "Radio",
+        artist: "Radio",
+        albumId: null,
+        albumTitle: "",
+        albumYear: "",
+        suffix: "Stream",
+        rowEl: button,
+        kind: "radio",
+        url: s.streamUrl,
+      },
+    ];
+    state.queueIndex = 0;
+
+    document.getElementById("np-title").textContent = s.name || "Radio";
+    document.getElementById("np-artist").textContent = "Radio";
+    const albumEl = document.getElementById("np-album");
+    const sepEl = document.getElementById("np-album-sep");
+    if (albumEl) albumEl.textContent = "";
+    if (sepEl) sepEl.textContent = "";
+    document.getElementById("np-year").textContent = "—";
+    document.getElementById("np-format").textContent = "Stream";
+    const cover = document.getElementById("np-cover");
+    cover.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>";
+
+    playButton.disabled = false;
+    prevButton.disabled = true;
+    nextButton.disabled = true;
+  }
+
   async function loadArtists() {
     try {
       const inner = await client.query("getArtists");
@@ -258,6 +369,11 @@ export function renderShell(root, client, session, hooks = {}) {
     state.currentTrackId = null;
     updateHash();
     markActive(".pane-sidebar", btn);
+    // Leave radio mode if we were in it (the body class controls the
+    // grid collapse + track-pane hide via _app.css).
+    document.body.classList.remove("is-radio");
+    const albumsTitle = document.getElementById("albums-title");
+    if (albumsTitle) albumsTitle.textContent = "Albums";
     const pane = document.getElementById("albums-pane");
     pane.innerHTML = `<p class="empty">Loading albums…</p>`;
     document.getElementById("tracks-pane").innerHTML =
