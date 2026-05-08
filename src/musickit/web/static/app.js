@@ -75,6 +75,37 @@
     return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
   }
 
+  // Marquee: replace the text of an element that has a `.marquee-inner`
+  // child, then measure overflow and toggle `is-marquee` on the outer.
+  // The animation scrolls the inner from 0 to a CSS-variable distance
+  // matching the overflow, paused briefly at each end.
+  function setMarqueeText(outer, text) {
+    if (!outer) return;
+    let inner = outer.querySelector(".marquee-inner");
+    if (!inner) {
+      inner = document.createElement("span");
+      inner.className = "marquee-inner";
+      outer.replaceChildren(inner);
+    }
+    inner.textContent = text;
+    // Measure after layout so scrollWidth / clientWidth are valid.
+    requestAnimationFrame(() => {
+      const overflow = inner.scrollWidth - outer.clientWidth;
+      if (overflow > 4) {
+        outer.classList.add("is-marquee");
+        // Add a small gap past the overflow distance so the last
+        // character clears the right edge before the loop restart.
+        outer.style.setProperty("--marquee-translate", `-${overflow + 24}px`);
+        // ~60px/sec scroll speed with a sane minimum + padding for the
+        // pause segments at the start/end of the keyframe.
+        const seconds = Math.max(10, overflow / 60 + 8);
+        outer.style.setProperty("--marquee-duration", `${seconds}s`);
+      } else {
+        outer.classList.remove("is-marquee");
+      }
+    });
+  }
+
   async function fetchFragment(url) {
     const response = await fetch(url, { credentials: "same-origin" });
     if (!response.ok) {
@@ -148,7 +179,7 @@
       item.rowEl.classList.add("is-playing");
     }
 
-    npTitle.textContent = item.title || "—";
+    setMarqueeText(npTitle, item.title || "—");
     // Radio: the station name belongs in the artist line so the
     // top-right title row can flip to the StreamTitle (current song)
     // once /web/radio-meta polls return one.
@@ -281,7 +312,7 @@
         // Render: title row gets the current song; artist row stays as
         // the station name so the listener always sees what they tuned
         // into. StatusBar Album mirrors the song title.
-        npTitle.textContent = t;
+        setMarqueeText(npTitle, t);
         if (sbAlbum) sbAlbum.textContent = t;
       } catch (e) {
         // Network blip — try again on the next tick.
@@ -402,6 +433,47 @@
       tracksPane.innerHTML = html;
     }, 200);
   }
+
+  // -------------------------------------------------------------------- //
+  // Hover-marquee for long track titles                                  //
+  //                                                                      //
+  // Only fires while the row is hovered so the tracks pane isn't a wall  //
+  // of constant motion. Measures on enter, applies the same CSS animation//
+  // as the np-title marquee.                                             //
+  // -------------------------------------------------------------------- //
+
+  function applyMarqueeMeasure(outer) {
+    const inner = outer.querySelector(".marquee-inner");
+    if (!inner) return;
+    const overflow = inner.scrollWidth - outer.clientWidth;
+    if (overflow > 4) {
+      outer.classList.add("is-marquee");
+      outer.style.setProperty("--marquee-translate", `-${overflow + 24}px`);
+      outer.style.setProperty("--marquee-duration", `${Math.max(8, overflow / 60 + 6)}s`);
+    } else {
+      outer.classList.remove("is-marquee");
+    }
+  }
+
+  document.addEventListener(
+    "mouseenter",
+    function (event) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.matches(".track-title")) applyMarqueeMeasure(target);
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "mouseleave",
+    function (event) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.matches(".track-title")) target.classList.remove("is-marquee");
+    },
+    true,
+  );
 
   // -------------------------------------------------------------------- //
   // Click delegation                                                     //

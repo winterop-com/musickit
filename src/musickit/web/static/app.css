@@ -327,10 +327,43 @@ button:focus-visible {
 .np-title {
   color: var(--active);
   font-weight: 700;
+  font-size: 1.05rem;
+  display: block;
+  overflow: hidden;
+  /* No `white-space: nowrap` here — the inner .marquee-inner owns
+     wrapping. Outer is just a clipping window. */
+}
+
+/* Marquee: when text exceeds the outer width, the inner element animates
+   right-to-left. When it fits, the inner stays put with its own
+   text-overflow: ellipsis (max-width: 100% on the inner is what makes
+   the ellipsis kick in). The translateX distance and duration are set
+   per-target via CSS variables — see `setMarqueeText` in app.js. */
+.marquee-inner {
+  display: inline-block;
   white-space: nowrap;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 1.05rem;
+  vertical-align: bottom;
+  will-change: transform;
+}
+
+.is-marquee .marquee-inner {
+  max-width: none;
+  overflow: visible;
+  animation: marquee var(--marquee-duration, 16s) linear infinite;
+}
+
+@keyframes marquee {
+  0%,
+  8% {
+    transform: translateX(0);
+  }
+  92%,
+  100% {
+    transform: translateX(var(--marquee-translate, 0));
+  }
 }
 
 .np-artist-line {
@@ -855,9 +888,10 @@ button:focus-visible {
 .track-title {
   color: var(--text);
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* Inner `.marquee-inner` owns the ellipsis; the outer is just a
+     clipping window (matches the .np-title pattern). */
 }
 
 .track-artist {
