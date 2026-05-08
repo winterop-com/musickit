@@ -1,4 +1,4 @@
-.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
+.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots desktop-sync-frontend desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -78,23 +78,29 @@ docs: docs-serve
 # changes propagate to both web + desktop on save.
 # ---------------------------------------------------------------------------
 
+desktop-sync-frontend:
+	@echo ">>> Syncing shared frontend assets into desktop/frontend/"
+	@cp src/musickit/web/static/_palette.css desktop/frontend/_palette.css
+	@cp src/musickit/web/static/app.css      desktop/frontend/_app.css
+	@cp src/musickit/web/static/favicon.svg  desktop/frontend/favicon.svg
+
 desktop-tauri: desktop-tauri-dev
 
-desktop-tauri-dev:
+desktop-tauri-dev: desktop-sync-frontend
 	@echo ">>> Tauri dev — opens window pointed at desktop/frontend/index.html"
 	@cd desktop/tauri/src-tauri && cargo tauri dev
 
-desktop-tauri-build:
+desktop-tauri-build: desktop-sync-frontend
 	@echo ">>> Tauri release build — produces a .app under desktop/tauri/src-tauri/target/release/bundle/"
 	@cd desktop/tauri/src-tauri && cargo tauri build
 
 desktop-electron: desktop-electron-dev
 
-desktop-electron-dev:
+desktop-electron-dev: desktop-sync-frontend
 	@echo ">>> Electron dev — opens window pointed at desktop/frontend/index.html"
 	@cd desktop/electron && (test -d node_modules || npm install) && npm start
 
-desktop-electron-build:
+desktop-electron-build: desktop-sync-frontend
 	@echo ">>> Electron release build — produces a .dmg under desktop/electron/dist/"
 	@cd desktop/electron && (test -d node_modules || npm install) && npm run build
 

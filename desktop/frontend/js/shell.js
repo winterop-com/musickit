@@ -73,6 +73,13 @@ export function renderShell(root, client, session, hooks = {}) {
 
     <main class="three-pane">
       <section class="pane pane-sidebar" aria-label="Artists">
+        <section class="panel" aria-label="Radio">
+          <h2 class="panel-title">Radio</h2>
+          <button type="button" class="row-button" id="radio-toggle">
+            <span class="row-icon">📻</span> Stations
+          </button>
+        </section>
+
         <section class="panel panel-grow" aria-label="Browse">
           <h2 class="panel-title">Artists <span class="count" id="artists-count"></span></h2>
           <ul class="row-list" id="artists-list">
@@ -116,7 +123,39 @@ export function renderShell(root, client, session, hooks = {}) {
     queueIndex: -1,
     currentArtistId: null,
     currentAlbumId: null,
+    currentTrackId: null,
   };
+
+  // -----------------------------------------------------------------
+  // Refresh-restore (URL hash + localStorage).
+  //
+  // Same pattern as the web UI's app.js: the URL hash mirrors the
+  // navigation (`#a=&l=&t=`) so hitting Cmd+R lands the user back
+  // where they were. localStorage holds the volume slider position
+  // (TODO: + repeat/shuffle once we add those keybinds in Phase D).
+  // -----------------------------------------------------------------
+
+  const LS_VOLUME = "mk_desktop_volume";
+
+  function updateHash() {
+    const parts = [];
+    if (state.currentArtistId) parts.push("a=" + encodeURIComponent(state.currentArtistId));
+    if (state.currentAlbumId) parts.push("l=" + encodeURIComponent(state.currentAlbumId));
+    if (state.currentTrackId) parts.push("t=" + encodeURIComponent(state.currentTrackId));
+    const h = parts.length ? "#" + parts.join("&") : "";
+    history.replaceState(null, "", window.location.pathname + h);
+  }
+
+  function parseHash() {
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return {};
+    const params = new URLSearchParams(hash);
+    return {
+      artistId: params.get("a"),
+      albumId: params.get("l"),
+      trackId: params.get("t"),
+    };
+  }
 
   const audio = document.getElementById("audio");
   const playButton = document.getElementById("play-button");
@@ -124,9 +163,165 @@ export function renderShell(root, client, session, hooks = {}) {
   const nextButton = document.getElementById("next-button");
 
   // -----------------------------------------------------------------
-  // Artist list — fetched once per session, the spine of the browser.
+  // Boot: restore volume + artist list, then replay the URL hash.
   // -----------------------------------------------------------------
-  loadArtists();
+  try {
+    const v = parseFloat(localStorage.getItem(LS_VOLUME));
+    if (!Number.isNaN(v) && v >= 0 && v <= 1) audio.volume = v;
+  } catch (e) {
+    // localStorage unavailable.
+  }
+
+  loadArtists().then(() => restoreFromHash());
+
+  /** Replay the artist → album → track drill-down from window.location.hash. */
+  async function restoreFromHash() {
+    const { artistId, albumId, trackId } = parseHash();
+    if (!artistId) return;
+    const artistBtn = document.querySelector(
+      `[data-action], .row-button[data-artist-id="${cssEscape(artistId)}"]`,
+    );
+    // The artist buttons aren't tagged with data-action in shell.js;
+    // we look up by the artist id we stamped on the button itself.
+    const target = document.querySelector(
+      `.pane-sidebar .row-button[data-artist-id="${cssEscape(artistId)}"]`,
+    );
+    if (!target) return;
+    target.click();
+    if (!albumId) return;
+    const albumBtn = await waitForElement(
+      `.pane-albums .row-button[data-album-id="${cssEscape(albumId)}"]`,
+    );
+    if (!albumBtn) return;
+    albumBtn.click();
+    if (!trackId) return;
+    const trackBtn = await waitForElement(
+      `.pane-tracks .row-button[data-track-id="${cssEscape(trackId)}"]`,
+    );
+    if (trackBtn) trackBtn.scrollIntoView({ block: "center" });
+    // Don't auto-play — browser autoplay rules require a user gesture.
+  }
+
+  function waitForElement(selector, root = document, maxMs = 3000) {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      function tick() {
+        const el = root.querySelector(selector);
+        if (el) return resolve(el);
+        if (Date.now() - start > maxMs) return resolve(null);
+        setTimeout(tick, 40);
+      }
+      tick();
+    });
+  }
+
+  function cssEscape(s) {
+    return String(s).replace(/"/g, '\\"');
+  }
+
+  // -----------------------------------------------------------------
+  // Radio mode — `getInternetRadioStations` + click-to-play.
+  //
+  // Spec endpoint, supported by every Subsonic-compatible server.
+  // musickit serve returns the ~/.config/musickit/radio.toml list;
+  // Navidrome returns whatever its admins configured. Both work the
+  // same here because the response shape is canonical.
+  // -----------------------------------------------------------------
+  document.getElementById("radio-toggle")?.addEventListener("click", () => loadRadio());
+
+  async function loadRadio() {
+    const radioBtn = document.getElementById("radio-toggle");
+    markActive(".pane-sidebar", radioBtn);
+    state.currentArtistId = null;
+    state.currentAlbumId = null;
+    state.currentTrackId = null;
+    updateHash();
+    document.body.classList.add("is-radio");
+
+    const albumsTitle = document.getElementById("albums-title");
+    if (albumsTitle) albumsTitle.textContent = "Stations";
+    const pane = document.getElementById("albums-pane");
+    pane.innerHTML = `<p class="empty">Loading stations…</p>`;
+    document.getElementById("tracks-pane").innerHTML =
+      `<p class="empty">Pick a station to start streaming.</p>`;
+    try {
+      const inner = await client.query("getInternetRadioStations");
+      const stations = inner?.internetRadioStations?.internetRadioStation || [];
+      if (stations.length === 0) {
+        pane.innerHTML = `<p class="empty">No internet radio stations on this server.</p>`;
+        return;
+      }
+      const list = document.createElement("ul");
+      list.className = "row-list";
+      for (const s of stations) {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "row-button";
+        button.dataset.streamUrl = s.streamUrl;
+        button.dataset.stationName = s.name;
+        button.innerHTML = `
+          <span class="row-icon">📻</span>
+          <span class="album-text">
+            <span class="album-title">${escapeHtml(s.name || "—")}</span>
+            ${
+              s.homepageUrl
+                ? `<span class="album-meta"><span class="album-artist">${escapeHtml(s.homepageUrl)}</span></span>`
+                : ""
+            }
+          </span>
+        `;
+        button.addEventListener("click", () => playStation(s, button));
+        li.appendChild(button);
+        list.appendChild(li);
+      }
+      pane.innerHTML = "";
+      pane.appendChild(list);
+    } catch (e) {
+      pane.innerHTML = `<p class="empty">Failed: ${escapeHtml(e?.message || String(e))}</p>`;
+    }
+  }
+
+  function playStation(s, button) {
+    audio.src = s.streamUrl;
+    audio.play().catch((err) => console.warn("station playback failed:", err));
+
+    document.querySelectorAll(".row-button.is-playing").forEach((el) => {
+      el.classList.remove("is-playing");
+    });
+    button.classList.add("is-playing");
+
+    state.queue = [
+      {
+        id: "radio:" + s.streamUrl,
+        title: s.name || "Radio",
+        artist: "Radio",
+        albumId: null,
+        albumTitle: "",
+        albumYear: "",
+        suffix: "Stream",
+        rowEl: button,
+        kind: "radio",
+        url: s.streamUrl,
+      },
+    ];
+    state.queueIndex = 0;
+
+    document.getElementById("np-title").textContent = s.name || "Radio";
+    document.getElementById("np-artist").textContent = "Radio";
+    const albumEl = document.getElementById("np-album");
+    const sepEl = document.getElementById("np-album-sep");
+    if (albumEl) albumEl.textContent = "";
+    if (sepEl) sepEl.textContent = "";
+    document.getElementById("np-year").textContent = "—";
+    document.getElementById("np-format").textContent = "Stream";
+    const cover = document.getElementById("np-cover");
+    cover.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>";
+
+    playButton.disabled = false;
+    prevButton.disabled = true;
+    nextButton.disabled = true;
+  }
 
   async function loadArtists() {
     try {
@@ -171,7 +366,14 @@ export function renderShell(root, client, session, hooks = {}) {
   async function loadArtist(artistId, btn) {
     state.currentArtistId = artistId;
     state.currentAlbumId = null;
+    state.currentTrackId = null;
+    updateHash();
     markActive(".pane-sidebar", btn);
+    // Leave radio mode if we were in it (the body class controls the
+    // grid collapse + track-pane hide via _app.css).
+    document.body.classList.remove("is-radio");
+    const albumsTitle = document.getElementById("albums-title");
+    if (albumsTitle) albumsTitle.textContent = "Albums";
     const pane = document.getElementById("albums-pane");
     pane.innerHTML = `<p class="empty">Loading albums…</p>`;
     document.getElementById("tracks-pane").innerHTML =
@@ -221,6 +423,8 @@ export function renderShell(root, client, session, hooks = {}) {
   // -----------------------------------------------------------------
   async function loadAlbum(albumId, btn) {
     state.currentAlbumId = albumId;
+    state.currentTrackId = null;
+    updateHash();
     markActive(".pane-albums", btn);
     const pane = document.getElementById("tracks-pane");
     pane.innerHTML = `<p class="empty">Loading tracks…</p>`;
@@ -305,7 +509,11 @@ export function renderShell(root, client, session, hooks = {}) {
       item.rowEl = rowButtons[i];
     });
     const idx = state.queue.findIndex((q) => q.id === button.dataset.trackId);
-    if (idx >= 0) playQueueIndex(idx);
+    if (idx >= 0) {
+      state.currentTrackId = button.dataset.trackId;
+      updateHash();
+      playQueueIndex(idx);
+    }
   }
 
   function playQueueIndex(idx) {
