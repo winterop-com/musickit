@@ -1804,7 +1804,7 @@ dependencies = [
 
 [[package]]
 name = "musickit-desktop"
-version = "0.13.8"
+version = "0.13.9"
 dependencies = [
  "serde",
  "serde_json",
