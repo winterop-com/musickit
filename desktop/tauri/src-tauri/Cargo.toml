@@ -1,6 +1,12 @@
 [package]
 name = "musickit-desktop"
-version = "0.13.11"
+# Internal Cargo crate version — intentionally NOT bumped on releases.
+# User-visible version metadata lives in tauri.conf.json (sync'd to
+# pyproject.toml on every build via scripts/sync_desktop_versions.py).
+# Bumping this would force Cargo.lock to update too, and CI doesn't
+# run cargo so it'd drift by one version every release. See
+# scripts/sync_desktop_versions.py header for the rationale.
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Native desktop wrapper around the MusicKit web UI."
