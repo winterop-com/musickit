@@ -27,28 +27,23 @@ calls.
 
 ## Install
 
-Both Tauri and Electron .dmg / .exe / .AppImage / .deb artifacts are
-attached to every [GitHub Release](https://github.com/winterop-com/musickit/releases).
+Right now: **build from source on your own machine.** We don't publish
+desktop binaries to GitHub Releases, because shipping unsigned `.dmg` /
+`.exe` files past Gatekeeper / SmartScreen is a worse user experience
+than building locally. Code-signing setup (Apple Developer ID +
+Authenticode) is on the [roadmap](../roadmap.md); once that lands, the
+GHA matrix builds will come back.
 
-### macOS
+```bash
+git clone https://github.com/winterop-com/musickit.git
+cd musickit
+make desktop-tauri-build      # ~5 min on Apple Silicon — produces .app + .dmg
+# OR
+make desktop-electron-build   # ~3 min — produces .dmg
+```
 
-1. Download `MusicKit-Tauri-<version>-aarch64.dmg` (recommended, smaller)
-   or `MusicKit-Electron-<version>-arm64.dmg`.
-2. Open the DMG and drag the app into `/Applications`.
-3. First launch needs right-click → Open (the apps ship unsigned for
-   now; Apple Developer ID signing is on the [roadmap](../roadmap.md)).
-
-### Linux
-
-`MusicKit-Tauri-<version>-amd64.AppImage` or
-`MusicKit-Electron-<version>-x86_64.AppImage`. `chmod +x` and run.
-
-`.deb` packages also attach to the release; `sudo dpkg -i <file>` to install.
-
-### Windows
-
-`MusicKit-Tauri-<version>-x64.msi` (Tauri) or
-`MusicKit-Electron-<version>-x64.exe` (Electron NSIS installer).
+Both build outputs land under `desktop/{tauri,electron}/`; see
+"Building from source" below.
 
 ## Connecting
 
