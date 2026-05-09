@@ -165,7 +165,7 @@ uvx musickit library index rebuild DIR     # wipe + rebuild from scratch
 | `track_genres` | `(track_id, genre)` pairs for multi-genre support |
 | `album_warnings` | `(album_id, warning)` pairs from the audit pass |
 
-Schema changes don't run migrations — `db.py` defines a `SCHEMA_VERSION` constant; if the on-disk version doesn't match, the DB is unlinked and rebuilt from scratch. The `musickit_version` row records which release wrote the cache; **if the running musickit version differs from the stamp, the DB is also rebuilt**. So upgrading musickit transparently invalidates and refreshes the cache on the next open — you never have to remember to run `library index rebuild` after `uv tool upgrade musickit`.
+Schema changes don't run migrations — `db.py` defines a `SCHEMA_VERSION` constant; if the on-disk version doesn't match, the DB is unlinked and rebuilt from scratch. The `musickit_version` row records which release wrote the cache; **if the running musickit version differs from the stamp, the DB is also rebuilt**. So upgrading musickit (any version change) transparently invalidates and refreshes the cache on the next open — you never have to remember to run `library index rebuild` after `uv tool upgrade musickit`. Running the same version twice in a row reuses the cache; if you ever see a rebuild without a version change, run with `MUSICKIT_LOG_LEVEL=info` to see which gate (schema / root / version) failed.
 
 ### Cold-start flow
 

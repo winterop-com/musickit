@@ -360,8 +360,20 @@ export function renderShell(root, client, session, hooks = {}) {
         list.appendChild(li);
       }
     } catch (e) {
+      // The first API call after restoring a session is also our
+      // implicit "is the server still reachable?" probe. If it fails
+      // (network error, 401, server-not-Subsonic) the saved session
+      // is unusable — kick the user back to the login screen with a
+      // short banner so they can either retry or pick a different
+      // server. Without this they'd be stuck staring at "Failed to
+      // load artists" forever.
+      const msg = e?.subsonicMessage || e?.message || String(e);
       const list = document.getElementById("artists-list");
-      list.innerHTML = `<li class="empty">Failed to load artists: ${escapeHtml(e?.message || String(e))}</li>`;
+      list.innerHTML = `<li class="empty">Server unreachable — signing out…<br><span class="dim">${escapeHtml(msg)}</span></li>`;
+      if (typeof hooks?.onSignOut === "function") {
+        // Brief delay so the message is readable before we remount login.
+        setTimeout(() => hooks.onSignOut(), 1500);
+      }
     }
   }
 
