@@ -37,13 +37,25 @@ GHA matrix builds will come back.
 ```bash
 git clone https://github.com/winterop-com/musickit.git
 cd musickit
+make build                    # all three (Python wheel + Tauri + Electron) -> ./dist/
+# OR one wrapper at a time:
 make desktop-tauri-build      # ~5 min on Apple Silicon — produces .app + .dmg
-# OR
 make desktop-electron-build   # ~3 min — produces .dmg
 ```
 
-Both build outputs land under `desktop/{tauri,electron}/`; see
-"Building from source" below.
+`make build` collects everything into a single `./dist/` directory at
+the repo root for easy access:
+
+```
+dist/
+  musickit-X.Y.Z-py3-none-any.whl
+  musickit-X.Y.Z.tar.gz
+  MusicKit-Tauri-X.Y.Z-aarch64.dmg
+  MusicKit-Tauri.app
+  MusicKit-Electron-X.Y.Z-arm64.dmg
+```
+
+Drag a `.dmg` into your Finder or double-click the `.app` directly.
 
 ## Connecting
 

@@ -1,4 +1,4 @@
-.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python desktop-sync-frontend desktop-sync-version desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
+.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python dist-collect desktop-sync-frontend desktop-sync-version desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -15,8 +15,9 @@ help:
 	@echo "  docs-build   Build static documentation site to ./site"
 	@echo "  docs-screenshots  Regenerate the TUI SVG screenshots in docs/screenshots/"
 	@echo "  docs         Alias for docs-serve"
-	@echo "  build        Build release versions of everything (python wheel + Tauri .app + Electron .dmg)"
+	@echo "  build        Build release versions of everything; collect into ./dist"
 	@echo "  build-python Build Python wheel + sdist via uv build (-> ./dist)"
+	@echo "  dist-collect Copy desktop build artifacts into ./dist for easy access"
 	@echo "  desktop-tauri        Alias for desktop-tauri-dev"
 	@echo "  desktop-tauri-dev    Run the Tauri desktop app in dev mode (cargo tauri dev)"
 	@echo "  desktop-tauri-build  Build the Tauri desktop app .app bundle (release)"
@@ -83,25 +84,46 @@ docs: docs-serve
 # ---------------------------------------------------------------------------
 # Release builds
 #
-# `make build` produces release versions of every shippable surface:
-#   - Python wheel + sdist          -> ./dist/
-#   - Tauri .app                    -> desktop/tauri/src-tauri/target/release/bundle/macos/
-#   - Electron .dmg                 -> desktop/electron/dist/
+# `make build` produces release versions of every shippable surface,
+# then collects them all into ./dist for easy access:
+#
+#   ./dist/musickit-X.Y.Z-py3-none-any.whl       (Python wheel)
+#   ./dist/musickit-X.Y.Z.tar.gz                  (Python sdist)
+#   ./dist/MusicKit-Tauri-X.Y.Z-aarch64.dmg       (Tauri DMG)
+#   ./dist/MusicKit-Tauri.app                     (Tauri app bundle)
+#   ./dist/MusicKit-Electron-X.Y.Z-arm64.dmg      (Electron DMG)
 #
 # Each sub-target can also run on its own — useful when you only need
 # one artifact (e.g. CI publishing the Python wheel without touching
-# the desktop apps).
+# the desktop apps). Sub-targets still write to their native build
+# directories first; `dist-collect` is the single place that copies
+# them all into ./dist.
 # ---------------------------------------------------------------------------
 
-build: build-python desktop-tauri-build desktop-electron-build
-	@echo ">>> All release builds complete:"
-	@echo "    - Python:    $$(ls dist/*.whl 2>/dev/null | head -1)"
-	@echo "    - Tauri:     $$(ls desktop/tauri/src-tauri/target/release/bundle/macos/*.app 2>/dev/null | head -1)"
-	@echo "    - Electron:  $$(ls desktop/electron/dist/*.dmg 2>/dev/null | head -1)"
+build: build-python desktop-tauri-build desktop-electron-build dist-collect
+	@echo ">>> All release builds complete. Artifacts collected in ./dist:"
+	@ls -lh dist/ | tail -n +2
 
 build-python:
 	@echo ">>> Building Python wheel + sdist into ./dist"
 	@$(UV) build
+
+# Copy desktop artifacts into ./dist alongside the Python wheel + sdist
+# so a single directory has everything `make build` produced. Uses
+# `cp -f` / `cp -R` so re-runs overwrite cleanly. Safe to run on its
+# own after a partial build (skips files that don't exist yet).
+dist-collect:
+	@echo ">>> Collecting desktop artifacts into ./dist"
+	@mkdir -p dist
+	@# Tauri DMG (post-renamed by scripts/rename_tauri_artifacts.py)
+	@cp -f desktop/tauri/src-tauri/target/release/bundle/dmg/MusicKit-Tauri-*.dmg dist/ 2>/dev/null || true
+	@# Tauri .app — preserve the bundle directory structure verbatim.
+	@if [ -d desktop/tauri/src-tauri/target/release/bundle/macos/MusicKit-Tauri.app ]; then \
+		rm -rf "dist/MusicKit-Tauri.app"; \
+		cp -R desktop/tauri/src-tauri/target/release/bundle/macos/MusicKit-Tauri.app dist/; \
+	fi
+	@# Electron DMG (artifactName in package.json already produces the right name)
+	@cp -f desktop/electron/dist/MusicKit-Electron-*.dmg dist/ 2>/dev/null || true
 
 desktop-sync-frontend:
 	@echo ">>> Syncing shared frontend assets into desktop/frontend/"
