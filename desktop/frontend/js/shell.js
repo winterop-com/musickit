@@ -623,49 +623,59 @@ export function renderShell(root, client, session, hooks = {}) {
   });
 
   // -----------------------------------------------------------------
-  // Fullscreen visualizer — engine-agnostic canvas sizer.
+  // Fullscreen visualizer — engine-agnostic layout sizer.
   //
-  // Both Chromium (Electron) and WebKit (Tauri) collapse the canvas
-  // element inside the flex chain when fullscreen mode is on:
-  //   - WebKit pins to the canvas's intrinsic 300:150 aspect ratio
-  //     when `width: 100%` is set inside a flex parent.
-  //   - Chromium honors flex in plain HTML but, in our SPA's body
-  //     layout, the canvas drops to ~150px regardless.
+  // Three prior CSS-only attempts (flex, calc-height, abs-position)
+  // all collapsed the canvas to 80–150px in both Chromium (Electron)
+  // and WebKit (Tauri). Verified via DevTools: `.now-playing-region`
+  // itself wasn't growing past ~300px even with `flex: 1 1 0` set,
+  // so the issue is layout-engine-deep, not just canvas-specific.
   //
-  // CSS-only fixes (calc-height, abs-position, flex: 0 0 auto, height
-  // 100%) all failed in one engine or the other or both. The reliable
-  // path: read the .viz-panel's actually-rendered height after layout
-  // settles and pin canvas.style.height to it. Fires on body class
-  // changes (toggleFullscreen flips `is-viz`), window resize, and on
-  // initial mount.
+  // shell.css now uses `position: fixed` on the now-playing-region in
+  // is-viz mode, anchored below the topbar to the viewport bottom.
+  // We just need to:
+  //   1. Measure the actual topbar height and feed it to the CSS
+  //      custom property (`--mk-topbar-h`) so the `top:` offset is
+  //      accurate (the topbar's height varies a little across
+  //      Electron/Tauri/macOS native chrome).
+  //   2. Pin the canvas to fill its panel via JS (CSS-only height
+  //      keeps getting overridden by flex/min-height/aspect-ratio
+  //      rules from _app.css).
   // -----------------------------------------------------------------
-  function fitCanvasToPanel() {
+  function syncFullscreenLayout() {
+    const topbar = document.querySelector(".topbar");
+    if (topbar) {
+      document.body.style.setProperty("--mk-topbar-h", topbar.offsetHeight + "px");
+    }
     const panel = document.querySelector(".viz-panel");
     const canvas = document.getElementById("viz-canvas");
     if (!panel || !canvas) return;
     if (document.body.classList.contains("is-viz")) {
+      // Read the panel's rendered height (post position:fixed) and
+      // size the canvas to fill it minus the floating panel-title.
       const rect = panel.getBoundingClientRect();
       const titleEl = panel.querySelector(".panel-title");
       const titleHeight = titleEl ? titleEl.offsetHeight : 0;
       const cs = getComputedStyle(panel);
       const padTop = parseFloat(cs.paddingTop) || 0;
       const padBottom = parseFloat(cs.paddingBottom) || 0;
+      // Use !important via setProperty so flex/min-height base rules
+      // can't undo the explicit pixel height.
       const target = Math.max(120, rect.height - titleHeight - padTop - padBottom);
-      canvas.style.height = target + "px";
-      canvas.style.width = "100%";
+      canvas.style.setProperty("height", target + "px", "important");
+      canvas.style.setProperty("width", "100%", "important");
     } else {
-      canvas.style.height = "";
-      canvas.style.width = "";
+      canvas.style.removeProperty("height");
+      canvas.style.removeProperty("width");
     }
   }
 
-  const __vizClassObserver = new MutationObserver(fitCanvasToPanel);
-  __vizClassObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-  window.addEventListener("resize", fitCanvasToPanel);
-  // Run once initially (panel might already be rendered without is-viz),
-  // and again after a short delay so flex-driven sizes have settled.
-  fitCanvasToPanel();
-  setTimeout(fitCanvasToPanel, 100);
+  const __vizLayoutObserver = new MutationObserver(syncFullscreenLayout);
+  __vizLayoutObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  window.addEventListener("resize", syncFullscreenLayout);
+  // Initial pass + a 100ms-delayed pass so position:fixed has settled.
+  syncFullscreenLayout();
+  setTimeout(syncFullscreenLayout, 100);
 
   // -----------------------------------------------------------------
   // Click-to-seek on the progress bar.

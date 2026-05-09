@@ -310,27 +310,35 @@
 }
 
 /* Visualizer fullscreen — desktop-specific override.
-   The web UI's `_app.css` keeps the now-playing-region as a `display:
-   grid` with `grid-template-rows: auto 1fr` even in fullscreen, but
-   the grid's `1fr` row never resolves to the available height in our
-   SPA's body layout (`min-height: 100vh` on a flex-column body),
-   leaving the spectrum panel stuck at its content's natural size.
-   The fix: cap the body to the viewport in is-viz mode so flex has a
-   bounded space to distribute, and switch the now-playing-region from
-   grid to a plain vertical flex (np-card auto / viz-panel grows). */
+   Three prior attempts (grid->flex, calc-height on canvas, abs-position
+   on canvas) all failed: DevTools showed `.now-playing-region` itself
+   only growing to ~300px tall regardless of `flex: 1 1 0`. Stop
+   fighting flex chains. Take the now-playing-region out of normal
+   flow entirely with `position: fixed` and pin it below the topbar to
+   the viewport bottom — physically guaranteed to fill the screen.
+   Three-pane is hidden via the inherited `body.is-viz .three-pane`
+   rule from _app.css.
+   `--mk-topbar-h` is a CSS custom property; shell.js measures the
+   real topbar height on init/resize and sets it, so this calc is
+   robust against future topbar redesigns. */
 body.is-viz {
   height: 100vh;
   overflow: hidden;
+  --mk-topbar-h: 40px;
 }
 
 body.is-viz .now-playing-region {
+  position: fixed;
+  top: var(--mk-topbar-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
-  min-height: 0;
-  height: auto;
-  /* Drop the grid's gap so the panels stack tight in fullscreen. */
   gap: 0.4rem;
+  padding: 0.85rem 0.5rem;
+  /* Override the base rule's `height: 170px` and `flex-shrink: 0`. */
+  height: auto;
 }
 
 body.is-viz .np-card {
@@ -340,7 +348,6 @@ body.is-viz .np-card {
 body.is-viz .viz-panel {
   flex: 1 1 0;
   min-height: 0;
-  height: auto;
 }
 
 /* Canvas height in fullscreen is set by JS in shell.js (see
