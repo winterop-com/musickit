@@ -610,8 +610,74 @@ export function renderShell(root, client, session, hooks = {}) {
     }
   });
 
-  // Keybinds — a minimal set for now; full palette / repeat / shuffle
-  // ride along in Phase D.
+  // -----------------------------------------------------------------
+  // Click-to-seek on the progress bar.
+  // -----------------------------------------------------------------
+  const barEl = document.getElementById("np-bar");
+  barEl?.addEventListener("click", (event) => {
+    if (!audio.duration || !isFinite(audio.duration)) return;
+    const rect = barEl.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * audio.duration;
+  });
+  // The <progress> element itself doesn't focus, but cursor:pointer
+  // signals it's clickable. Set inline so we don't need a CSS edit.
+  if (barEl) barEl.style.cursor = "pointer";
+
+  // -----------------------------------------------------------------
+  // Volume + mute helpers (used by keybinds).
+  // -----------------------------------------------------------------
+  function bumpVolume(delta) {
+    audio.volume = Math.max(0, Math.min(1, audio.volume + delta));
+    try {
+      localStorage.setItem(LS_VOLUME, String(audio.volume));
+    } catch (e) {
+      // localStorage unavailable.
+    }
+  }
+  function toggleMute() {
+    audio.muted = !audio.muted;
+  }
+  function seekRelative(deltaSec) {
+    if (!audio.duration || !isFinite(audio.duration)) return;
+    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + deltaSec));
+  }
+
+  // -----------------------------------------------------------------
+  // Shortcut help modal — `?` toggles.
+  // -----------------------------------------------------------------
+  function toggleShortcutHelp() {
+    const existing = document.getElementById("shortcut-help");
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    const overlay = document.createElement("div");
+    overlay.id = "shortcut-help";
+    overlay.className = "shortcut-help-overlay";
+    overlay.innerHTML = `
+      <div class="shortcut-help-card">
+        <h2>Keyboard shortcuts</h2>
+        <table class="shortcut-help-table">
+          <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+          <tr><td><kbd>n</kbd></td><td>Next track</td></tr>
+          <tr><td><kbd>p</kbd></td><td>Previous track</td></tr>
+          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Seek -5s / +5s</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Volume up / down</td></tr>
+          <tr><td><kbd>m</kbd></td><td>Mute / unmute</td></tr>
+          <tr><td><kbd>f</kbd></td><td>Fullscreen visualizer</td></tr>
+          <tr><td><kbd>/</kbd></td><td>Focus filter</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close modal / exit fullscreen</td></tr>
+          <tr><td><kbd>?</kbd></td><td>Toggle this panel</td></tr>
+        </table>
+        <p class="shortcut-help-hint">Click anywhere or press Esc to close.</p>
+      </div>
+    `;
+    overlay.addEventListener("click", () => overlay.remove());
+    document.body.appendChild(overlay);
+  }
+
+  // Keybinds.
   document.addEventListener("keydown", (event) => {
     const tag = (event.target && event.target.tagName) || "";
     const inField = tag === "INPUT" || tag === "TEXTAREA";
@@ -621,6 +687,14 @@ export function renderShell(root, client, session, hooks = {}) {
       return;
     }
     if (inField) return;
+    if (event.key === "Escape") {
+      const help = document.getElementById("shortcut-help");
+      if (help) {
+        help.remove();
+        return;
+      }
+      // Visualizer fullscreen handles its own Escape.
+    }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (event.code === "Space") {
       event.preventDefault();
@@ -629,6 +703,23 @@ export function renderShell(root, client, session, hooks = {}) {
       nextTrack();
     } else if (event.key === "p" || event.key === "P") {
       prevTrack();
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      seekRelative(5);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      seekRelative(-5);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      bumpVolume(0.05);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      bumpVolume(-0.05);
+    } else if (event.key === "m" || event.key === "M") {
+      toggleMute();
+    } else if (event.key === "?") {
+      event.preventDefault();
+      toggleShortcutHelp();
     }
   });
 }
