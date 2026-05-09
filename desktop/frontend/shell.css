@@ -343,33 +343,12 @@ body.is-viz .viz-panel {
   height: auto;
 }
 
-/* WebKit (Tauri's WKWebView) ignores `flex: 1` for canvas height
-   when `width: 100%` is set — the canvas pins to its intrinsic 300:150
-   aspect ratio even though Chromium honors the flex layout.
-   `calc(100vh - …)` and `flex: 0 0 auto` overrides both fail to win.
-   The reliable fix is absolute positioning: pull the canvas out of
-   the flex chain in fullscreen mode and pin it to the four edges
-   of the (now position: relative) viz-panel. This is purely a
-   fullscreen-mode override; the non-fullscreen flex layout is
-   untouched, so this can't break Chromium. */
-body.is-viz .viz-panel {
-  position: relative;
-}
-
-body.is-viz .viz-panel .visualizer-canvas {
-  position: absolute;
-  /* Top offset clears the floating .panel-title (h2) — the title is
-     translated up to overlap the panel border, but it still occupies
-     ~22px of leading space inside the panel. 28px gives a little
-     breathing room. */
-  top: 28px;
-  left: 0.55rem;
-  right: 0.55rem;
-  bottom: 0.5rem;
-  height: auto;
-  width: auto;
-  min-height: 0;
-}
+/* Canvas height in fullscreen is set by JS in shell.js (see
+   `fitCanvasToPanel`), not CSS. Both Chromium (Electron) and WebKit
+   (Tauri) collapse the canvas to its intrinsic 300x150 size or the
+   aspect-ratio-derived height when CSS-only sizing is used inside
+   a flex layout. JS reads the actual rendered .viz-panel size and
+   sets canvas.style.height to fill it — engine-agnostic. */
 
 /* Used by the auto-logout banner to dim the underlying error detail. */
 .dim {

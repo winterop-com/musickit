@@ -14,6 +14,14 @@
 
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
+// electron-store v8 needs `Store.initRenderer()` called once in the main
+// process to register the IPC handler the renderer-side preload uses.
+// Without it, the renderer's first `store.get(...)` call logs:
+//   WebContents #1 called ipcRenderer.sendSync() with
+//   'electron-store-get-data' channel without listeners
+// and the call returns undefined.
+const Store = require("electron-store");
+Store.initRenderer();
 
 let mainWindow;
 

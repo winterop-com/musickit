@@ -623,6 +623,51 @@ export function renderShell(root, client, session, hooks = {}) {
   });
 
   // -----------------------------------------------------------------
+  // Fullscreen visualizer — engine-agnostic canvas sizer.
+  //
+  // Both Chromium (Electron) and WebKit (Tauri) collapse the canvas
+  // element inside the flex chain when fullscreen mode is on:
+  //   - WebKit pins to the canvas's intrinsic 300:150 aspect ratio
+  //     when `width: 100%` is set inside a flex parent.
+  //   - Chromium honors flex in plain HTML but, in our SPA's body
+  //     layout, the canvas drops to ~150px regardless.
+  //
+  // CSS-only fixes (calc-height, abs-position, flex: 0 0 auto, height
+  // 100%) all failed in one engine or the other or both. The reliable
+  // path: read the .viz-panel's actually-rendered height after layout
+  // settles and pin canvas.style.height to it. Fires on body class
+  // changes (toggleFullscreen flips `is-viz`), window resize, and on
+  // initial mount.
+  // -----------------------------------------------------------------
+  function fitCanvasToPanel() {
+    const panel = document.querySelector(".viz-panel");
+    const canvas = document.getElementById("viz-canvas");
+    if (!panel || !canvas) return;
+    if (document.body.classList.contains("is-viz")) {
+      const rect = panel.getBoundingClientRect();
+      const titleEl = panel.querySelector(".panel-title");
+      const titleHeight = titleEl ? titleEl.offsetHeight : 0;
+      const cs = getComputedStyle(panel);
+      const padTop = parseFloat(cs.paddingTop) || 0;
+      const padBottom = parseFloat(cs.paddingBottom) || 0;
+      const target = Math.max(120, rect.height - titleHeight - padTop - padBottom);
+      canvas.style.height = target + "px";
+      canvas.style.width = "100%";
+    } else {
+      canvas.style.height = "";
+      canvas.style.width = "";
+    }
+  }
+
+  const __vizClassObserver = new MutationObserver(fitCanvasToPanel);
+  __vizClassObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  window.addEventListener("resize", fitCanvasToPanel);
+  // Run once initially (panel might already be rendered without is-viz),
+  // and again after a short delay so flex-driven sizes have settled.
+  fitCanvasToPanel();
+  setTimeout(fitCanvasToPanel, 100);
+
+  // -----------------------------------------------------------------
   // Click-to-seek on the progress bar.
   // -----------------------------------------------------------------
   const barEl = document.getElementById("np-bar");
