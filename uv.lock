@@ -1064,7 +1064,7 @@ wheels = [
 
 [[package]]
 name = "musickit"
-version = "0.13.10"
+version = "0.13.11"
 source = { editable = "." }
 dependencies = [
     { name = "av" },

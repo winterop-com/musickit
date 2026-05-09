@@ -100,8 +100,15 @@ docs: docs-serve
 # them all into ./dist.
 # ---------------------------------------------------------------------------
 
+# Read the current version from pyproject.toml so dist-collect copies
+# ONLY the current build's artifacts and ignores stale older versions
+# left behind in desktop/electron/dist (electron-builder doesn't prune
+# its own output dir between builds, and old DMGs accumulate fast at
+# ~95 MB each).
+VERSION := $(shell grep '^version' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+
 build: build-python desktop-tauri-build desktop-electron-build dist-collect
-	@echo ">>> All release builds complete. Artifacts collected in ./dist:"
+	@echo ">>> All release builds complete. Artifacts collected in ./dist (v$(VERSION)):"
 	@ls -lh dist/ | tail -n +2
 
 build-python:
@@ -109,26 +116,29 @@ build-python:
 	@$(UV) build
 
 # Copy desktop artifacts into ./dist alongside the Python wheel + sdist
-# so a single directory has everything `make build` produced. Uses
-# `cp -f` / `cp -R` so re-runs overwrite cleanly. Safe to run on its
-# own after a partial build (skips files that don't exist yet).
+# so a single directory has everything `make build` produced. Wipes
+# stale prior-version desktop artifacts in ./dist so a clean re-run
+# leaves only the current version. Safe to run on its own after a
+# partial build (skips files that don't exist yet).
 dist-collect:
-	@echo ">>> Collecting desktop artifacts into ./dist"
+	@echo ">>> Collecting v$(VERSION) artifacts into ./dist"
 	@mkdir -p dist
-	@# Tauri DMG (post-renamed by scripts/rename_tauri_artifacts.py)
-	@cp -f desktop/tauri/src-tauri/target/release/bundle/dmg/MusicKit-Tauri-*.dmg dist/ 2>/dev/null || true
+	@# Wipe prior-version desktop artifacts so dist/ only holds the
+	@# current build (Python wheel + sdist already overwrote in place
+	@# via uv build).
+	@find dist -maxdepth 1 \( -name 'MusicKit-Tauri-*' -o -name 'MusicKit-Electron-*' \) -exec rm -rf {} + 2>/dev/null || true
+	@# Tauri DMG for current version (post-renamed by scripts/rename_tauri_artifacts.py)
+	@cp -f desktop/tauri/src-tauri/target/release/bundle/dmg/MusicKit-Tauri-$(VERSION)-*.dmg dist/ 2>/dev/null || true
 	@# Tauri .app — preserve the bundle directory structure verbatim.
 	@if [ -d desktop/tauri/src-tauri/target/release/bundle/macos/MusicKit-Tauri.app ]; then \
-		rm -rf "dist/MusicKit-Tauri.app"; \
 		cp -R desktop/tauri/src-tauri/target/release/bundle/macos/MusicKit-Tauri.app dist/; \
 	fi
-	@# Electron DMG (artifactName in package.json already produces the right name)
-	@cp -f desktop/electron/dist/MusicKit-Electron-*.dmg dist/ 2>/dev/null || true
+	@# Electron DMG for current version only.
+	@cp -f desktop/electron/dist/MusicKit-Electron-$(VERSION)-*.dmg dist/ 2>/dev/null || true
 	@# Electron .app — produced under mac-arm64/ as MusicKit.app, copy
 	@# with the Electron tag in the name to disambiguate from the Tauri
 	@# bundle that lives alongside it in dist/.
 	@if [ -d desktop/electron/dist/mac-arm64/MusicKit.app ]; then \
-		rm -rf "dist/MusicKit-Electron.app"; \
 		cp -R desktop/electron/dist/mac-arm64/MusicKit.app dist/MusicKit-Electron.app; \
 	fi
 
