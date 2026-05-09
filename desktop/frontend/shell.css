@@ -344,8 +344,16 @@ body.is-viz .viz-panel {
 }
 
 body.is-viz .viz-panel .visualizer-canvas {
-  /* Bigger floor than the default 80px so even on a small window the
-     bars are tall enough to read. */
+  /* WebKit (Tauri's renderer) keeps canvas elements pinned to their
+     intrinsic 300:150 aspect ratio when `width: 100%` is set, even
+     with `flex: 1` in the parent. Result: the canvas height collapses
+     to ~half the panel's width regardless of flex. Forcing an
+     explicit height with calc against the viewport breaks the
+     aspect-ratio lock. The 240px subtracts the topbar (~40px) +
+     np-card (~170px) + viz-panel padding/title (~30px) so the canvas
+     really does fill the rest of the screen. min-height ensures
+     legibility on short windows. */
+  height: calc(100vh - 240px);
   min-height: 200px;
 }
 
