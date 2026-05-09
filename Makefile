@@ -124,6 +124,13 @@ dist-collect:
 	fi
 	@# Electron DMG (artifactName in package.json already produces the right name)
 	@cp -f desktop/electron/dist/MusicKit-Electron-*.dmg dist/ 2>/dev/null || true
+	@# Electron .app — produced under mac-arm64/ as MusicKit.app, copy
+	@# with the Electron tag in the name to disambiguate from the Tauri
+	@# bundle that lives alongside it in dist/.
+	@if [ -d desktop/electron/dist/mac-arm64/MusicKit.app ]; then \
+		rm -rf "dist/MusicKit-Electron.app"; \
+		cp -R desktop/electron/dist/mac-arm64/MusicKit.app dist/MusicKit-Electron.app; \
+	fi
 
 desktop-sync-frontend:
 	@echo ">>> Syncing shared frontend assets into desktop/frontend/"
