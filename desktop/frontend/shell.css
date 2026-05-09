@@ -231,7 +231,8 @@
 .shortcut-help-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -240,52 +241,93 @@
 }
 
 .shortcut-help-card {
-  background: var(--panel);
+  /* `--bg-elevated` is the actual variable name in _palette.css;
+     the previous `--panel` wasn't defined so the card rendered
+     transparent and the underlying pane bled through. */
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.25rem 1.5rem;
-  min-width: 320px;
-  max-width: 480px;
+  border-radius: 10px;
+  padding: 1.75rem 2.25rem 2rem;
+  min-width: 460px;
+  max-width: 560px;
   cursor: default;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
 }
 
 .shortcut-help-card h2 {
-  margin: 0 0 0.75rem;
-  font-size: 1rem;
-  color: var(--text);
+  margin: 0 0 1.25rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--header);
+  letter-spacing: 0.02em;
 }
 
 .shortcut-help-table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+  border-collapse: separate;
+  border-spacing: 0 0.35rem;
+  font-size: 0.9rem;
 }
 
 .shortcut-help-table td {
-  padding: 0.25rem 0.5rem;
+  padding: 0.45rem 0.75rem;
   vertical-align: middle;
+  line-height: 1.4;
 }
 
 .shortcut-help-table td:first-child {
   white-space: nowrap;
-  width: 30%;
+  width: 36%;
   color: var(--label);
+  text-align: right;
+  padding-right: 1rem;
+}
+
+.shortcut-help-table td:last-child {
+  color: var(--text);
 }
 
 .shortcut-help-table kbd {
   display: inline-block;
-  padding: 0.1rem 0.4rem;
+  padding: 0.15rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg);
   font-family: var(--mono);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--text);
+  margin: 0 0.05rem;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
 }
 
 .shortcut-help-hint {
-  margin: 0.75rem 0 0;
-  font-size: 0.75rem;
-  color: var(--label);
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-soft);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Visualizer fullscreen — desktop-specific override that ensures the
+   now-playing-region truly fills remaining viewport height (the web
+   UI rules in _app.css cascade here, but specificity + the desktop
+   SPA's body layout sometimes leaves the spectrum panel stuck at its
+   170px base height). Force the flex grow on every level. */
+body.is-viz .now-playing-region {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+body.is-viz .viz-panel {
+  /* Inside the now-playing-region grid, the viz-panel is in row 2
+     (`1fr`); make sure it actually takes that fraction. */
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+body.is-viz .viz-panel .visualizer-canvas {
+  min-height: 200px;
 }
