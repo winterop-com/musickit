@@ -1,6 +1,6 @@
 {
   "name": "musickit-desktop-electron",
-  "version": "0.13.9",
+  "version": "0.13.10",
   "description": "Electron sibling of the MusicKit desktop wrapper \u2014 for comparison with the Tauri build.",
   "main": "src/main.js",
   "private": true,
@@ -12,10 +12,12 @@
     "build:linux": "electron-builder --linux --publish=never",
     "build:win": "electron-builder --win --publish=never"
   },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  },
   "devDependencies": {
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
-    "electron-store": "^8.2.0"
+    "electron-builder": "^25.0.0"
   },
   "build": {
     "appId": "com.winterop.musickit.electron",
