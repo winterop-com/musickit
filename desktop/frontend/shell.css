@@ -331,3 +331,9 @@ body.is-viz .viz-panel {
 body.is-viz .viz-panel .visualizer-canvas {
   min-height: 200px;
 }
+
+/* Used by the auto-logout banner to dim the underlying error detail. */
+.dim {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}

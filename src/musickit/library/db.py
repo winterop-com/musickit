@@ -4,6 +4,11 @@ The DB at `<library_root>/.musickit/index.db` is a fully-derived cache of
 the filesystem walk + tag read + audit. The filesystem is the source of
 truth, so when the schema changes — or when the running musickit version
 changes — we unlink the file and rebuild instead of running migrations.
+
+`_can_use_existing` is the single gatekeeper. It logs WHICH check
+failed when it returns False, so a user running the same musickit
+twice and still getting a rebuild can `MUSICKIT_LOG_LEVEL=DEBUG`
+the cause out of the noise.
 """
 
 from __future__ import annotations
@@ -172,33 +177,59 @@ def reclaim_freelist(conn: sqlite3.Connection) -> None:
 
 
 def _can_use_existing(path: Path, root: Path) -> bool:
-    """Return True iff the on-disk DB matches the current schema + root."""
+    """Return True iff the on-disk DB matches the current schema + root + version.
+
+    Logs at INFO which check failed when returning False so users
+    seeing unexpected rebuilds can see the cause without attaching a
+    debugger.
+    """
     try:
         probe = sqlite3.connect(path, check_same_thread=False)
-    except sqlite3.DatabaseError:
+    except sqlite3.DatabaseError as exc:
+        log.info("library cache: rebuild — sqlite open failed (%s)", exc)
         return False
     try:
         try:
             tables = {r[0] for r in probe.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        except sqlite3.DatabaseError:
+        except sqlite3.DatabaseError as exc:
+            log.info("library cache: rebuild — sqlite_master read failed (%s)", exc)
             return False
         if "meta" not in tables:
+            log.info("library cache: rebuild — meta table missing")
             return False
         try:
             schema_row = probe.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
             root_row = probe.execute("SELECT value FROM meta WHERE key='library_root_abs'").fetchone()
             version_row = probe.execute("SELECT value FROM meta WHERE key='musickit_version'").fetchone()
-        except sqlite3.DatabaseError:
+        except sqlite3.DatabaseError as exc:
+            log.info("library cache: rebuild — meta read failed (%s)", exc)
             return False
         if schema_row is None or schema_row[0] != str(SCHEMA_VERSION):
+            log.info(
+                "library cache: rebuild — schema_version stamp=%r != current=%r",
+                schema_row[0] if schema_row else None,
+                str(SCHEMA_VERSION),
+            )
             return False
-        if root_row is None or root_row[0] != str(root.resolve()):
+        want_root = str(root.resolve())
+        if root_row is None or root_row[0] != want_root:
+            log.info(
+                "library cache: rebuild — library_root_abs stamp=%r != current=%r",
+                root_row[0] if root_row else None,
+                want_root,
+            )
             return False
-        # version_row may be missing on DBs created before the
-        # musickit_version stamp existed — treat absence as a mismatch
-        # so they rebuild on first open under a newer musickit.
+        # version_row may be missing on DBs created before the stamp
+        # existed — treat absence as a mismatch so they rebuild + acquire
+        # the stamp on first open.
         if version_row is None or version_row[0] != MUSICKIT_VERSION:
+            log.info(
+                "library cache: rebuild — musickit_version stamp=%r != current=%r",
+                version_row[0] if version_row else None,
+                MUSICKIT_VERSION,
+            )
             return False
+        log.info("library cache: reusing existing index.db (schema=%s version=%s)", SCHEMA_VERSION, MUSICKIT_VERSION)
         return True
     finally:
         probe.close()

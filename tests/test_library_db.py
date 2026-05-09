@@ -196,14 +196,17 @@ def test_open_db_rebuilds_when_schema_version_row_missing(tmp_path: Path) -> Non
 
 
 def test_open_db_rebuilds_on_musickit_version_mismatch(tmp_path: Path) -> None:
-    """A DB stamped with an older musickit version triggers a clean rebuild."""
+    """A DB stamped with a different musickit version triggers a clean rebuild."""
     root = tmp_path / "lib"
     root.mkdir()
 
-    # Open once at the current version, then tamper the stamp to look
-    # like an older release wrote it.
+    # Open once at the current version, then tamper the stamp.
     conn = library.open_db(root)
     conn.execute("UPDATE meta SET value='0.0.0' WHERE key='musickit_version'")
+    conn.execute(
+        "INSERT INTO albums(rel_path, artist_dir, album_dir, track_count, dir_mtime, scanned_at) "
+        "VALUES ('Artist/Album', 'Artist', 'Album', 1, 0, 0)"
+    )
     conn.close()
 
     # Reopening should detect the version mismatch and rebuild from scratch.
@@ -214,6 +217,31 @@ def test_open_db_rebuilds_on_musickit_version_mismatch(tmp_path: Path) -> None:
         v = conn.execute("SELECT value FROM meta WHERE key='musickit_version'").fetchone()[0]
         assert v == MUSICKIT_VERSION
         assert library.is_empty(conn)
+    finally:
+        conn.close()
+
+
+def test_open_db_keeps_cache_on_same_version(tmp_path: Path) -> None:
+    """Running the same version twice must NOT trigger a rebuild.
+
+    The user's hot path: same `uv tool` install, same library, same
+    serve invocation. A row inserted on the first open must still be
+    there on the second open.
+    """
+    root = tmp_path / "lib"
+    root.mkdir()
+
+    conn = library.open_db(root)
+    conn.execute(
+        "INSERT INTO albums(rel_path, artist_dir, album_dir, track_count, dir_mtime, scanned_at) "
+        "VALUES ('Artist/Album', 'Artist', 'Album', 1, 0, 0)"
+    )
+    conn.close()
+
+    conn = library.open_db(root)
+    try:
+        # Row survived: no rebuild happened.
+        assert not library.is_empty(conn)
     finally:
         conn.close()
 
