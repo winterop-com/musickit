@@ -84,6 +84,9 @@ def _read_flac(path: Path, *, light: bool = False, measure_pictures: bool = Fals
     track.label = _vorbis_first(tags, "label") or _vorbis_first(tags, "publisher")
     track.catalog = _vorbis_first(tags, "catalognumber") or _vorbis_first(tags, "labelno")
     track.lyrics = _vorbis_first(tags, "lyrics")
+    # Vorbis comments — Picard / iTunes write `encoder` for the encoding tool;
+    # other tools sometimes use `tool` or `encoded by`.
+    track.encoder = _vorbis_first(tags, "encoder") or _vorbis_first(tags, "tool")
 
     for key in ("replaygain_track_gain", "replaygain_track_peak", "replaygain_album_gain", "replaygain_album_peak"):
         value = _vorbis_first(tags, key)
@@ -150,6 +153,7 @@ def _read_mp3(path: Path, *, light: bool = False, measure_pictures: bool = False
 
     track.track_no, track.track_total = _split_pos(_id3_text(id3, "TRCK"))
     track.disc_no, track.disc_total = _split_pos(_id3_text(id3, "TPOS"))
+    track.encoder = _id3_text(id3, "TSSE")
 
     apics = id3.getall("APIC")
     if apics:
@@ -187,6 +191,7 @@ def _read_mp4(path: Path, *, light: bool = False, measure_pictures: bool = False
     if track.genre:
         track.genres = [track.genre]
     track.lyrics = _mp4_first(tags, "\xa9lyr")
+    track.encoder = _mp4_first(tags, "\xa9too")
 
     trkn = tags.get("trkn") if tags else None
     if trkn:

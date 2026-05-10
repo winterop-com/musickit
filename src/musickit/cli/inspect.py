@@ -95,6 +95,7 @@ def _render_tags_panel(track: SourceTrack) -> Panel:
     add("bpm", track.bpm)
     add("label", track.label)
     add("catalog", track.catalog)
+    add("encoder", track.encoder)
 
     if not table.row_count:
         return Panel(
