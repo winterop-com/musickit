@@ -21,13 +21,25 @@ from mutagen.id3._frames import (  # pyright: ignore[reportPrivateImportUsage]
     TPOS,
     TPUB,
     TRCK,
+    TSSE,
     TXXX,
     USLT,
 )
 from mutagen.id3._util import ID3NoHeaderError
 from mutagen.mp4 import MP4, MP4Cover
 
+from musickit import __version__ as MUSICKIT_VERSION
 from musickit.metadata.models import AlbumSummary, MusicBrainzIds, SourceTrack
+
+
+def _encoder_tag() -> str:
+    r"""Encoder string written into every output file (MP4 `\xa9too` / ID3 `TSSE`).
+
+    `musickit inspect` and any tag editor surfaces this, so a stray
+    file weeks later still tells you which release produced it —
+    useful when chasing regressions across versions.
+    """
+    return f"musickit {MUSICKIT_VERSION}"
 
 
 def write_tags(
@@ -113,6 +125,11 @@ def write_mp4_tags(
     if cover_bytes:
         cover_format = MP4Cover.FORMAT_PNG if (cover_mime or "").lower().endswith("png") else MP4Cover.FORMAT_JPEG
         tags["covr"] = [MP4Cover(cover_bytes, imageformat=cover_format)]
+
+    # iTunes-style "encoder" atom — read by `musickit inspect`, ffprobe,
+    # and most tag editors as the encoder/encoding-tool field. Always
+    # last so it overwrites any inherited value.
+    _set(tags, "\xa9too", _encoder_tag())
 
     mp4.save()
 
@@ -201,6 +218,11 @@ def write_id3_tags(
     if cover_bytes:
         mime = "image/png" if (cover_mime or "").lower().endswith("png") else "image/jpeg"
         id3.add(APIC(encoding=3, mime=mime, type=3, desc="Front cover", data=cover_bytes))
+
+    # ID3v2.4 "Software/hardware and settings used for encoding" — the
+    # ID3 equivalent of MP4's `\xa9too`. Mirrors what we write in
+    # `write_mp4_tags`; same release-traceability use case.
+    id3.add(TSSE(encoding=3, text=_encoder_tag()))
 
     id3.save(path, v2_version=4)
 
