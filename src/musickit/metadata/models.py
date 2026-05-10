@@ -45,6 +45,10 @@ class SourceTrack(BaseModel):
     # `--enrich` is on. Picard convention: stored as `MusicBrainz Track Id`
     # on MP4 freeform / `MusicBrainz Recording Id` on ID3 TXXX.
     mb_recording_id: str | None = None
+    # Encoder / encoding-tool string. Read from MP4 `\xa9too` and ID3
+    # `TSSE`. Files we produce embed `musickit X.Y.Z` here so a later
+    # `musickit inspect` shows which release wrote them.
+    encoder: str | None = None
 
 
 class AlbumSummary(BaseModel):

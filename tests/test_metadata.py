@@ -400,3 +400,58 @@ def test_write_id3_tags_emits_per_track_recording_mbid(silent_flac: Path, tmp_pa
     id3 = ID3(out)
     txxx_frames = {f.desc: f.text[0] for f in id3.getall("TXXX")}
     assert txxx_frames.get("MusicBrainz Recording Id") == "rec-mbid-zzz"
+
+
+def test_write_mp4_tags_embeds_musickit_encoder(silent_flac: Path, tmp_path: Path) -> None:
+    """`write_mp4_tags` writes `\\xa9too` = `musickit X.Y.Z` so each output file is traceable."""
+    from musickit import __version__ as MUSICKIT_VERSION
+
+    track = read_source(silent_flac)
+    summary = AlbumSummary(album="Album", album_artist="Artist")
+
+    out = tmp_path / "01.m4a"
+    convert.to_alac(silent_flac, out)
+    write_mp4_tags(out, track, summary, cover_bytes=None, cover_mime=None, musicbrainz=None)
+
+    tags = MP4(out).tags
+    assert tags is not None
+    assert tags["\xa9too"][0] == f"musickit {MUSICKIT_VERSION}"
+
+    # And the reader round-trips it onto SourceTrack.encoder.
+    reread = read_source(out)
+    assert reread.encoder == f"musickit {MUSICKIT_VERSION}"
+
+
+def test_write_id3_tags_embeds_musickit_encoder(silent_flac: Path, tmp_path: Path) -> None:
+    """`write_id3_tags` writes ID3 `TSSE` = `musickit X.Y.Z` so each output file is traceable."""
+    import shutil
+    import subprocess
+
+    from mutagen.id3 import ID3
+
+    from musickit import __version__ as MUSICKIT_VERSION
+    from musickit.metadata import write_id3_tags
+
+    if shutil.which("ffmpeg") is None:
+        import pytest
+
+        pytest.skip("ffmpeg not on PATH")
+
+    out = tmp_path / "01.mp3"
+    subprocess.run(
+        ["ffmpeg", "-y", "-nostdin", "-i", str(silent_flac), "-c:a", "libmp3lame", "-b:a", "128k", str(out)],
+        check=True,
+    )
+
+    track = read_source(silent_flac)
+    summary = AlbumSummary(album="Album", album_artist="Artist")
+    write_id3_tags(out, track, summary, cover_bytes=None, cover_mime=None, musicbrainz=None)
+
+    id3 = ID3(out)
+    tsse = id3.get("TSSE")
+    assert tsse is not None
+    assert tsse.text[0] == f"musickit {MUSICKIT_VERSION}"
+
+    # Round-trip via the high-level reader too.
+    reread = read_source(out)
+    assert reread.encoder == f"musickit {MUSICKIT_VERSION}"
