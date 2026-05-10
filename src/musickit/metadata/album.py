@@ -23,7 +23,17 @@ _DISC_SUFFIX_RE = re.compile(
     r"\s*[\[\(\-]?\s*(?:cd|disc|disk)[\s\-_.]*\d+\s*[\]\)]?\s*$",
     re.IGNORECASE,
 )
+# Word-form disc suffixes that some box sets ship: `Greatest Hits I / Disc One`,
+# `Album - Disc Three`. Covers one through twelve (most box sets stop well short).
+_DISC_WORD_SUFFIX_RE = re.compile(
+    r"\s*[\[\(\-/]?\s*(?:cd|disc|disk)\s+"
+    r"(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+    r"\s*[\]\)]?\s*$",
+    re.IGNORECASE,
+)
 _BARE_DISC_PAREN_RE = re.compile(r"\s*\(\s*\d{1,2}\s*\)\s*$")
+# Trailing separators left behind after disc-suffix stripping (` /`, ` -`, etc).
+_TRAILING_SEPARATOR_RE = re.compile(r"\s*[/\-]\s*$")
 
 
 # Dot-as-word-separator scene-rip vandalism (`VA.-.Absolute.Music.60`).
@@ -85,7 +95,13 @@ def clean_album_title(album: str | None) -> str | None:
     cleaned = album
     # Repeatedly strip trailing disc markers (handles `Album [CD1] (Deluxe)`).
     while True:
+        # Both numeric (`Disc 2`) and word-form (`Disc Two`) suffixes — some
+        # box sets ship the latter, e.g. Queen `Greatest Hits I / Disc One`.
         stripped = _DISC_SUFFIX_RE.sub("", cleaned).strip(" -")
+        stripped = _DISC_WORD_SUFFIX_RE.sub("", stripped).strip(" -")
+        # Any leftover trailing separator (slash / dash / etc.) — common
+        # after stripping `Album / Disc One` → `Album /`.
+        stripped = _TRAILING_SEPARATOR_RE.sub("", stripped).strip()
         if stripped == cleaned:
             break
         cleaned = stripped
