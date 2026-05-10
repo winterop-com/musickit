@@ -94,6 +94,15 @@ auto-advance through the visible album; play/pause/next/prev buttons
 **Phase D — Polish: TODO** for v0.12.1+. Search, lyrics panel,
 visualizer, command palette, repeat/shuffle, marquee titles.
 
+Window size + position are persisted across launches. Both wrappers
+write a small bounds file (`window.json` for Tauri in `app_data_dir`,
+`musickit-window.json` for Electron in the same userData directory as
+the servers / session stores) and reapply on next launch. Saves are
+gated on min size 720x480 and skipped while minimized or fullscreen
+so a transient sub-min Resized event can't wedge the next launch at
+a tiny window — a regression we hit when we tried
+`tauri-plugin-window-state` / `electron-window-state` directly.
+
 **Phase E — Internet radio: TODO.** `getInternetRadioStations` is
 already returned by musickit serve; click-to-play directly via
 `<audio src="<station-url>">` should "just work".
