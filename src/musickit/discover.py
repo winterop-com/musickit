@@ -27,6 +27,46 @@ _DISC_SUFFIX_RE = re.compile(
 )
 
 
+def _disc_album_names_differ(disc_paths: list[Path], leaf_tracks: dict[Path, list[Path]]) -> bool:
+    """True if the disc subfolders' tagged album names are all distinct.
+
+    Box-set rips like Queen's "Greatest Hits I, II & III [3CD Box Set]"
+    ship three separate albums in three CD subfolders — each has its
+    own album tag. Merging them into one multi-disc album loses the
+    per-disc identity. This helper reads the first track in each disc
+    subfolder, applies `clean_album_title` to normalise disc-suffix
+    variants, and returns True when the post-cleanup names are
+    pairwise different. The merge step uses that as a "don't merge"
+    signal and leaves the discs as standalone albums.
+
+    Returns False (= "go ahead and merge") when:
+      - any disc has no readable album tag (assume same album)
+      - the cleaned names match across discs (real multi-disc album)
+    """
+    # Local import to avoid pulling the metadata package into discover's
+    # import graph for the tag-less path. The metadata module also imports
+    # discover indirectly via the pipeline; keeping this lazy keeps the
+    # cycle at module-load time avoidable.
+    from musickit.metadata import clean_album_title, read_source
+
+    cleaned_names: list[str] = []
+    for disc_path in disc_paths:
+        tracks = leaf_tracks.get(disc_path, [])
+        if not tracks:
+            return False
+        try:
+            track = read_source(tracks[0], light=True)
+        except Exception:  # noqa: BLE001 — any unreadable file means "don't make a decision"
+            return False
+        if not track.album:
+            return False
+        cleaned = clean_album_title(track.album)
+        if not cleaned:
+            return False
+        cleaned_names.append(cleaned.lower())
+    return len(set(cleaned_names)) == len(cleaned_names) and len(cleaned_names) > 1
+
+
 def _disc_info(name: str) -> tuple[int, str] | None:
     """Return `(disc_number, prefix)` for a disc folder name, else None.
 
@@ -126,6 +166,14 @@ def _merge_disc_siblings(leaves: list[tuple[Path, list[Path]]]) -> list[AlbumDir
             if len(group) < 2:
                 continue  # singleton — don't merge, leave as standalone
             sorted_group = sorted(group, key=lambda p: disc_info_for[p][0])
+            # Box-set guard: if the disc subfolders' tagged album names are
+            # all DIFFERENT (after disc-suffix cleanup), they're not multiple
+            # discs of one album — they're independent albums shipped in a
+            # single box. Real case: Queen `CD1 - Greatest Hits I`, `CD2 -
+            # Greatest Hits II`, `CD3 - Greatest Hits III` — three separate
+            # albums, not one merged. Leave them as standalone albums.
+            if _disc_album_names_differ(sorted_group, leaf_tracks):
+                continue
             # Anchor at the parent for bare leading style (`CD1`/`CD2`) so
             # the cover at the parent level is reachable. For shared-prefix
             # style (`Album (CD1)`/`Album (CD2)`), anchor at the first disc

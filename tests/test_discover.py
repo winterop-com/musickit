@@ -171,3 +171,64 @@ def test_discover_drops_disc_subfolders_when_parent_owns_audio(tmp_path: Path) -
     assert [t.name for t in albums[0].tracks] == ["01.flac", "02.flac"]
     assert albums[0].disc_for_track == {}
     assert albums[0].disc_total is None
+
+
+def test_discover_does_not_merge_box_set_with_distinct_album_names(silent_flac_template: Path, tmp_path: Path) -> None:
+    """3CD box set where each disc has its OWN album tag → keep as 3 albums.
+
+    Real Queen case: ``Greatest Hits I, II & III [3CD Box Set]`` has three
+    CD subfolders, each with a different ``TALB`` (``Greatest Hits I``,
+    ``... II``, ``... III``). The discover layer used to merge them into
+    one multi-disc album (losing per-CD identity); now it inspects the
+    first track of each disc and skips the merge when names differ.
+    """
+    import shutil
+
+    from mutagen.flac import FLAC
+
+    box = tmp_path / "Queen - Box Set"
+    for cd_idx, name in enumerate(["Hits I", "Hits II", "Hits III"], start=1):
+        d = box / f"CD{cd_idx} - {name}"
+        d.mkdir(parents=True)
+        track = d / "01.flac"
+        shutil.copy2(silent_flac_template, track)
+        flac = FLAC(track)
+        flac["ALBUM"] = name
+        flac["ARTIST"] = "Queen"
+        flac.save()
+
+    albums = discover_albums(tmp_path)
+    # Three separate albums, not one merged multi-disc album.
+    assert len(albums) == 3
+    assert sorted(a.path.name for a in albums) == [
+        "CD1 - Hits I",
+        "CD2 - Hits II",
+        "CD3 - Hits III",
+    ]
+    # None of them is flagged as multi-disc.
+    assert all(a.disc_total is None for a in albums)
+
+
+def test_discover_still_merges_when_disc_names_match(silent_flac_template: Path, tmp_path: Path) -> None:
+    """Real multi-disc album where all discs share the same TALB → merge as before."""
+    import shutil
+
+    from mutagen.flac import FLAC
+
+    album = tmp_path / "Pink Floyd - The Wall"
+    for cd_idx in (1, 2):
+        d = album / f"CD{cd_idx}"
+        d.mkdir(parents=True)
+        track = d / "01.flac"
+        shutil.copy2(silent_flac_template, track)
+        flac = FLAC(track)
+        # Both discs share the album name (the Wall ships with TALB=
+        # "The Wall" on both discs, optionally with " (Disc 1)" suffix
+        # which clean_album_title strips).
+        flac["ALBUM"] = "The Wall (Disc 1)" if cd_idx == 1 else "The Wall (Disc 2)"
+        flac["ARTIST"] = "Pink Floyd"
+        flac.save()
+
+    albums = discover_albums(tmp_path)
+    assert len(albums) == 1
+    assert albums[0].disc_total == 2
