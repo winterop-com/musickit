@@ -39,6 +39,34 @@ _SCENE_DOT_SEP_RE = re.compile(r"(?<=\w{2})\.(?=\w{2})")
 _SCENE_USCORE_SEP_RE = re.compile(r"(?<=\w{2})_(?=\w{2})")
 _VA_PREFIX_IN_ALBUM_RE = re.compile(r"^\s*(?:VA|Various)[\s.\-]+", re.IGNORECASE)
 
+# Heuristics for "this album_artist value is folder-name noise, not an
+# actual artist name." Conservative: fires only when the value contains
+# bracket markup or an explicit box-set keyword AND the per-track
+# artist appears as a substring (so we have a clean fallback).
+_NOISY_ALBUM_ARTIST_HINTS_RE = re.compile(r"[\[\(]|\bbox\s*set\b|\bcd\d|\b\d+cd\b", re.IGNORECASE)
+
+
+def clean_album_artist(album_artist: str | None, artist_fallback: str | None) -> str | None:
+    """Reject obvious folder-name noise as an album_artist value.
+
+    Some rips put the box-set folder name into TPE2 (e.g. ``"Greatest
+    Hits I, II & III (The Platinum Collection) [3CD Box Set] - Queen"``)
+    instead of the actual artist (``"Queen"``). When that happens AND
+    we have a clean per-track artist that appears as a substring of
+    the noisy value, prefer the per-track artist.
+
+    Returns ``album_artist`` unchanged when the value looks plausibly
+    legitimate (no bracket / box-set markers) — Various Artists box
+    sets like ``"Various Artists"`` or short clean values pass through.
+    """
+    if not album_artist or not artist_fallback:
+        return album_artist
+    if not _NOISY_ALBUM_ARTIST_HINTS_RE.search(album_artist):
+        return album_artist
+    if artist_fallback.lower() in album_artist.lower():
+        return artist_fallback
+    return album_artist
+
 
 def clean_album_title(album: str | None) -> str | None:
     """Clean disc markers, scene-rip dot-separators, and `VA -` prefixes from an album tag.
@@ -93,7 +121,7 @@ def summarize_album(tracks: list[SourceTrack]) -> AlbumSummary:
     # single stray tagged track (foreign album mixed into the rip) can't
     # impersonate the whole-album value when most tracks have no album tag.
     album = clean_album_title(_majority((t.album for t in album_source), quorum=True))
-    album_artist = _majority(t.album_artist for t in tracks)
+    raw_album_artist = _majority(t.album_artist for t in tracks)
     year = _majority(t.date for t in tracks)
     genre = _majority(t.genre for t in tracks)
     label = _majority(t.label for t in tracks)
@@ -102,6 +130,11 @@ def summarize_album(tracks: list[SourceTrack]) -> AlbumSummary:
     artist_counts = Counter(t.artist for t in tracks if t.artist)
     distinct_artists = len(artist_counts)
     artist_fallback = artist_counts.most_common(1)[0][0] if artist_counts else None
+
+    # Now apply the album_artist cleanup against the resolved per-track
+    # artist majority. Done after artist_fallback so we have something
+    # to fall back to.
+    album_artist = clean_album_artist(raw_album_artist, artist_fallback)
 
     track_total = max((t.track_total or 0 for t in tracks), default=0) or len(tracks) or None
     disc_total = max((t.disc_total or 0 for t in tracks), default=0) or None

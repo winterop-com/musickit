@@ -207,6 +207,52 @@ def test_summarize_album_album_quorum_accepts_unanimous_tags() -> None:
     assert summary.album == "Night Visions"
 
 
+def test_summarize_album_strips_box_set_noise_from_album_artist() -> None:
+    """Box-set folder name in TPE2 → fall back to per-track artist.
+
+    Real-world Queen case: every MP3 had
+    `TPE2 = "Greatest Hits I, II & III (The Platinum Collection) [3CD Box Set] - Queen"`
+    with `TPE1 = "Queen"`. The convert pipeline used to copy that
+    monstrous string into the output. Now `summarize_album` detects
+    the bracket / box-set markers and prefers the clean artist value.
+    """
+    noisy = "Greatest Hits I, II & III (The Platinum Collection) [3CD Box Set] - Queen"
+    tracks = [
+        SourceTrack(path=Path(f"/{i}.mp3"), artist="Queen", album_artist=noisy, album="Greatest Hits I")
+        for i in range(18)
+    ]
+    summary = summarize_album(tracks)
+    assert summary.album_artist == "Queen"
+
+
+def test_summarize_album_keeps_clean_album_artist_unchanged() -> None:
+    """Plain album_artist with no bracket noise stays as-is — no false-positive cleanup."""
+    tracks = [SourceTrack(path=Path(f"/{i}.flac"), artist="The Beatles", album_artist="The Beatles") for i in range(11)]
+    summary = summarize_album(tracks)
+    assert summary.album_artist == "The Beatles"
+
+
+def test_summarize_album_keeps_va_album_artist() -> None:
+    """`Various Artists` literal value (no brackets) survives cleanup."""
+    tracks = [
+        SourceTrack(path=Path("/1.mp3"), artist="A", album_artist="Various Artists"),
+        SourceTrack(path=Path("/2.mp3"), artist="B", album_artist="Various Artists"),
+    ]
+    summary = summarize_album(tracks)
+    assert summary.album_artist == "Various Artists"
+
+
+def test_summarize_album_keeps_noisy_album_artist_when_no_artist_match() -> None:
+    """If the per-track artist isn't a substring, leave the noisy value alone (better than guessing)."""
+    tracks = [
+        SourceTrack(path=Path(f"/{i}.mp3"), artist="DifferentName", album_artist="VA Box Set [3CD]") for i in range(5)
+    ]
+    summary = summarize_album(tracks)
+    # `DifferentName` doesn't appear in `VA Box Set [3CD]` so we keep
+    # the original — wrong-looking, but preferable to guessing.
+    assert summary.album_artist == "VA Box Set [3CD]"
+
+
 def test_summarize_album_detects_compilation_when_per_track_artist_is_va_marker() -> None:
     # Rip stamps every track with ARTIST=VA and leaves album_artist blank.
     tracks = [SourceTrack(path=Path(f"/{i}.flac"), artist="VA", album="Mix") for i in range(3)]
