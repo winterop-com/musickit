@@ -67,6 +67,16 @@ Drag a `.dmg` into your Finder or double-click the `.app` directly.
    credentials in OS-encrypted storage (Keychain on macOS, libsecret
    on Linux, Credential Manager on Windows).
 
+## Window size
+
+Resize the window to whatever you like — it's persisted across launches.
+Both wrappers write a small bounds file alongside their existing servers /
+session stores (Tauri: `window.json` in `app_data_dir`; Electron:
+`musickit-window.json` in the same userData folder). Saves are skipped
+while minimized or fullscreen and below the configured 720x480 minimum,
+so a transient sub-min Resized event on macOS can't wedge the next launch
+at a tiny window. To reset to the 1440x900 default, delete that file.
+
 ## Refresh-restore
 
 The app encodes the current artist / album / track in the URL hash:
