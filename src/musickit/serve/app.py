@@ -17,7 +17,7 @@ from typing import Any
 import structlog
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from musickit import __version__
@@ -104,7 +104,7 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
         ),
         version=SERVER_VERSION,
         docs_url="/docs",
-        redoc_url="/redoc",
+        redoc_url=None,
         lifespan=_lifespan,
     )
     app.state.root = root
@@ -217,24 +217,37 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     # name, version, and a pointer to the Subsonic API surface. The
     # browser UI is served by `musickit ui` (a separate static-file
     # server); this server is pure Subsonic now.
-    @app.get("/")
-    async def server_info(request: Request) -> Response:
-        del request
-        return JSONResponse(
-            {
-                "name": SERVER_NAME,
-                "version": SERVER_VERSION,
-                "type": "subsonic-compatible",
-                "api": "/rest/",
-                # `/docs` is the OpenAPI schema for THIS server's actual
-                # surface — only the endpoints we've implemented. Linking
-                # the upstream Subsonic spec instead would advertise
-                # commands we don't support, which is a worse lie than
-                # under-advertising.
-                "docs": "/docs",
-                "redoc": "/redoc",
-            }
+    @app.get("/", response_class=HTMLResponse)
+    async def server_info(request: Request) -> HTMLResponse:
+        # Tiny HTML landing page — clickable links to `/docs` and the
+        # `/rest/` Subsonic surface from any browser that hits the root.
+        # Subsonic clients (Symfonium, Amperfy, play:Sub) hit `/rest/ping`
+        # directly so they never see this page; this is purely for the
+        # human who paste the host into Safari to confirm the server is
+        # reachable. ReDoc is disabled — Swagger's enough.
+        base = str(request.base_url).rstrip("/")
+        body = (
+            "<!doctype html><html><head><meta charset=utf-8>"
+            f"<title>{SERVER_NAME} {SERVER_VERSION}</title>"
+            "<style>"
+            "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;"
+            "background:#1a1b26;color:#a9b1d6;max-width:42rem;margin:3rem auto;"
+            "padding:0 1.5rem;line-height:1.6}"
+            "h1{color:#7aa2f7;font-weight:600;margin-bottom:0.2rem}"
+            ".sub{color:#565f89;font-size:0.95rem;margin-bottom:1.5rem}"
+            "a{color:#7dcfff}"
+            "code{background:#24283b;padding:0.1rem 0.4rem;border-radius:3px;"
+            "font-size:0.9em;color:#bb9af7}"
+            "ul{padding-left:1.2rem}"
+            "</style></head><body>"
+            f"<h1>{SERVER_NAME}</h1>"
+            f'<p class="sub">{SERVER_VERSION} · Subsonic-compatible</p>'
+            f'<ul><li><a href="{base}/docs">/docs</a> — OpenAPI schema (Swagger UI)</li>'
+            f"<li><code>{base}/rest/</code> — Subsonic API root "
+            "(connect any Subsonic client here)</li></ul>"
+            "</body></html>"
         )
+        return HTMLResponse(body)
 
     return app
 
