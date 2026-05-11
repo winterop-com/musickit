@@ -139,13 +139,14 @@ def test_f_json_returns_json(tmp_path: Path) -> None:
 
 def test_non_rest_path_unaffected(tmp_path: Path) -> None:
     """Non-/rest/* responses pass through as-is, no XML conversion."""
-    # The root probe returns JSON regardless of `f` param — it's not a
-    # Subsonic endpoint, just a server-info probe.
-    response = _client(tmp_path).get("/", headers={"accept": "application/json"})
+    # Root landing page is HTML (since 0.20.6) — confirming the
+    # Subsonic-format middleware doesn't touch non-/rest/* responses.
+    response = _client(tmp_path).get("/", headers={"accept": "text/html"})
     assert response.status_code == 200
-    assert response.headers["content-type"].startswith("application/json")
-    body = response.json()
-    assert body["type"] == "subsonic-compatible"
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    assert "MusicKit" in body
+    assert "/docs" in body
 
 
 # ---------------------------------------------------------------------------

@@ -67,7 +67,7 @@ def _structured_payload(album: LibraryAlbum, track: LibraryTrack) -> dict[str, A
 
 
 @router.api_route("/getLyrics", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getLyrics.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getLyrics.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_lyrics(
     request: Request,
     artist: str | None = Query(default=None),
@@ -94,7 +94,7 @@ async def get_lyrics(
 
 
 @router.api_route("/getLyricsBySongId", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getLyricsBySongId.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getLyricsBySongId.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_lyrics_by_song_id(request: Request, id: str = Query(...)) -> dict:
     """OpenSubsonic structured-lyrics endpoint — looks up by stable track ID."""
     cache = _get_cache(request)

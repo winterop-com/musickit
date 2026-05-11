@@ -137,7 +137,7 @@ def _transcode_response(path: Path, *, bitrate_kbps: int, time_offset_s: int = 0
 
 
 @router.api_route("/stream", methods=["GET", "POST", "HEAD"])
-@router.api_route("/stream.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/stream.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def stream(
     request: Request,
     id: str = Query(...),
@@ -175,7 +175,7 @@ async def stream(
 
 
 @router.api_route("/download", methods=["GET", "POST", "HEAD"])
-@router.api_route("/download.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/download.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def download(request: Request, id: str = Query(...)) -> Response:
     """Always raw bytes — `download` skips transcoding by spec."""
     cache = _get_cache(request)
@@ -192,7 +192,7 @@ async def download(request: Request, id: str = Query(...)) -> Response:
 
 
 @router.api_route("/getCoverArt", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getCoverArt.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getCoverArt.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_cover_art(
     request: Request,
     id: str = Query(...),

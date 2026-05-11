@@ -9,15 +9,17 @@ from __future__ import annotations
 
 import json
 import time
+import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 import structlog
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.security import APIKeyQuery
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from musickit import __version__
@@ -25,6 +27,16 @@ from musickit.serve.auth import AuthError, verify
 from musickit.serve.config import ServeConfig
 from musickit.serve.index import IndexCache
 from musickit.serve.xml import to_xml
+
+# FastAPI generates OpenAPI `operationId` from `function_name + path` without
+# including the HTTP method, so the same handler registered with three
+# methods (`GET` / `POST` / `HEAD` — the Subsonic spec allows all three on
+# every endpoint) produces three routes with identical op-ids. FastAPI emits
+# a `UserWarning` for each duplicate; with ~60 endpoints × 3 methods that's
+# 100+ warnings on every `/openapi.json` build, which made `/docs` painfully
+# slow to load. `operationId` is only consumed by codegen tools we don't
+# target — silencing the noise is the right call.
+warnings.filterwarnings("ignore", message="Duplicate Operation ID", category=UserWarning)
 
 _access_log = structlog.stdlib.get_logger("musickit.serve.access")
 
@@ -173,14 +185,66 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
         expose_headers=["*"],
     )
 
+    # OpenAPI security schemes — `Security(...)` declarations propagate to
+    # the schema so Swagger UI renders an "Authorize" dialog with these
+    # four fields. Filling them once applies to every `Try it out` call
+    # for every endpoint, instead of pasting `u=admin&t=...` into every
+    # form. Functionally these are just query-string params — same as
+    # before, the dialog is purely a UX wrapper.
+    # Distinct `scheme_name` per APIKeyQuery — without that, FastAPI
+    # deduplicates them under the same `APIKeyQuery` entry in the
+    # OpenAPI `securitySchemes` and Swagger's Authorize dialog shows
+    # only the last one. Naming each scheme means all four appear with
+    # their own description + value box.
+    api_key_u = APIKeyQuery(
+        name="u",
+        scheme_name="u (username)",
+        auto_error=False,
+        description="Subsonic username (required for every endpoint).",
+    )
+    api_key_p = APIKeyQuery(
+        name="p",
+        scheme_name="p (plain password)",
+        auto_error=False,
+        description=(
+            "Plain-text password. Legacy form — exposes the password in URL "
+            "logs / browser history. Prefer `t` + `s` (salted token) below."
+        ),
+    )
+    api_key_t = APIKeyQuery(
+        name="t",
+        scheme_name="t (salted token)",
+        auto_error=False,
+        description=(
+            "Salted MD5 token: `md5(password + s)`. Modern Subsonic-spec auth — "
+            "password never appears on the wire. Pair with `s`."
+        ),
+    )
+    api_key_s = APIKeyQuery(
+        name="s",
+        scheme_name="s (salt)",
+        auto_error=False,
+        description="Random salt used to compute `t`. Any string the client chooses.",
+    )
+
     async def require_auth(
         request: Request,
-        u: str | None = Query(default=None),
-        p: str | None = Query(default=None),
-        t: str | None = Query(default=None),
-        s: str | None = Query(default=None),
+        u: str | None = Security(api_key_u),
+        p: str | None = Security(api_key_p),
+        t: str | None = Security(api_key_t),
+        s: str | None = Security(api_key_s),
     ) -> None:
-        """FastAPI dependency that enforces Subsonic auth on every endpoint."""
+        """FastAPI dependency that enforces Subsonic auth on every endpoint.
+
+        Two auth modes are accepted, both per the Subsonic spec:
+
+          - **Plain**: `?u=<user>&p=<pass>`
+          - **Token**: `?u=<user>&t=<md5(pass+salt)>&s=<salt>`
+
+        The `v=` (client API version) and `c=` (client name) params are also
+        part of the spec but not enforced here — clients send them for
+        compatibility but we don't gate on them.
+        """
         del request
         try:
             verify(cfg, user=u, password=p, token=t, salt=s)

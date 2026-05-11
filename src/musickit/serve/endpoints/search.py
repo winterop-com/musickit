@@ -95,7 +95,7 @@ def _search(
 
 
 @router.api_route("/search3", methods=["GET", "POST", "HEAD"])
-@router.api_route("/search3.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/search3.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def search3(
     request: Request,
     query: str = Query(...),
@@ -128,7 +128,7 @@ async def search3(
 
 
 @router.api_route("/search2", methods=["GET", "POST", "HEAD"])
-@router.api_route("/search2.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/search2.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def search2(
     request: Request,
     query: str = Query(...),

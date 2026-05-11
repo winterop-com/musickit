@@ -44,7 +44,7 @@ def _get_stars(request: Request) -> StarStore:
 
 
 @router.api_route("/scrobble", methods=["GET", "POST", "HEAD"])
-@router.api_route("/scrobble.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/scrobble.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def scrobble(
     request: Request,
     id: str | None = Query(default=None),
@@ -113,14 +113,14 @@ def _empty_artist_info(_artist_id: str) -> dict[str, Any]:
 
 
 @router.api_route("/getArtistInfo", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getArtistInfo.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getArtistInfo.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_artist_info(id: str = Query(...)) -> dict:
     """Empty artist info (legacy v1 endpoint) — no bio/similar-artist data tracked."""
     return envelope("artistInfo", _empty_artist_info(id))
 
 
 @router.api_route("/getArtistInfo2", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getArtistInfo2.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getArtistInfo2.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_artist_info2(id: str = Query(...)) -> dict:
     """Empty artist info (modern v3 endpoint)."""
     return envelope("artistInfo2", _empty_artist_info(id))
@@ -133,7 +133,7 @@ async def get_artist_info2(id: str = Query(...)) -> dict:
 
 
 @router.api_route("/getMusicDirectory", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getMusicDirectory.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getMusicDirectory.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_music_directory(request: Request, id: str = Query(...)) -> dict:
     """Legacy folder browse. `ar_*` → albums; `al_*` → tracks."""
     cache = _get_cache(request)
@@ -172,7 +172,7 @@ async def get_music_directory(request: Request, id: str = Query(...)) -> dict:
 
 
 @router.api_route("/getRandomSongs", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getRandomSongs.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getRandomSongs.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_random_songs(
     request: Request,
     size: int = Query(default=10, ge=1, le=500),
@@ -232,21 +232,21 @@ def _build_starred_payload(cache: IndexCache, stars: StarStore) -> dict[str, Any
 
 
 @router.api_route("/getStarred", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getStarred.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getStarred.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_starred(request: Request) -> dict:
     """Return artists / albums / songs currently starred by the user."""
     return envelope("starred", _build_starred_payload(_get_cache(request), _get_stars(request)))
 
 
 @router.api_route("/getStarred2", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getStarred2.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getStarred2.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_starred2(request: Request) -> dict:
     """v2 of getStarred — same payload shape; the wrapper key differs."""
     return envelope("starred2", _build_starred_payload(_get_cache(request), _get_stars(request)))
 
 
 @router.api_route("/star", methods=["GET", "POST", "HEAD"])
-@router.api_route("/star.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/star.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def star(
     request: Request,
     id: str | None = Query(default=None),
@@ -270,7 +270,7 @@ async def star(
 
 
 @router.api_route("/unstar", methods=["GET", "POST", "HEAD"])
-@router.api_route("/unstar.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/unstar.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def unstar(
     request: Request,
     id: str | None = Query(default=None),
@@ -317,7 +317,7 @@ def _id_resolves(cache: IndexCache, sid: str) -> bool:
 
 
 @router.api_route("/getPlaylists", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getPlaylists.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getPlaylists.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_playlists() -> dict:
     """No playlist support yet — return empty list."""
     return envelope("playlists", {"playlist": []})
@@ -352,7 +352,7 @@ def _user_payload(username: str) -> dict[str, Any]:
 
 
 @router.api_route("/getUser", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getUser.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getUser.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_user(request: Request, username: str | None = Query(default=None)) -> dict:
     """Return user details. The single configured user has every role."""
     cfg = request.app.state.cfg
@@ -363,7 +363,7 @@ async def get_user(request: Request, username: str | None = Query(default=None))
 
 
 @router.api_route("/getUsers", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getUsers.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getUsers.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_users(request: Request) -> dict:
     """Return all users — just the one we host."""
     cfg = request.app.state.cfg
@@ -379,7 +379,7 @@ async def get_users(request: Request) -> dict:
 
 
 @router.api_route("/getOpenSubsonicExtensions", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getOpenSubsonicExtensions.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getOpenSubsonicExtensions.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_open_subsonic_extensions() -> dict:
     """Advertise the OpenSubsonic extensions we actually support.
 
@@ -408,7 +408,7 @@ async def get_open_subsonic_extensions() -> dict:
 
 
 @router.api_route("/getGenres", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getGenres.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getGenres.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_genres(request: Request) -> dict:
     """Distinct genres + per-genre song / album counts.
 

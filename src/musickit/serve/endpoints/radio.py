@@ -30,35 +30,35 @@ def _station_payload() -> list[dict[str, str]]:
 
 
 @router.api_route("/getInternetRadioStations", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getInternetRadioStations.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getInternetRadioStations.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_internet_radio_stations() -> dict:
     """Return defaults + radio.toml stations in Subsonic shape."""
     return envelope("internetRadioStations", {"internetRadioStation": _station_payload()})
 
 
 @router.api_route("/createInternetRadioStation", methods=["GET", "POST", "HEAD"])
-@router.api_route("/createInternetRadioStation.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/createInternetRadioStation.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def create_internet_radio_station() -> dict:
     """No-op — stations live in the TUI's local config."""
     return envelope()
 
 
 @router.api_route("/updateInternetRadioStation", methods=["GET", "POST", "HEAD"])
-@router.api_route("/updateInternetRadioStation.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/updateInternetRadioStation.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def update_internet_radio_station() -> dict:
     """No-op — stations live in the TUI's local config."""
     return envelope()
 
 
 @router.api_route("/deleteInternetRadioStation", methods=["GET", "POST", "HEAD"])
-@router.api_route("/deleteInternetRadioStation.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/deleteInternetRadioStation.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def delete_internet_radio_station() -> dict:
     """No-op — stations live in the TUI's local config."""
     return envelope()
 
 
 @router.api_route("/radioStream", methods=["GET", "POST", "HEAD"])
-@router.api_route("/radioStream.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/radioStream.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def radio_stream(url: str) -> Response:
     """Same-origin proxy for a radio station's upstream stream (Subsonic-auth'd).
 
@@ -75,7 +75,7 @@ async def radio_stream(url: str) -> Response:
 
 
 @router.api_route("/radioMeta", methods=["GET", "POST", "HEAD"])
-@router.api_route("/radioMeta.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/radioMeta.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def radio_meta(url: str) -> Response:
     """Return the last-seen ICY StreamTitle for a station URL, parsed by the proxy.
 
