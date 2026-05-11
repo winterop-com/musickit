@@ -15,17 +15,14 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 
 from musickit import __version__
 from musickit.serve.auth import AuthError, verify
 from musickit.serve.config import ServeConfig
 from musickit.serve.index import IndexCache
 from musickit.serve.xml import to_xml
-from musickit.web.session import RestQueryAuthFromSessionMiddleware, derive_session_secret
 
 API_VERSION = "1.16.1"
 SERVER_NAME = "musickit"
@@ -82,17 +79,16 @@ async def _lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     yield
 
 
-def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_web: bool = True) -> FastAPI:
+def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastAPI:
     """Build the FastAPI app for `root` with the given credentials.
 
     `use_cache=False` disables the persistent `<root>/.musickit/index.db`
     and falls back to in-memory scan on every rebuild.
 
-    `enable_web=False` skips mounting the browser UI (/login, /web/*,
-    /web-static/*). The Subsonic `/rest/*` API stays fully available.
-    Useful when you only want the Subsonic surface on a host (smaller
-    attack area) or when running headless on a TV/embedded box where
-    nobody will visit / in a browser.
+    The server exposes only the Subsonic `/rest/*` surface; the embedded
+    `/web` browser UI was removed in 0.20.4 in favour of the
+    standalone `musickit ui` command, which serves the same SPA against
+    any Subsonic server without needing one running in-process.
     """
     app = FastAPI(
         title="musickit",
@@ -122,41 +118,31 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_w
 
     # Middleware order is REVERSE of registration — last add_middleware
     # is the outermost wrap. We need:
-    #   request -> CORS -> Session -> RestQueryAuthFromSession ->
-    #              PostFormToQuery -> SubsonicFormat -> route
+    #   request -> CORS -> PostFormToQuery -> SubsonicFormat -> route
     # so that:
     #   - CORS handles cross-origin preflights + appends headers to
-    #     responses. Required for the MusicKit desktop app (Tauri /
-    #     Electron webviews load from a `tauri://` or `file://` origin
-    #     and fetch `http://server/rest/*` cross-origin — without CORS
+    #     responses. Required for `musickit ui` and the MusicKit
+    #     desktop wrappers (Tauri / Electron) — they load from a
+    #     `tauri://` / `file://` / `http://localhost:1888` origin and
+    #     fetch `http://server/rest/*` cross-origin; without CORS
     #     headers the browser blocks the response from JS access even
-    #     though the server returned 200).
-    #   - Session sets request.session before RestQueryAuth reads it.
-    #   - RestQueryAuth injects ?u=&p= so the existing auth dep works for
-    #     browser <audio src='/rest/stream?id=...'> calls.
+    #     though the server returned 200.
     #   - PostForm merges form-body credentials so play:Sub works.
     #   - SubsonicFormat converts JSON responses to XML when needed.
+    #
+    # The session + session-to-query middleware pair used to live here
+    # for the embedded `/web` UI (cookies → `<audio src=/rest/stream>`
+    # auth). Both went away with `/web` itself in 0.20.4 — Subsonic
+    # `/rest/*` only ever needs salted-token auth from query params.
     app.add_middleware(SubsonicFormatMiddleware)
     app.add_middleware(PostFormToQueryMiddleware)
-    app.add_middleware(RestQueryAuthFromSessionMiddleware)
-    # Sign cookies with a key derived from the password. Changing the
-    # password invalidates every existing session — desirable. 30-day
-    # sliding expiry is plenty for self-hosted use.
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=derive_session_secret(cfg.password),
-        session_cookie="musickit_session",
-        max_age=30 * 24 * 60 * 60,
-        same_site="lax",
-        https_only=False,
-    )
     # CORS — outermost. We allow any origin because the Subsonic auth
     # token (`?u=&t=&s=`) is the security boundary, not the request
-    # origin. This lets the MusicKit desktop wrappers (Tauri / Electron)
-    # talk to a remote musickit serve from their tauri:// / file://
-    # origin without the webview blocking the response. Other Subsonic
-    # clients (Symfonium / Amperfy / play:Sub) aren't browsers and
-    # don't care about CORS either way; this is purely additive.
+    # origin. This lets `musickit ui` (and the desktop wrappers) talk
+    # to a remote musickit serve from their own origin without the
+    # webview blocking the response. Other Subsonic clients (Symfonium
+    # / Amperfy / play:Sub) aren't browsers and don't care about CORS
+    # either way; this is purely additive.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -209,25 +195,14 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True, enable_w
     app.include_router(radio_router, prefix="/rest", dependencies=auth_dep)
     app.include_router(stubs_router, prefix="/rest", dependencies=auth_dep)
 
-    # Web UI — login + three-pane browse + audio player. Lives at /login,
-    # /web, /web/artist/{id}, /web/album/{id}. Static assets served via
-    # the StaticFiles mount below. Skipped entirely when `enable_web=False`.
-    if enable_web:
-        from musickit.web.routes import router as web_router
-
-        app.include_router(web_router)
-        web_static_dir = Path(__file__).resolve().parents[1] / "web" / "static"
-        app.mount("/web-static", StaticFiles(directory=str(web_static_dir)), name="web-static")
-
-    # Root probe — JSON for Subsonic clients (Amperfy hits / pre-login
-    # to confirm the host is reachable), HTML redirect for browsers.
-    # When the web UI is disabled, browsers also get the JSON body
-    # (there's no /login to redirect to).
+    # Root probe — JSON only. Browsers visiting `/` get the same
+    # introspection payload Subsonic clients hit on pre-login: server
+    # name, version, and a pointer to the Subsonic API surface. The
+    # browser UI is served by `musickit ui` (a separate static-file
+    # server); this server is pure Subsonic now.
     @app.get("/")
     async def server_info(request: Request) -> Response:
-        accept = request.headers.get("accept", "")
-        if "text/html" in accept and enable_web:
-            return RedirectResponse(url="/login", status_code=303)
+        del request
         return JSONResponse(
             {
                 "name": SERVER_NAME,

@@ -157,6 +157,25 @@ export function renderShell(root, client, session, hooks = {}) {
     </main>
 
     <audio id="audio" preload="none"></audio>
+
+    <!--
+      Cmd/Ctrl+P command palette. The wiring lives in
+      desktop/frontend/js/palette.js; this block just provides the
+      DOM hooks (backdrop, input, list) that palette.js queries. The
+      palette is hidden until the user hits Cmd/Ctrl+P (or runs a
+      command via the palette).
+    -->
+    <div class="palette-backdrop" id="palette-backdrop" hidden>
+      <div class="palette" id="palette" role="dialog" aria-label="Command palette">
+        <input type="text"
+               id="palette-input"
+               class="palette-input"
+               placeholder="type a command…"
+               autocomplete="off"
+               spellcheck="false">
+        <ul class="palette-list" id="palette-list" role="listbox"></ul>
+      </div>
+    </div>
   `;
 
   // Runtime drag-handle wiring for Tauri.
