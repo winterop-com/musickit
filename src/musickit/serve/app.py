@@ -96,10 +96,15 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     """
     app = FastAPI(
         title="musickit",
-        description="Subsonic-compatible API server for a converted musickit library.",
+        description=(
+            "Subsonic-compatible HTTP API for a converted musickit library. "
+            "Every endpoint accepts the Subsonic salted-token query params "
+            "(`?u=&t=&s=&v=&c=`); Swagger's *Try it out* form is read-only "
+            "without those, but the schema itself is fully populated."
+        ),
         version=SERVER_VERSION,
-        docs_url=None,  # the OpenAPI docs collide with `?u=&p=` — keep them off for now
-        redoc_url=None,
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=_lifespan,
     )
     app.state.root = root
@@ -221,7 +226,13 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
                 "version": SERVER_VERSION,
                 "type": "subsonic-compatible",
                 "api": "/rest/",
-                "spec": "https://opensubsonic.netlify.app/docs/api-reference/",
+                # `/docs` is the OpenAPI schema for THIS server's actual
+                # surface — only the endpoints we've implemented. Linking
+                # the upstream Subsonic spec instead would advertise
+                # commands we don't support, which is a worse lie than
+                # under-advertising.
+                "docs": "/docs",
+                "redoc": "/redoc",
             }
         )
 
