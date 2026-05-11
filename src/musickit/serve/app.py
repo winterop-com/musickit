@@ -8,11 +8,13 @@ shaped the same way with `status="failed"` + an error code/message.
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import structlog
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -23,6 +25,8 @@ from musickit.serve.auth import AuthError, verify
 from musickit.serve.config import ServeConfig
 from musickit.serve.index import IndexCache
 from musickit.serve.xml import to_xml
+
+_access_log = structlog.stdlib.get_logger("musickit.serve.access")
 
 API_VERSION = "1.16.1"
 SERVER_NAME = "musickit"
@@ -92,10 +96,15 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     """
     app = FastAPI(
         title="musickit",
-        description="Subsonic-compatible API server for a converted musickit library.",
+        description=(
+            "Subsonic-compatible HTTP API for a converted musickit library. "
+            "Every endpoint accepts the Subsonic salted-token query params "
+            "(`?u=&t=&s=&v=&c=`); Swagger's *Try it out* form is read-only "
+            "without those, but the schema itself is fully populated."
+        ),
         version=SERVER_VERSION,
-        docs_url=None,  # the OpenAPI docs collide with `?u=&p=` — keep them off for now
-        redoc_url=None,
+        docs_url="/docs",
+        redoc_url="/redoc",
         lifespan=_lifespan,
     )
     app.state.root = root
@@ -136,6 +145,14 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     # `/rest/*` only ever needs salted-token auth from query params.
     app.add_middleware(SubsonicFormatMiddleware)
     app.add_middleware(PostFormToQueryMiddleware)
+    # Access log — one structured line per HTTP request, with the
+    # canonical Apache combined fields (client, user, request line,
+    # status, bytes, referer, user_agent) plus a duration_ms for
+    # easy slow-endpoint spotting. Outputs through the same
+    # structlog handler `configure_logging()` installed, so JSON
+    # mode produces one record per request that log shippers can
+    # pivot on without regex parsing.
+    app.add_middleware(AccessLogMiddleware)
     # CORS — outermost. We allow any origin because the Subsonic auth
     # token (`?u=&t=&s=`) is the security boundary, not the request
     # origin. This lets `musickit ui` (and the desktop wrappers) talk
@@ -209,7 +226,13 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
                 "version": SERVER_VERSION,
                 "type": "subsonic-compatible",
                 "api": "/rest/",
-                "spec": "https://opensubsonic.netlify.app/docs/api-reference/",
+                # `/docs` is the OpenAPI schema for THIS server's actual
+                # surface — only the endpoints we've implemented. Linking
+                # the upstream Subsonic spec instead would advertise
+                # commands we don't support, which is a worse lie than
+                # under-advertising.
+                "docs": "/docs",
+                "redoc": "/redoc",
             }
         )
 
@@ -218,6 +241,47 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
 
 class _SubsonicAuthError(Exception):
     """Internal — translated to a Subsonic error 40 response by the handler."""
+
+
+class AccessLogMiddleware(BaseHTTPMiddleware):
+    """One structured log line per HTTP request.
+
+    Carries the Apache combined log fields (client IP, authenticated
+    user — Subsonic `?u=` query param — method, path, HTTP version,
+    status code, response bytes, Referer, User-Agent) plus a
+    `duration_ms` for slow-endpoint spotting. Routes through the
+    structlog handler `configure_logging()` installed, so JSON mode
+    produces one machine-parseable record per request.
+    """
+
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
+        started = time.perf_counter()
+        # `call_next` is `Callable[[Request], Awaitable[Response]]`;
+        # left as `Any` because the BaseHTTPMiddleware stub types it
+        # vaguely. Cast the return so mypy sees the concrete `Response`.
+        response: Response = await call_next(request)
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+        client = request.client.host if request.client else "-"
+        # Subsonic auth puts the username in `?u=`; surface it where an
+        # Apache log would carry `%u`. Falls back to "-" for any
+        # request that hasn't authenticated yet (root probe, OPTIONS).
+        user = request.query_params.get("u") or "-"
+        http_version = request.scope.get("http_version", "1.1")
+        bytes_sent = response.headers.get("content-length", "-")
+        _access_log.info(
+            "request",
+            client=client,
+            user=user,
+            method=request.method,
+            path=request.url.path,
+            http_version=http_version,
+            status=response.status_code,
+            bytes=bytes_sent,
+            referer=request.headers.get("referer", "-"),
+            user_agent=request.headers.get("user-agent", "-"),
+            duration_ms=elapsed_ms,
+        )
+        return response
 
 
 class PostFormToQueryMiddleware:
