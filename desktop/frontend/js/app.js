@@ -26,12 +26,45 @@ const ROOT_ID = "root";
 /** Top-level state machine. Either renders login or shell. */
 async function boot() {
   const session = await loadSession();
-  if (session) {
-    const client = subsonicClient(session);
-    mountShell(client, session);
-  } else {
+  if (!session) {
     mountLogin();
+    return;
   }
+  // Verify the server is reachable before showing the shell. Without
+  // this check, a stale session against a server that's offline (laptop
+  // moved off the LAN, server stopped, Tailscale down) renders the full
+  // empty shell for ~2s while the artist-list fetch hangs, then loads
+  // into a broken state. Pre-check with a short ping and fall back to
+  // the login form (pre-filled with the last-used host + user) when it
+  // fails, so the user can either re-enter their password against a
+  // now-reachable server or switch to a different one.
+  const client = subsonicClient(session);
+  try {
+    await pingWithTimeout(client, 3000);
+  } catch (e) {
+    console.warn("session restore: server unreachable, showing login:", e);
+    mountLogin({
+      host: session.host,
+      user: session.user,
+      connectError: `Couldn't reach ${session.host}. Check the URL or the server, then sign in again.`,
+    });
+    return;
+  }
+  mountShell(client, session);
+}
+
+/**
+ * Race `client.query("ping")` against a hard timeout. Returns the
+ * server-info envelope on success, throws on either failure path
+ * (network error or timeout).
+ */
+async function pingWithTimeout(client, timeoutMs) {
+  return Promise.race([
+    client.query("ping"),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`ping timeout after ${timeoutMs}ms`)), timeoutMs),
+    ),
+  ]);
 }
 
 async function mountLogin(prefill = null) {
@@ -104,6 +137,14 @@ async function mountLogin(prefill = null) {
   if (userInput) userInput.value = qUser || last?.user || "admin";
   if (passInput && qPass) passInput.value = qPass;
   else if (passInput && !last) passInput.value = "admin";
+
+  // If `boot()` couldn't reach the previously-active server, surface
+  // that as an error message above the form so the user knows why
+  // they landed back at the login screen.
+  if (prefill?.connectError) {
+    const status = document.getElementById("login-status");
+    setStatus(status, prefill.connectError, true);
+  }
 
   // Render saved-servers list.
   if (saved.length > 0) {
