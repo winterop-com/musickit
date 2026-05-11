@@ -24,6 +24,7 @@ from fastapi.templating import Jinja2Templates
 from musickit import __version__, radio
 from musickit.serve.auth import AuthError, verify
 from musickit.serve.radio_proxy import latest_icy_title, proxy_station_stream
+from musickit.serve.stars import StarStore
 from musickit.web.session import SESSION_PW_KEY, SESSION_USER_KEY, new_csrf_token
 
 router = APIRouter()
@@ -228,6 +229,7 @@ async def web_album(request: Request, al_id: str) -> Response:
     if redirect is not None:
         return redirect
     cache = request.app.state.cache
+    stars: StarStore = request.app.state.stars
     album = cache.albums_by_id.get(al_id)
     if album is None:
         return HTMLResponse("<p class='empty'>Album not found.</p>", status_code=404)
@@ -246,6 +248,7 @@ async def web_album(request: Request, al_id: str) -> Response:
                 "title": track.title or track.path.stem,
                 "artist": track.artist or album.artist_dir,
                 "duration": _fmt_mmss(track.duration_s or 0.0),
+                "starred": stars.is_starred(tr_id),
             }
         )
     return templates.TemplateResponse(
@@ -257,6 +260,56 @@ async def web_album(request: Request, al_id: str) -> Response:
             "album_title": album.tag_album or album.album_dir,
             "album_artist": album.tag_album_artist or album.artist_dir,
             "album_year": album.tag_year or "",
+        },
+    )
+
+
+@router.get("/web/starred", response_class=HTMLResponse, include_in_schema=False)
+async def web_starred(request: Request) -> Response:
+    """HTML fragment: every starred track, rendered as a flat playable list.
+
+    Reuses the album-tracks template — each row carries its own `album_id`
+    so cover art / playback URL building keeps working when the queue
+    spans many albums. The album-heading at the top says "Starred · N
+    tracks" rather than an album name.
+    """
+    redirect = _require_auth_or_redirect(request)
+    if redirect is not None:
+        return redirect
+    cache = request.app.state.cache
+    stars: StarStore = request.app.state.stars
+    tracks: list[dict] = []
+    for sid, _ts in sorted(stars.by_kind("tr_").items(), key=lambda kv: kv[1], reverse=True):
+        pair = cache.tracks_by_id.get(sid)
+        if pair is None:
+            # Stale star entry (file removed since starring) — skipped
+            # silently. Run `stars.prune(...)` separately to clean up.
+            continue
+        album, track = pair
+        al_id = next((aid for aid, a in cache.albums_by_id.items() if a is album), None)
+        if al_id is None:
+            continue
+        tracks.append(
+            {
+                "id": sid,
+                "track_no": len(tracks) + 1,
+                "title": track.title or track.path.stem,
+                "artist": track.artist or album.artist_dir,
+                "duration": _fmt_mmss(track.duration_s or 0.0),
+                "starred": True,
+                "album_id": al_id,
+            }
+        )
+    return templates.TemplateResponse(
+        request,
+        "tracks.html",
+        {
+            "tracks": tracks,
+            "album_id": "",
+            "album_title": "Starred",
+            "album_artist": f"{len(tracks)} tracks",
+            "album_year": "",
+            "empty_message": "No starred tracks yet. Star a track from an album to add it here.",
         },
     )
 
