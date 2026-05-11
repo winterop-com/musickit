@@ -331,6 +331,8 @@ export function renderShell(root, client, session, hooks = {}) {
     const cover = document.getElementById("np-cover");
     cover.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>";
 
+    updateMediaSessionMetadata(state.queue[0]);
+
     playButton.disabled = false;
     prevButton.disabled = true;
     nextButton.disabled = true;
@@ -567,9 +569,63 @@ export function renderShell(root, client, session, hooks = {}) {
       cover.src = client.mediaUrl("getCoverArt", { id: item.albumId, size: 80 });
     }
 
+    updateMediaSessionMetadata(item);
+
     playButton.disabled = false;
     prevButton.disabled = idx === 0;
     nextButton.disabled = idx === state.queue.length - 1;
+  }
+
+  // -----------------------------------------------------------------
+  // Media Session API — wires macOS / Windows / Linux media keys
+  // (F7/F8/F9 on a MacBook, dedicated transport keys on third-party
+  // keyboards, AirPods double/triple-tap, the macOS Control Center
+  // "Now Playing" widget) to the same prev / play-pause / next
+  // functions the on-screen transport buttons use.
+  //
+  // Metadata is also pushed via `MediaMetadata` so the OS widget can
+  // show the current title / artist / album cover.
+  // -----------------------------------------------------------------
+  function updateMediaSessionMetadata(item) {
+    if (!("mediaSession" in navigator)) return;
+    if (item.kind === "radio") {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: item.title || "Radio",
+        artist: item.artist || "Radio",
+        album: "",
+      });
+      return;
+    }
+    const artwork = item.albumId
+      ? [
+          {
+            src: client.mediaUrl("getCoverArt", { id: item.albumId, size: 512 }),
+            sizes: "512x512",
+            type: "image/jpeg",
+          },
+        ]
+      : [];
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: item.title || "",
+      artist: item.artist || "",
+      album: item.albumTitle || "",
+      artwork,
+    });
+  }
+
+  if ("mediaSession" in navigator) {
+    navigator.mediaSession.setActionHandler("play", () => {
+      audio.play().catch((err) => console.warn("media-key play failed:", err));
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      audio.pause();
+    });
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      prevTrack();
+    });
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      nextTrack();
+    });
   }
 
   function nextTrack() {
@@ -604,10 +660,12 @@ export function renderShell(root, client, session, hooks = {}) {
   audio.addEventListener("play", () => {
     playGlyph.textContent = "‖";
     stateIconEl.textContent = "▶";
+    if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
   });
   audio.addEventListener("pause", () => {
     playGlyph.textContent = "▶";
     stateIconEl.textContent = "‖";
+    if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
   });
   audio.addEventListener("ended", () => {
     playGlyph.textContent = "▶";
