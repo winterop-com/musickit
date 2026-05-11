@@ -234,21 +234,50 @@
    traffic-light buttons that stay pinned in their normal position,
    and mark the bar as `-webkit-app-region: drag` so click-and-drag
    anywhere along it moves the window like native chrome would.
-   Interactive children opt back out via `no-drag` so input, buttons,
-   and the search dropdown keep responding to clicks. Only the
-   desktop SPA loads `shell.css`; the browser `/web` route uses the
-   stock topbar layout (with its own brand + version label). */
+
+   `-webkit-app-region` is NOT inherited, so each child container
+   (`.topbar-left` / `-center` / `-right`) needs its own `drag` rule —
+   without that, clicking the empty space inside any column lands on
+   a non-draggable child and the drag doesn't engage. Interactive
+   leaves (`input`, `button`, `.search-dropdown`, `a`) then opt back
+   out via `no-drag` so they still respond to clicks normally.
+
+   Only the desktop SPA loads `shell.css`; the browser `/web` route
+   uses the stock topbar layout (with its own brand + version label
+   and no app-region rules — browsers ignore them). */
 .topbar {
   padding-left: 78px;
+  /* No text selection on the title-bar surrogate — keeps the version
+     label / username feeling like inert chrome, and prevents
+     mouse-down on text from starting a selection instead of a drag. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Default-everything-in-the-topbar to `drag` so spans / divs / the
+   empty space between cells all act as the drag handle. Then carve
+   out the interactive leaves so the search input + sign-out button +
+   search dropdown still take clicks normally. The descendant
+   `.topbar *` selector is intentional — `-webkit-app-region` doesn't
+   inherit, and child elements default to `no-drag`, so without
+   forcing every descendant we end up with little non-draggable
+   patches wherever a `<span>` or wrapper `<div>` sits. Tauri also
+   reads `data-tauri-drag-region` (set on the topbar + columns in
+   `shell.js`) as a more reliable signal than CSS-only when the
+   webview is WebKit. */
+.topbar,
+.topbar * {
   -webkit-app-region: drag;
 }
 
 .topbar input,
 .topbar button,
-.topbar .search-dropdown,
 .topbar a,
-.topbar [data-action] {
+.topbar .search-dropdown,
+.topbar .search-dropdown * {
   -webkit-app-region: no-drag;
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 
 /* Shortcut help overlay — centred modal triggered by `?`. */

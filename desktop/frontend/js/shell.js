@@ -31,8 +31,8 @@ const ICONS = {
 /** Mount the shell into `root`. Takes the SubsonicClient + session. */
 export function renderShell(root, client, session, hooks = {}) {
   root.innerHTML = `
-    <header class="topbar">
-      <div class="topbar-left">
+    <header class="topbar" data-tauri-drag-region>
+      <div class="topbar-left" data-tauri-drag-region>
         <input type="search" id="search" class="search-input"
                placeholder="search…  (/)" autocomplete="off" spellcheck="false">
         <div class="search-dropdown" id="search-dropdown" hidden>
@@ -51,11 +51,11 @@ export function renderShell(root, client, session, hooks = {}) {
           <p class="search-empty" hidden>No matches.</p>
         </div>
       </div>
-      <div class="topbar-center">
-        <span class="version" id="server-info"></span>
+      <div class="topbar-center" data-tauri-drag-region>
+        <span class="version" id="server-info" data-tauri-drag-region></span>
       </div>
-      <div class="topbar-right">
-        <span class="user" id="topbar-user"></span>
+      <div class="topbar-right" data-tauri-drag-region>
+        <span class="user" id="topbar-user" data-tauri-drag-region></span>
         <button type="button" class="ghost-button" id="signout-btn">Sign out</button>
       </div>
     </header>
@@ -158,6 +158,50 @@ export function renderShell(root, client, session, hooks = {}) {
 
     <audio id="audio" preload="none"></audio>
   `;
+
+  // Runtime drag-handle wiring for Tauri.
+  //
+  // Tauri 2 exposes the current-window object via two parallel global
+  // paths depending on the runtime config — `window.__TAURI__.window
+  // .getCurrentWindow()` and `window.__TAURI__.webviewWindow
+  // .getCurrentWebviewWindow()`. Both return an object with
+  // `.startDragging()` available, but which one is populated depends
+  // on plugin presence + Tauri-CLI version. Trying both keeps this
+  // working across the version churn.
+  //
+  // Why a runtime listener instead of just CSS `-webkit-app-region:
+  // drag` (which works for Electron)? Tauri 2's WKWebView ignores
+  // that property entirely; the Tauri docs require either the
+  // `data-tauri-drag-region` HTML attribute (also set, but Tauri
+  // sometimes misses it on dynamically-rendered DOM) or the runtime
+  // `startDragging()` API. Document-level delegation means it works
+  // even if the topbar is later re-rendered.
+  function getTauriWindow() {
+    const t = /** @type {{ window?: any; webviewWindow?: any }} */ (window).__TAURI__;
+    if (!t) return null;
+    if (typeof t.window?.getCurrentWindow === "function") return t.window.getCurrentWindow();
+    if (typeof t.webviewWindow?.getCurrentWebviewWindow === "function") {
+      return t.webviewWindow.getCurrentWebviewWindow();
+    }
+    if (typeof t.window?.getCurrent === "function") return t.window.getCurrent();
+    return null;
+  }
+
+  document.addEventListener("mousedown", (event) => {
+    if (event.buttons !== 1) return;
+    const target = /** @type {Element} */ (event.target);
+    const topbar = target.closest?.(".topbar");
+    if (!topbar) return;
+    if (target.closest("input, button, a, .search-dropdown")) return;
+    const tauriWin = getTauriWindow();
+    if (!tauriWin?.startDragging) return;
+    // Fire-and-forget — `await` would yield the event loop before
+    // Tauri's native side could grab the OS mouse-event stream,
+    // sometimes resulting in a no-op drag. Logging the rejection
+    // (instead of swallowing it) so DevTools surfaces the cause if
+    // something on the Rust side blocks the call.
+    tauriWin.startDragging().catch((e) => console.warn("startDragging failed:", e));
+  });
 
   // Wire up topbar identity / sign-out.
   document.getElementById("topbar-user").textContent = session.user;
