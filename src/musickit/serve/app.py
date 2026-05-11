@@ -95,9 +95,13 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     any Subsonic server without needing one running in-process.
     """
     app = FastAPI(
-        title="musickit",
+        # The Swagger / OpenAPI title is user-facing — match the branded
+        # name used in the desktop wrappers and the HTML landing page.
+        # (The Subsonic-spec `type` field stays lowercase "musickit" in
+        # API payloads; that's a machine identifier.)
+        title="MusicKit",
         description=(
-            "Subsonic-compatible HTTP API for a converted musickit library. "
+            "Subsonic-compatible HTTP API for a MusicKit library. "
             "Every endpoint accepts the Subsonic salted-token query params "
             "(`?u=&t=&s=&v=&c=`); Swagger's *Try it out* form is read-only "
             "without those, but the schema itself is fully populated."
@@ -230,9 +234,16 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
         # human who paste the host into Safari to confirm the server is
         # reachable. ReDoc is disabled — Swagger's enough.
         base = str(request.base_url).rstrip("/")
+        # `SERVER_NAME` ("musickit") stays the lowercase Subsonic API
+        # identifier — it appears in `{"type": "musickit"}` payloads and
+        # is what other clients match on. The user-facing brand in the
+        # UI is "MusicKit" (matches the desktop wrappers' window title
+        # and the project README). Hardcode rather than `.title()` so
+        # future renames stay explicit.
+        display_name = "MusicKit"
         body = (
             "<!doctype html><html><head><meta charset=utf-8>"
-            f"<title>{SERVER_NAME} {SERVER_VERSION}</title>"
+            f"<title>{display_name} {SERVER_VERSION}</title>"
             "<style>"
             "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;"
             "background:#1a1b26;color:#a9b1d6;max-width:42rem;margin:3rem auto;"
@@ -244,7 +255,7 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
             "font-size:0.9em;color:#bb9af7}"
             "ul{padding-left:1.2rem}"
             "</style></head><body>"
-            f"<h1>{SERVER_NAME}</h1>"
+            f"<h1>{display_name}</h1>"
             f'<p class="sub">{SERVER_VERSION} · Subsonic-compatible</p>'
             f'<ul><li><a href="{base}/docs">/docs</a> — OpenAPI schema (Swagger UI)</li>'
             f"<li><code>{base}/rest/</code> — Subsonic API root "
