@@ -14,10 +14,31 @@
 (function () {
   "use strict";
 
-  const backdrop = document.getElementById("palette-backdrop");
-  const input = document.getElementById("palette-input");
-  const list = document.getElementById("palette-list");
-  if (!backdrop || !input || !list) return;
+  // The palette DOM is rendered by `shell.js`'s `renderShell()` AFTER
+  // login — when this script runs at page load the DOM doesn't exist
+  // yet. Lazy-resolve refs on first Cmd+P press, then wire all the
+  // per-palette listeners (input, list, backdrop) once. The global
+  // Cmd+P keydown listener is the only thing installed at load time.
+  let backdrop = null;
+  let input = null;
+  let list = null;
+  let wired = false;
+
+  function wireRefs() {
+    backdrop = document.getElementById("palette-backdrop");
+    input = document.getElementById("palette-input");
+    list = document.getElementById("palette-list");
+    if (!backdrop || !input || !list) return false;
+    if (wired) return true;
+    wired = true;
+    input.addEventListener("input", () => applyFilter(input.value));
+    input.addEventListener("keydown", onInputKeydown);
+    list.addEventListener("click", onListClick);
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop) close();
+    });
+    return true;
+  }
 
   // Static command catalog. Label is the user-visible string, hint is
   // the keybind shown on the right, action is what happens on invoke.
@@ -41,7 +62,7 @@
     { label: "Focus search", hint: "/", action: { key: "/" } },
     { label: "Show keyboard shortcuts", hint: "?", action: { key: "?" } },
     { label: "Close lyrics / visualizer", hint: "esc", action: { key: "Escape" } },
-    { label: "Sign out", hint: "", action: { submit: "form.logout-form" } },
+    { label: "Sign out", hint: "", action: { click: "#signout-btn" } },
   ];
 
   function currentMode() {
@@ -153,15 +174,18 @@
       // Brief defer so the close finishes before the keybind handler
       // re-evaluates focus (e.g. `/` should focus the search bar).
       setTimeout(() => dispatchKeyExtended(cmd.action.key), 0);
+    } else if (cmd.action.click) {
+      // Click a button by selector — used for Sign out (the desktop's
+      // signout button calls `hooks.onSignOut`, no form submit needed).
+      const el = document.querySelector(cmd.action.click);
+      if (el && typeof el.click === "function") el.click();
     } else if (cmd.action.submit) {
       const form = document.querySelector(cmd.action.submit);
       if (form && typeof form.submit === "function") form.submit();
     }
   }
 
-  input.addEventListener("input", () => applyFilter(input.value));
-
-  input.addEventListener("keydown", (event) => {
+  function onInputKeydown(event) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       activeIdx = Math.min(activeIdx + 1, filtered.length - 1);
@@ -178,29 +202,25 @@
       event.preventDefault();
       close();
     }
-  });
+  }
 
-  list.addEventListener("click", (event) => {
+  function onListClick(event) {
     const li = event.target.closest("[data-idx]");
     if (!li) return;
     const cmd = filtered[parseInt(li.dataset.idx, 10)];
     if (cmd) invoke(cmd);
-  });
-
-  backdrop.addEventListener("click", (event) => {
-    if (event.target === backdrop) close();
-  });
+  }
 
   document.addEventListener("keydown", (event) => {
     // Ctrl+P (Linux/Win) or Cmd+P (macOS).
     const isPaletteShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p";
-    if (isPaletteShortcut) {
-      event.preventDefault();
-      if (backdrop.hidden) {
-        open();
-      } else {
-        close();
-      }
+    if (!isPaletteShortcut) return;
+    if (!wireRefs()) return; // no palette DOM on this page (login screen)
+    event.preventDefault();
+    if (backdrop.hidden) {
+      open();
+    } else {
+      close();
     }
   });
 })();

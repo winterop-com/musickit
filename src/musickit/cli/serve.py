@@ -65,13 +65,6 @@ def serve(
             help="Rebuild the index DB from scratch on startup (ignores any cached rows).",
         ),
     ] = False,
-    no_web: Annotated[
-        bool,
-        typer.Option(
-            "--no-web",
-            help="Disable the browser UI (/login, /web, /web-static). Subsonic /rest/* API stays available.",
-        ),
-    ] = False,
 ) -> None:
     """Start a Subsonic-compatible server for the converted library.
 
@@ -90,8 +83,8 @@ def serve(
             err=True,
         )
 
-    fastapi_app = create_app(root=target_dir.resolve(), cfg=cfg, use_cache=not no_cache, enable_web=not no_web)
-    _print_startup_banner(host=host, port=port, root=target_dir.resolve(), web_enabled=not no_web)
+    fastapi_app = create_app(root=target_dir.resolve(), cfg=cfg, use_cache=not no_cache)
+    _print_startup_banner(host=host, port=port, root=target_dir.resolve())
 
     # Block on the initial scan so the first client request hits a populated
     # cache. Show a transient progress bar — large libraries on slow drives
@@ -155,11 +148,10 @@ def serve(
             unregister_service(zc, info)
 
 
-def _print_startup_banner(*, host: str, port: int, root: Path, web_enabled: bool = True) -> None:
+def _print_startup_banner(*, host: str, port: int, root: Path) -> None:
     """Show LAN + Tailscale URLs on startup so the user can copy/paste into a client."""
     typer.echo(f"musickit serve — Subsonic API for {root}")
     typer.echo(f"  bind: {host}:{port}")
-    typer.echo(f"  web UI: {'enabled at /web' if web_enabled else 'disabled (--no-web)'}")
     if host in ("0.0.0.0", "::"):
         lan = _local_lan_ip()
         if lan:

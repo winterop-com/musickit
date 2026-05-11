@@ -16,5 +16,11 @@
        it's deferred, it runs after the SPA's app.js has populated
        the shell DOM with the canvas. -->
   <script defer src="js/visualizer.js"></script>
+  <!-- Cmd/Ctrl+P command palette. Self-contained IIFE that wires itself
+       to the palette DOM rendered by `shell.js`'s `renderShell()`. `defer`
+       so it runs after app.js has populated the shell, and after any
+       login-only render no-ops gracefully (the palette DOM doesn't exist
+       on the picker page). -->
+  <script defer src="js/palette.js"></script>
 </body>
 </html>

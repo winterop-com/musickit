@@ -37,6 +37,7 @@ nav:
       - inspect: guides/inspect.md
       - tui: guides/tui.md
       - serve: guides/serve.md
+      - ui: guides/ui.md
       - playlist: guides/playlist.md
   - Clients:
       - Desktop apps: guides/desktop.md

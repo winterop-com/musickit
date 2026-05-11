@@ -3,10 +3,12 @@
 A Subsonic-compatible HTTP server. Any modern Subsonic client (Symfonium, Amperfy, play:Sub, Feishin, Supersonic, DSub) connects, browses, searches, streams, and seeks. Works equally well over LAN and over Tailscale.
 
 ```bash
-uvx musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [--no-mdns] [--no-watch] [--no-cache] [--full-rescan] [--no-web]
+uvx musickit serve TARGET_DIR [--host H] [--port P] [--user U] [--password P] [--no-mdns] [--no-watch] [--no-cache] [--full-rescan]
 ```
 
 `TARGET_DIR` is required. `--host 0.0.0.0`, `--port 4533`, credentials default to `admin`/`admin` with a yellow warning. `--no-cache` skips the persistent SQLite index at `<TARGET_DIR>/.musickit/index.db`; `--full-rescan` rebuilds it from scratch on startup. See [`musickit library index`](library.md#index-manage-the-persistent-sqlite-cache) for index management.
+
+`musickit serve` exposes only the Subsonic `/rest/*` surface. The browser UI ships separately as the `musickit ui` command (since 0.20.0) — it static-serves the same SPA the desktop wrappers bundle, with a login picker that points at any Subsonic server. See [`musickit ui`](ui.md).
 
 ## Startup banner
 
@@ -178,67 +180,107 @@ Stars live OUTSIDE the SQLite library index because the index is fully derived f
 
 ## Browser UI
 
-Open the server URL in any browser to use the bundled web player. The visual language tracks the TUI's `widgets.py` exactly — bordered panels with floating titles, the same palette (cyan headers / blue labels / green for playing / orange for the active track), monospace numerics, slim "round 30%"-style scrollbars, ncmpcpp-style KeyBar.
+The browser UI used to live inside `musickit serve` at `/login` + `/web`. As of 0.20.4 it's a separate command — [`musickit ui`](ui.md) — that static-serves the same SPA the desktop wrappers bundle, with a login picker that points at any Subsonic-compatible server (musickit serve, Navidrome, Airsonic, Gonic, ...). `musickit serve` now exposes only the Subsonic `/rest/*` surface.
 
+```bash
+musickit ui --url http://<host>:4533 --user admin --password admin
+# opens http://localhost:1888 in the browser, picker pre-filled
 ```
-http://<host>:4533/login          → sign-in form (same creds as the Subsonic API)
-http://<host>:4533/web            → three-pane browser
+
+Why split: the SPA is a pure Subsonic client, so coupling it to a co-hosted serve instance was an artificial restriction. `musickit ui` works against a remote server over Tailscale, a local serve on a different port, Navidrome with no musickit installed at all — and `musickit serve` shrinks to a single-purpose API binary.
+
+## Running as a background service
+
+Once you've got `musickit serve` working interactively, lift it into a managed service so it boots with the machine and auto-restarts on crash. Both flavours below assume musickit is installed system-wide (or in a virtualenv) and your library lives at a stable path.
+
+### systemd (Linux)
+
+Drop a unit file at `/etc/systemd/system/musickit.service`:
+
+```ini
+[Unit]
+Description=MusicKit Subsonic server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=morten
+Group=morten
+ExecStart=/usr/local/bin/musickit serve /srv/music --host 0.0.0.0 --port 4533
+Restart=on-failure
+RestartSec=5
+# Hardening — opt out if you actually need broader filesystem / network access.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-![Browser UI — three-pane shell](../screenshots/web-shell.png)
+Enable + start:
 
-Click an artist in the left Browse pane to see albums, click an album to see tracks, click a track to start playing. Now Playing card (top-left) shows the active title / artist / album / cover; the Spectrum panel (top-right) is a 48-band FFT bar visualizer driven by the Web Audio API.
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now musickit
+sudo journalctl -fu musickit          # live logs
+```
 
-![Drilled into an album](../screenshots/web-album-tracks.png)
+For a user-level service (no sudo, no `/etc`), drop the file under `~/.config/systemd/user/musickit.service` and use `systemctl --user`.
 
-**Internet radio** lives in the same sidebar. Click the Radio panel's Stations entry to load `/web/radio` — the list comes from [`getInternetRadioStations`](#internet-radio), which is backed by `radio.load_stations()` (defaults + `~/.config/musickit/radio.toml`). The grid collapses to two columns in radio mode, the active station gets the orange `is-playing` highlight, and the Now Playing title flips to the current ICY StreamTitle once the proxy parses one (see below).
+### launchd (macOS)
 
-![Radio mode — Stations selected, NRK mP3 streaming](../screenshots/web-radio.png)
+Drop a property list at `~/Library/LaunchAgents/com.winterop.musickit.plist`:
 
-**Press `f`** to fullscreen the Spectrum visualizer. The Now Playing card stays visible at the top, the panes hide, the bars take the rest of the viewport. Press `f` again to return.
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.winterop.musickit</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/musickit</string>
+    <string>serve</string>
+    <string>/Users/morten/Music</string>
+    <string>--host</string>
+    <string>0.0.0.0</string>
+    <string>--port</string>
+    <string>4533</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/morten/Library/Logs/musickit.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/morten/Library/Logs/musickit.log</string>
+</dict>
+</plist>
+```
 
-![Fullscreen Spectrum visualizer](../screenshots/web-spectrum-fullscreen.png)
+Load it:
 
-**Press `?`** for a slide-in keys panel; **Cmd/Ctrl+P** opens a Textual-style command palette. Both filter their contents by the current playback mode — the help and palette below were captured while a radio stream was playing, so Next / Prev / Seek / Repeat / Shuffle / Lyrics are absent (they don't apply to a live stream).
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.winterop.musickit.plist
+launchctl print gui/$(id -u)/com.winterop.musickit | head
+tail -f ~/Library/Logs/musickit.log
+```
 
-![Help panel — radio mode](../screenshots/web-help.png)
+Unload / reload after edits:
 
-![Command palette — radio mode](../screenshots/web-palette.png)
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.winterop.musickit.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.winterop.musickit.plist
+```
 
-The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same `/rest/getArtists` / `/rest/getArtist` / `/rest/getAlbum` endpoints the rest of the API uses; track playback hits `/rest/stream`, radio playback hits `/web/radio-stream` (a same-origin proxy that strips ICY metadata frames so the Web Audio visualizer keeps working). Login sets a signed session cookie so `<audio src="/rest/stream?id=...">` doesn't have to leak the password into HTML.
+Use a Launch Agent (`~/Library/LaunchAgents/`) for "runs when this user is logged in" — easy to set up, no root, survives reboots after login. Use a Launch Daemon (`/Library/LaunchDaemons/`, owned by root) only if you need the server up before login. Most setups want the agent.
 
-Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using `?u=&p=` query params and never see the cookie path — they're untouched by this addition.
-
-**Disable the web UI** with `--no-web`. With the flag, `/login`, `/web`, and `/web-static/*` are not mounted — `/` returns the JSON probe to browsers as well as Subsonic clients. The `/rest/*` API stays fully available. Useful when you only want the Subsonic surface on a host (smaller attack area) or running headless on an embedded box where nobody hits the URL in a browser.
-
-**Keybinds:**
-
-| Key | Action |
-|---|---|
-| Space | Play / pause |
-| `n` / `p` | Next / previous track in the current album queue |
-| `<` / `>` | Seek backward / forward 5s |
-| `9` / `0` | Volume down / up |
-| `r` | Cycle repeat (off / album / track) |
-| `s` | Toggle shuffle |
-| `l` | Toggle the lyrics panel (synced highlight when LRC is available) |
-| `f` | Toggle the FFT visualizer (Web Audio API + Canvas) |
-| `/` | Focus the search bar |
-| `?` | Show keyboard shortcuts (slide-in panel) |
-| Cmd / Ctrl + P | Command palette |
-| Esc | Close lyrics / visualizer / blur search |
-
-**Sidebar Radio panel** — clicking it loads `/web/radio`, which lists the same stations the TUI plays (defaults + `~/.config/musickit/radio.toml`). Click a station to start streaming via `<audio>`; the visualizer keeps working over the live stream.
-
-**Search** uses the same FTS5 index `/search3` does (sub-ms ranked, prefix-matching, diacritic-folded — `bey` finds `Beyoncé`). Results swap into the right pane as artist / album / track sections; click any result to drill in or play.
-
-**Cover art** thumbnails appear in album rows + the now-playing card; sourced from `/rest/getCoverArt` with the LRU cache from v0.9.1.
-
-**Queue** is the visible album. Click a track → play from there; auto-advance through remaining tracks; `n`/`p` step. (Cross-album queueing comes later.)
-
-**FFT visualizer** runs entirely in the browser via the Web Audio API: a `MediaElementAudioSourceNode` tees the `<audio>` element into an `AnalyserNode`, the JS averages the FFT into 48 log-spaced bands (30Hz to 16kHz), and renders bars to a `<canvas>` at 60fps with red/yellow/green VU gradient — same palette as the TUI. Asymmetric attack/release smoothing so transients pop while sustained tones don't shimmer.
-
-Follow-ups not yet shipped: custom queue / "play next", playlist creation in the browser.
+The default `--host 0.0.0.0` is what makes the server reachable from your phone or another Mac on the same network or Tailnet. Pin it to `127.0.0.1` in the args list above if you want a single-machine setup.
 
 ## Authentication
 
