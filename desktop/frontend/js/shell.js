@@ -75,6 +75,11 @@ export function renderShell(root, client, session, hooks = {}) {
                     id="next-button" disabled aria-label="Next track">
               <span aria-hidden="true">⏭</span>
             </button>
+            <button type="button" class="np-button np-mute" id="mute-button" aria-label="Mute">
+              <span aria-hidden="true" id="mute-glyph">🔊</span>
+            </button>
+            <input type="range" id="volume-slider" class="volume-slider"
+                   min="0" max="1" step="0.01" value="1" aria-label="Volume">
           </div>
         </div>
         <div class="np-progress" id="np-progress">
@@ -773,19 +778,54 @@ export function renderShell(root, client, session, hooks = {}) {
   if (barEl) barEl.style.cursor = "pointer";
 
   // -----------------------------------------------------------------
-  // Volume + mute helpers (used by keybinds).
+  // Volume + mute helpers — used by keybinds AND the in-card slider /
+  // mute button. The single source of truth is `audio.volume` /
+  // `audio.muted`; everything else (slider position, mute glyph,
+  // localStorage) re-syncs from the `volumechange` event below.
   // -----------------------------------------------------------------
   function bumpVolume(delta) {
     audio.volume = Math.max(0, Math.min(1, audio.volume + delta));
+  }
+  function toggleMute() {
+    audio.muted = !audio.muted;
+  }
+
+  const volumeSlider = document.getElementById("volume-slider");
+  const muteButton = document.getElementById("mute-button");
+  const muteGlyph = document.getElementById("mute-glyph");
+
+  volumeSlider.value = String(audio.volume);
+  // Slider -> audio: drag end fires `change`, drag-in-progress fires
+  // `input`; we wire both to `input` so the volume tracks the drag.
+  // Moving the slider above zero implicitly unmutes — same behaviour
+  // as macOS / browsers.
+  volumeSlider.addEventListener("input", () => {
+    const v = parseFloat(volumeSlider.value);
+    if (Number.isFinite(v)) {
+      audio.volume = v;
+      if (v > 0 && audio.muted) audio.muted = false;
+    }
+  });
+
+  muteButton.addEventListener("click", () => toggleMute());
+
+  // `volumechange` fires for both `volume` and `muted` writes, so a
+  // single listener keeps the slider, mute glyph, and localStorage in
+  // sync regardless of who flipped the value (slider drag, ArrowUp/
+  // ArrowDown keybind, mute button, `m` keybind, media-session pause).
+  audio.addEventListener("volumechange", () => {
+    volumeSlider.value = String(audio.volume);
+    const silent = audio.muted || audio.volume === 0;
+    muteGlyph.textContent = silent ? "🔇" : audio.volume < 0.5 ? "🔉" : "🔊";
+    muteButton.setAttribute("aria-label", audio.muted ? "Unmute" : "Mute");
     try {
       localStorage.setItem(LS_VOLUME, String(audio.volume));
     } catch (e) {
       // localStorage unavailable.
     }
-  }
-  function toggleMute() {
-    audio.muted = !audio.muted;
-  }
+  });
+  // Fire once so the icon matches the restored volume on boot.
+  audio.dispatchEvent(new Event("volumechange"));
   function seekRelative(deltaSec) {
     if (!audio.duration || !isFinite(audio.duration)) return;
     audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + deltaSec));
