@@ -602,18 +602,28 @@ button:focus-visible {
 .three-pane {
   display: grid;
   grid-template-columns: 260px 340px 1fr;
-  /* Without `grid-template-rows`, the implicit row defaults to `auto`
-     and grows to fit content — so a long tracks list stretched the
-     row, the `.pane` (a grid-stretch child) stretched with it, and
-     the inner `.row-list`'s `overflow-y: auto` never engaged. The
-     overflow then bubbled up to the document and scrolling on tracks
-     scrolled the entire window (topbar and now-playing-region rolled
-     off the top). `minmax(0, 1fr)` constrains the row to the
-     container's flex-allotted height regardless of content, so the
-     row-list does its own scrolling — same trick already used at the
-     mobile breakpoint via `grid-auto-rows`. */
+  /* `minmax(0, 1fr)` keeps the grid row from being sized to its
+     content. Required so the inner `.pane` -> `.panel.panel-grow` ->
+     `.row-list` chain has a definite height to size against. */
   grid-template-rows: minmax(0, 1fr);
-  flex: 1;
+  /* Explicit `height: calc(...)` instead of `flex: 1` + `min-height: 0`.
+     The flex-chain approach worked in vanilla Chromium but failed in
+     Electron (and some Chromium versions) — DevTools showed the
+     `.three-pane` being sized to its content (~1850px) instead of
+     the flex-allotted leftover (~700px). The fr unit then resolved
+     against that content height, the `.pane` grid-stretched to match,
+     and `.row-list`'s overflow never engaged because its parent was
+     always tall enough — overflow bubbled to the document and the
+     entire window scrolled.
+     `--mk-topbar-h` is set live by `shell.js` from `topbar.offsetHeight`
+     on init / resize; the default 40px is the typical macOS topbar.
+     The now-playing region is hard-coded to `height: 170px` above. */
+  height: calc(100vh - var(--mk-topbar-h, 40px) - 170px);
+  /* With explicit `height`, `flex: 1` would override it (basis 0%).
+     `flex: 0 0 auto` keeps `height` as the flex basis so the element
+     stays at the calc'd size. The body still flex-stacks topbar +
+     now-playing + three-pane without any growing/shrinking. */
+  flex: 0 0 auto;
   min-height: 0;
   overflow: hidden;
   padding: 0.5rem;

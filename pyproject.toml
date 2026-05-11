@@ -1,6 +1,6 @@
 [project]
 name = "musickit"
-version = "0.13.17"
+version = "0.13.18"
 description = "Self-hosted music toolkit: convert / audit / retag rips into a clean tagged library, browse + play via a Textual TUI (local / internet radio / Subsonic-client / AirPlay), and stream over Tailscale via a Subsonic-compatible HTTP server."
 readme = "README.md"
 requires-python = ">=3.13"
