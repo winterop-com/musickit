@@ -202,15 +202,19 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
     from musickit.serve.endpoints.system import router as system_router
 
     auth_dep = [Depends(require_auth)]
-    app.include_router(system_router, prefix="/rest", dependencies=auth_dep)
-    app.include_router(browsing_router, prefix="/rest", dependencies=auth_dep)
-    app.include_router(scan_router, prefix="/rest", dependencies=auth_dep)
-    app.include_router(media_router, prefix="/rest", dependencies=auth_dep)
-    app.include_router(search_router, prefix="/rest", dependencies=auth_dep)
-    app.include_router(extras_router, prefix="/rest", dependencies=auth_dep)
-    app.include_router(lyrics_router, prefix="/rest", dependencies=auth_dep)
-    app.include_router(radio_router, prefix="/rest", dependencies=auth_dep)
-    app.include_router(stubs_router, prefix="/rest", dependencies=auth_dep)
+    # Tags group endpoints in `/docs` (Swagger UI) — without them every
+    # route lands under "default" and the page is one long flat list.
+    # The grouping mirrors the module layout (`endpoints/<category>.py`)
+    # so a request from a client maps directly to its source file.
+    app.include_router(system_router, prefix="/rest", dependencies=auth_dep, tags=["system"])
+    app.include_router(browsing_router, prefix="/rest", dependencies=auth_dep, tags=["browsing"])
+    app.include_router(scan_router, prefix="/rest", dependencies=auth_dep, tags=["scan"])
+    app.include_router(media_router, prefix="/rest", dependencies=auth_dep, tags=["media"])
+    app.include_router(search_router, prefix="/rest", dependencies=auth_dep, tags=["search"])
+    app.include_router(extras_router, prefix="/rest", dependencies=auth_dep, tags=["extras"])
+    app.include_router(lyrics_router, prefix="/rest", dependencies=auth_dep, tags=["lyrics"])
+    app.include_router(radio_router, prefix="/rest", dependencies=auth_dep, tags=["radio"])
+    app.include_router(stubs_router, prefix="/rest", dependencies=auth_dep, tags=["stubs"])
 
     # Root probe — JSON only. Browsers visiting `/` get the same
     # introspection payload Subsonic clients hit on pre-login: server
