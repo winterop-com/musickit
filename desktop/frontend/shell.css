@@ -227,6 +227,30 @@
   font-family: var(--mono);
 }
 
+/* Native title-bar is hidden via the wrapper's `titleBarStyle:
+   "hiddenInset"` / `"Overlay"` so the in-app `.topbar` takes over as
+   the window's title bar — drops the duplicate "MusicKit" text macOS
+   used to paint above our own. Reserve ~78px on the left for the
+   traffic-light buttons that stay pinned in their normal position,
+   and mark the bar as `-webkit-app-region: drag` so click-and-drag
+   anywhere along it moves the window like native chrome would.
+   Interactive children opt back out via `no-drag` so input, buttons,
+   and the search dropdown keep responding to clicks. Only the
+   desktop SPA loads `shell.css`; the browser `/web` route uses the
+   stock topbar layout (with its own brand + version label). */
+.topbar {
+  padding-left: 78px;
+  -webkit-app-region: drag;
+}
+
+.topbar input,
+.topbar button,
+.topbar .search-dropdown,
+.topbar a,
+.topbar [data-action] {
+  -webkit-app-region: no-drag;
+}
+
 /* Shortcut help overlay — centred modal triggered by `?`. */
 .shortcut-help-overlay {
   position: fixed;

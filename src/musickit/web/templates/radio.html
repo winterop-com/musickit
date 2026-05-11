@@ -1,3 +1,4 @@
+{% import "icons.html" as ic %}
 <p class="panel-count">{{ stations|length }} stations</p>
 <ul class="row-list" id="radio-list">
   {% for station in stations %}
@@ -8,7 +9,7 @@
             data-name="{{ station.name }}"
             data-url="{{ station.url }}"
             {% if station.homepage %}data-homepage="{{ station.homepage }}"{% endif %}>
-      <span class="row-icon">📻</span>
+      <span class="row-icon">{{ ic.radio() }}</span>
       <span class="album-text">
         <span class="album-title">{{ station.name }}</span>
         {% if station.description %}

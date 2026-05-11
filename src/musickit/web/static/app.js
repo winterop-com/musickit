@@ -16,6 +16,18 @@
 (function () {
   "use strict";
 
+  // Lucide-sourced SVG icons for the runtime toggles (play↔pause, ♡↔♥).
+  // Server-rendered HTML already carries the right icon at first paint
+  // via the Jinja `icons.html` macros; these constants only kick in
+  // when JS needs to swap an icon in place. Same SVG path data the
+  // template uses, so the two sources stay visually identical.
+  const ICONS = {
+    play: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
+    pause: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>`,
+    heart: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg>`,
+    heartFilled: `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg>`,
+  };
+
   const audio = document.getElementById("audio");
   const playButton = document.getElementById("play-button");
   const prevButton = document.getElementById("prev-button");
@@ -295,7 +307,7 @@
     const wasStarred = starEl.classList.contains("is-starred");
     const inStarredView = document.body.classList.contains("is-starred");
     starEl.classList.toggle("is-starred", !wasStarred);
-    starEl.textContent = wasStarred ? "♡" : "♥";
+    starEl.innerHTML = wasStarred ? ICONS.heart : ICONS.heartFilled;
     starEl.setAttribute("aria-label", wasStarred ? "Star" : "Unstar");
     const endpoint = wasStarred ? "/rest/unstar" : "/rest/star";
     try {
@@ -329,7 +341,7 @@
     } catch (e) {
       // Revert on failure.
       starEl.classList.toggle("is-starred", wasStarred);
-      starEl.textContent = wasStarred ? "♥" : "♡";
+      starEl.innerHTML = wasStarred ? ICONS.heartFilled : ICONS.heart;
       starEl.setAttribute("aria-label", wasStarred ? "Unstar" : "Star");
       console.warn("toggleStar failed:", e);
     }
@@ -864,7 +876,7 @@
 
   audio.addEventListener("play", function () {
     playButton.classList.remove("is-paused");
-    playButton.firstElementChild.textContent = "‖";
+    playButton.firstElementChild.innerHTML = ICONS.pause;
     setStateIcon("▶");
   });
 

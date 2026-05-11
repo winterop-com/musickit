@@ -1,4 +1,4 @@
-.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python dist-collect desktop-sync-frontend desktop-sync-version desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build clean
+.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python dist-collect desktop-sync-frontend desktop-sync-version desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build ui-static-sync clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -111,9 +111,12 @@ build: build-python desktop-tauri-build desktop-electron-build dist-collect
 	@echo ">>> All release builds complete. Artifacts collected in ./dist (v$(VERSION)):"
 	@ls -lh dist/ | tail -n +2
 
-build-python:
+build-python: ui-static-sync
 	@echo ">>> Building Python wheel + sdist into ./dist"
 	@$(UV) build
+
+ui-static-sync:
+	@$(UV) run python scripts/copy_ui_static.py
 
 # Copy desktop artifacts into ./dist alongside the Python wheel + sdist
 # so a single directory has everything `make build` produced. Wipes

@@ -1,3 +1,4 @@
+{% import "icons.html" as ic %}
 <div class="album-heading" data-year="{{ album_year }}">
   <span class="album-heading-title">{{ album_title }}</span>
   <span class="album-heading-artist">{{ album_artist }}</span>
@@ -28,7 +29,7 @@
             data-action="toggle-star"
             data-id="{{ track.id }}"
             role="button"
-            aria-label="{% if track.starred %}Unstar{% else %}Star{% endif %}">{% if track.starred %}♥{% else %}♡{% endif %}</span>
+            aria-label="{% if track.starred %}Unstar{% else %}Star{% endif %}">{% if track.starred %}{{ ic.heart_filled() }}{% else %}{{ ic.heart() }}{% endif %}</span>
     </button>
   </li>
   {% else %}

@@ -92,6 +92,22 @@ function createWindow() {
     center: !usePosition,
     title: "MusicKit",
     icon: path.join(__dirname, "..", "..", "tauri", "src-tauri", "icons", "icon.png"),
+    // Hide the native title-bar text so our in-app topbar IS the title
+    // bar — Spotify / Linear / Notion / VSCode all do this. On macOS,
+    // `hiddenInset` keeps the traffic-light buttons in their usual top-
+    // left position but drops the duplicated "MusicKit" label. CSS in
+    // `_app.css` adds ~78px of left padding to `.topbar` on darwin so
+    // the search input doesn't sit under the traffic lights, and
+    // marks the bar as `-webkit-app-region: drag` so it functions as
+    // a drag handle like a native title bar.
+    titleBarStyle: "hiddenInset",
+    // Windows / Linux equivalent — overlay buttons over the topbar
+    // colour so the visual cue is consistent across platforms.
+    titleBarOverlay: {
+      color: "#1a1b26",
+      symbolColor: "#a9b1d6",
+      height: 36,
+    },
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

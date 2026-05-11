@@ -458,6 +458,58 @@ button:focus-visible {
   flex-shrink: 0;
 }
 
+/* Inline Lucide SVGs in the transport / mute buttons inherit
+   `currentColor` for stroke + fill. The wrapping `<span>` is flexed
+   so the SVG sits dead-centre without inheriting text-baseline
+   offsets — without this, the speaker / play glyph drift down/right
+   inside their circular buttons because each glyph's content is
+   placed asymmetrically inside its 24×24 viewBox. */
+.np-button > span,
+.play-button > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.np-button svg,
+.play-button svg {
+  display: block;
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.play-button svg {
+  width: 1.4em;
+  height: 1.4em;
+}
+
+/* Row-icon SVGs sit inline next to text labels; the slight `vertical-
+   align` nudges them to match the cap-height of adjacent text. */
+.row-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -0.15em;
+}
+
+.row-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+
+.track-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.track-star svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+}
+
 .np-button:hover:not([disabled]) {
   color: var(--text);
   border-color: var(--label);
