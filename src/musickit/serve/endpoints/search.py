@@ -8,12 +8,17 @@ from musickit.serve import search_index
 from musickit.serve.app import envelope
 from musickit.serve.index import IndexCache
 from musickit.serve.payloads import album_payload, artist_summary, song_payload
+from musickit.serve.stars import StarStore
 
 router = APIRouter()
 
 
 def _get_cache(request: Request) -> IndexCache:
     return request.app.state.cache  # type: ignore[no-any-return]
+
+
+def _get_stars(request: Request) -> StarStore:
+    return request.app.state.stars  # type: ignore[no-any-return]
 
 
 def _matches(needle: str, haystack: str) -> bool:
@@ -112,6 +117,13 @@ async def search3(
         album_offset=albumOffset,
         song_offset=songOffset,
     )
+    stars = _get_stars(request)
+    for entry in result.get("artist", []):
+        stars.enrich(entry)
+    for entry in result.get("album", []):
+        stars.enrich(entry)
+    for entry in result.get("song", []):
+        stars.enrich(entry)
     return envelope("searchResult3", result)
 
 

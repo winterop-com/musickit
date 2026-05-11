@@ -105,6 +105,13 @@ export function renderShell(root, client, session, hooks = {}) {
           </button>
         </section>
 
+        <section class="panel" aria-label="Starred">
+          <h2 class="panel-title">Starred</h2>
+          <button type="button" class="row-button" id="starred-toggle">
+            <span class="row-icon">♥</span> Tracks
+          </button>
+        </section>
+
         <section class="panel panel-grow" aria-label="Browse">
           <h2 class="panel-title">Artists <span class="count" id="artists-count"></span></h2>
           <ul class="row-list" id="artists-list">
@@ -187,6 +194,18 @@ export function renderShell(root, client, session, hooks = {}) {
   const prevButton = document.getElementById("prev-button");
   const nextButton = document.getElementById("next-button");
 
+  // Tag the audio element CORS-anonymous up-front so the visualizer's
+  // first-play `audio.crossOrigin = "anonymous"` is a no-op (the
+  // `if (!audio.crossOrigin)` check finds it set). Without this, the
+  // visualizer's lazy-init RELOADS the element mid-play to apply CORS
+  // — for radio streams that means ~1s of buffered audio plays from
+  // the pre-CORS fetch, then the reload aborts and the second fetch's
+  // audio never reaches the speakers. Setting it once at mount means
+  // every fetch is CORS-tagged from the start, no reload happens.
+  // Subsonic /rest/stream and our /rest/radioStream proxy both send
+  // `Access-Control-Allow-Origin: *` so the request goes through.
+  audio.crossOrigin = "anonymous";
+
   // -----------------------------------------------------------------
   // Boot: restore volume + artist list, then replay the URL hash.
   // -----------------------------------------------------------------
@@ -262,6 +281,7 @@ export function renderShell(root, client, session, hooks = {}) {
     state.currentTrackId = null;
     updateHash();
     document.body.classList.add("is-radio");
+    document.body.classList.remove("is-starred");
 
     const albumsTitle = document.getElementById("albums-title");
     if (albumsTitle) albumsTitle.textContent = "Stations";
@@ -416,9 +436,11 @@ export function renderShell(root, client, session, hooks = {}) {
     state.currentTrackId = null;
     updateHash();
     markActive(".pane-sidebar", btn);
-    // Leave radio mode if we were in it (the body class controls the
-    // grid collapse + track-pane hide via _app.css).
+    // Leave radio / starred mode if we were in either — both body classes
+    // collapse one of the panes via `_app.css`, and an album drill-in
+    // needs all three panes visible again.
     document.body.classList.remove("is-radio");
+    document.body.classList.remove("is-starred");
     const albumsTitle = document.getElementById("albums-title");
     if (albumsTitle) albumsTitle.textContent = "Albums";
     const pane = document.getElementById("albums-pane");
@@ -491,37 +513,199 @@ export function renderShell(root, client, session, hooks = {}) {
         <span class="album-heading-title">${escapeHtml(album.name || "—")}</span>
         <span class="album-heading-artist">${escapeHtml(album.artist || "—")}</span>
       `;
-      const tableHeader = document.createElement("div");
-      tableHeader.className = "track-table-header";
-      tableHeader.innerHTML = `
-        <span class="th-no">#</span>
-        <span class="th-title">Title</span>
-        <span class="th-artist">Artist</span>
-        <span class="th-time">Time</span>
-      `;
+      const tableHeader = buildTrackTableHeader();
       const rule = document.createElement("div");
       rule.className = "track-table-rule";
       const list = document.createElement("ul");
       list.className = "row-list track-list";
       for (const song of songs) {
         const li = document.createElement("li");
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "row-button track-row";
-        button.dataset.trackId = song.id;
-        button.dataset.albumId = album.id;
-        button.dataset.title = song.title || "—";
-        button.dataset.artist = song.artist || album.artist || "—";
-        button.dataset.albumTitle = album.name || "";
-        button.dataset.albumYear = album.year || "";
-        button.dataset.suffix = song.suffix || "";
-        button.innerHTML = `
-          <span class="track-no">${song.track ?? ""}</span>
-          <span class="track-title"><span class="marquee-inner">${escapeHtml(song.title || "—")}</span></span>
-          <span class="track-artist">${escapeHtml(song.artist || album.artist || "—")}</span>
-          <span class="track-time">${fmtTime(song.duration ?? 0)}</span>
-        `;
-        button.addEventListener("click", () => onTrackClick(button, songs, album));
+        const button = buildTrackButton(song, album, song.track ?? "");
+        button.addEventListener("click", (event) => {
+          if (event.target.closest(".track-star")) {
+            toggleStar(button);
+            return;
+          }
+          onTrackClick(button, songs, album);
+        });
+        li.appendChild(button);
+        list.appendChild(li);
+      }
+      pane.innerHTML = "";
+      pane.appendChild(heading);
+      pane.appendChild(tableHeader);
+      pane.appendChild(rule);
+      pane.appendChild(list);
+    } catch (e) {
+      pane.innerHTML = `<p class="empty">Failed: ${escapeHtml(e?.message || String(e))}</p>`;
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Track-row builder shared by `loadAlbum` (album drill-in) and
+  // `loadStarred` (flat starred-tracks list).
+  //
+  // `displayNum` is the leading number cell — track number for normal
+  // albums, sequential 1..N for the starred list (which spans albums
+  // so the original `song.track` would mean nothing).
+  // -----------------------------------------------------------------
+  function buildTrackTableHeader() {
+    const tableHeader = document.createElement("div");
+    tableHeader.className = "track-table-header";
+    tableHeader.innerHTML = `
+      <span class="th-no">#</span>
+      <span class="th-title">Title</span>
+      <span class="th-artist">Artist</span>
+      <span class="th-time">Time</span>
+      <span class="th-star"></span>
+    `;
+    return tableHeader;
+  }
+
+  function buildTrackButton(song, album, displayNum) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "row-button track-row";
+    button.dataset.trackId = song.id;
+    button.dataset.albumId = album.id;
+    button.dataset.title = song.title || "—";
+    button.dataset.artist = song.artist || album.artist || "—";
+    button.dataset.albumTitle = album.name || "";
+    button.dataset.albumYear = album.year || "";
+    button.dataset.suffix = song.suffix || "";
+    const isStarred = Boolean(song.starred);
+    if (isStarred) button.dataset.starred = String(song.starred);
+    button.innerHTML = `
+      <span class="track-no">${displayNum}</span>
+      <span class="track-title"><span class="marquee-inner">${escapeHtml(song.title || "—")}</span></span>
+      <span class="track-artist">${escapeHtml(song.artist || album.artist || "—")}</span>
+      <span class="track-time">${fmtTime(song.duration ?? 0)}</span>
+      <span class="track-star ${isStarred ? "is-starred" : ""}" aria-label="${isStarred ? "Unstar" : "Star"}" role="button">${isStarred ? "♥" : "♡"}</span>
+    `;
+    return button;
+  }
+
+  async function toggleStar(rowButton) {
+    const id = rowButton.dataset.trackId;
+    if (!id) return;
+    const starEl = rowButton.querySelector(".track-star");
+    const wasStarred = starEl.classList.contains("is-starred");
+    // Optimistic flip — instant feedback. Reverted if the network
+    // call rejects (rare but possible if the server's stars.toml is
+    // read-only or auth expired).
+    starEl.classList.toggle("is-starred", !wasStarred);
+    starEl.textContent = wasStarred ? "♡" : "♥";
+    starEl.setAttribute("aria-label", wasStarred ? "Star" : "Unstar");
+    if (wasStarred) {
+      delete rowButton.dataset.starred;
+    } else {
+      rowButton.dataset.starred = new Date().toISOString();
+    }
+    // If we're in the Starred view and just unstarred, drop the row
+    // from the DOM — it no longer belongs in this list. Wait until
+    // the network call succeeds before pruning so a failure doesn't
+    // leave a phantom gap.
+    const inStarredView = document.body.classList.contains("is-starred");
+    try {
+      await client.query(wasStarred ? "unstar" : "star", { id });
+      if (inStarredView && wasStarred) {
+        // Update queue state so prev / next still walks the remaining
+        // rows correctly; remove the queue entry whose id matches.
+        const removedIdx = state.queue.findIndex((q) => q.id === id);
+        if (removedIdx >= 0) {
+          state.queue.splice(removedIdx, 1);
+          if (state.queueIndex > removedIdx) state.queueIndex -= 1;
+          else if (state.queueIndex === removedIdx) state.queueIndex = -1;
+        }
+        rowButton.closest("li")?.remove();
+        // Renumber the visible rows so the # column stays 1..N.
+        const remaining = document.querySelectorAll(
+          "#tracks-pane .track-row .track-no",
+        );
+        remaining.forEach((el, i) => {
+          el.textContent = String(i + 1);
+        });
+        // Refresh the "N tracks" caption in the album heading.
+        const heading = document.querySelector(
+          "#tracks-pane .album-heading-artist",
+        );
+        if (heading) heading.textContent = `${remaining.length} tracks`;
+      }
+    } catch (e) {
+      // Revert on failure.
+      starEl.classList.toggle("is-starred", wasStarred);
+      starEl.textContent = wasStarred ? "♥" : "♡";
+      starEl.setAttribute("aria-label", wasStarred ? "Unstar" : "Star");
+      if (wasStarred) {
+        rowButton.dataset.starred = "rollback";
+      } else {
+        delete rowButton.dataset.starred;
+      }
+      console.warn("toggleStar failed:", e);
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Starred mode — flat list of every starred track across the library.
+  // Behaves like a virtual album for queue purposes: clicking a row
+  // plays it and walks forward / backward through the same list.
+  // -----------------------------------------------------------------
+  document.getElementById("starred-toggle")?.addEventListener("click", () => loadStarred());
+
+  async function loadStarred() {
+    const starredBtn = document.getElementById("starred-toggle");
+    markActive(".pane-sidebar", starredBtn);
+    state.currentArtistId = null;
+    state.currentAlbumId = null;
+    state.currentTrackId = null;
+    updateHash();
+    document.body.classList.remove("is-radio");
+    // `is-starred` hides the albums pane and lets the tracks pane span
+    // the remaining width; CSS toggles this via `body.is-starred`.
+    document.body.classList.add("is-starred");
+
+    document.getElementById("tracks-title").textContent = "Tracks";
+    const pane = document.getElementById("tracks-pane");
+    pane.innerHTML = `<p class="empty">Loading starred tracks…</p>`;
+    try {
+      const inner = await client.query("getStarred2");
+      const songs = inner?.starred2?.song || [];
+      if (songs.length === 0) {
+        pane.innerHTML =
+          `<p class="empty">No starred tracks yet. Star a track from an album to add it here.</p>`;
+        return;
+      }
+      const virtualAlbum = { id: "starred", name: "Starred", artist: "Various", year: "" };
+      const heading = document.createElement("div");
+      heading.className = "album-heading";
+      heading.innerHTML = `
+        <span class="album-heading-title">Starred</span>
+        <span class="album-heading-artist">${songs.length} tracks</span>
+      `;
+      const tableHeader = buildTrackTableHeader();
+      const rule = document.createElement("div");
+      rule.className = "track-table-rule";
+      const list = document.createElement("ul");
+      list.className = "row-list track-list";
+      for (const [i, song] of songs.entries()) {
+        const li = document.createElement("li");
+        // Use the song's own album metadata for queue display, falling
+        // back to "Various" when missing — the Subsonic `song_payload`
+        // includes `album` / `albumId` so this is usually present.
+        const songAlbum = {
+          id: song.albumId || virtualAlbum.id,
+          name: song.album || virtualAlbum.name,
+          artist: song.artist || virtualAlbum.artist,
+          year: song.year || "",
+        };
+        const button = buildTrackButton(song, songAlbum, i + 1);
+        button.addEventListener("click", (event) => {
+          if (event.target.closest(".track-star")) {
+            toggleStar(button);
+            return;
+          }
+          onTrackClick(button, songs, songAlbum);
+        });
         li.appendChild(button);
         list.appendChild(li);
       }
