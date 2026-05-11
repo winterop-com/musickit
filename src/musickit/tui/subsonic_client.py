@@ -161,6 +161,36 @@ class SubsonicClient:
         body = self._get("getAlbum", id=album_id)
         return body.get("album", {})  # type: ignore[no-any-return]
 
+    def star(self, item_id: str) -> None:
+        """Mark an artist / album / track as starred on the server.
+
+        Subsonic infers the kind from the id prefix on musickit serve
+        (`ar_` / `al_` / `tr_`); generic Subsonic servers accept the
+        single `id` query param regardless. The endpoint returns an
+        empty success envelope, so we only care about the HTTP status.
+        """
+        self._get("star", id=item_id)
+
+    def unstar(self, item_id: str) -> None:
+        """Remove a star previously set via `star`."""
+        self._get("unstar", id=item_id)
+
+    def get_starred(self) -> dict[str, list[dict[str, Any]]]:
+        """Categorised lists of currently-starred entities.
+
+        Returns the `starred2` payload — `{artist: [...], album: [...],
+        song: [...]}`. Used by the TUI's Starred view to render a flat
+        list of starred tracks across the library; the artist / album
+        lists are surfaced for clients that want to display all three.
+        """
+        body = self._get("getStarred2")
+        starred = body.get("starred2", {})
+        return {
+            "artist": list(starred.get("artist", [])),
+            "album": list(starred.get("album", [])),
+            "song": list(starred.get("song", [])),
+        }
+
     def stream_url(self, song_id: str) -> str:
         """Build the auth-loaded `/rest/stream` URL for `AudioPlayer.play()`."""
         params = {**self._auth_params(), "id": song_id}
@@ -316,6 +346,11 @@ def _album_from_subsonic(
         # `LibraryTrack.path` is required and a few UI fallbacks read
         # `.stem` / `.suffix` when title/extension are missing.
         synthetic_path = Path("/subsonic") / artist_name / album_name / f"{title}.{suffix}"
+        # `starred` comes from `StarStore.enrich` on the server — present
+        # as an ISO 8601 string when the track is currently starred,
+        # absent otherwise. We forward it untouched so `format_track_row`
+        # can render the ♥ glyph.
+        starred_at = song.get("starred")
         tracks.append(
             LibraryTrack(
                 path=synthetic_path,
@@ -329,6 +364,7 @@ def _album_from_subsonic(
                 has_cover=bool(song.get("coverArt")),
                 cover_pixels=0,
                 stream_url=client.stream_url(song["id"]),
+                starred=str(starred_at) if starred_at else None,
             )
         )
 
