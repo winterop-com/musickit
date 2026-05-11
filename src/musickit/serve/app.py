@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
+from musickit import __version__
 from musickit.serve.auth import AuthError, verify
 from musickit.serve.config import ServeConfig
 from musickit.serve.index import IndexCache
@@ -28,7 +29,10 @@ from musickit.web.session import RestQueryAuthFromSessionMiddleware, derive_sess
 
 API_VERSION = "1.16.1"
 SERVER_NAME = "musickit"
-SERVER_VERSION = "0.1.0"
+# Pulled from the installed package metadata via `importlib.metadata`
+# (set in `musickit/__init__.py`). Avoids the stale "0.1.0" string that
+# used to live here and forget to track `pyproject.toml`'s version bumps.
+SERVER_VERSION = __version__
 
 
 def envelope(payload_key: str | None = None, payload: Any = None) -> dict[str, Any]:
