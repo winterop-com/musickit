@@ -100,6 +100,7 @@ from musickit.cli import playlist as _playlist_cmd  # noqa: E402
 from musickit.cli import retag as _retag_cmd  # noqa: E402
 from musickit.cli import serve as _serve_cmd  # noqa: E402
 from musickit.cli import tui as _tui_cmd  # noqa: E402
+from musickit.cli import ui as _ui_cmd  # noqa: E402
 
 _ = (
     _config_cmd,
@@ -112,4 +113,5 @@ _ = (
     _retag_cmd,
     _serve_cmd,
     _tui_cmd,
+    _ui_cmd,
 )

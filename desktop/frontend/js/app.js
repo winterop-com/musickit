@@ -86,15 +86,24 @@ async function mountLogin(prefill = null) {
     </main>
   `;
 
-  // Pre-fill from last-used if present, otherwise fall back to the
-  // local-musickit-serve defaults — most first-time users are testing
-  // against `musickit serve <library>` on their own machine.
+  // Pre-fill order of precedence:
+  //   1. `?host=&user=&password=` query string — `musickit ui --url ...`
+  //      passes these in so the form opens already populated. Useful for
+  //      a one-command "open the UI pointed at this server" workflow.
+  //   2. Last-used credentials from the store.
+  //   3. The local-musickit-serve defaults — most first-time users are
+  //      testing against `musickit serve <library>` on their own machine.
+  const params = new URLSearchParams(window.location.search);
+  const qHost = params.get("host");
+  const qUser = params.get("user");
+  const qPass = params.get("password");
   const hostInput = document.getElementById("login-host");
   const userInput = document.getElementById("login-user");
   const passInput = document.getElementById("login-pass");
-  if (hostInput) hostInput.value = last?.host || "http://localhost:4533";
-  if (userInput) userInput.value = last?.user || "admin";
-  if (passInput && !last) passInput.value = "admin";
+  if (hostInput) hostInput.value = qHost || last?.host || "http://localhost:4533";
+  if (userInput) userInput.value = qUser || last?.user || "admin";
+  if (passInput && qPass) passInput.value = qPass;
+  else if (passInput && !last) passInput.value = "admin";
 
   // Render saved-servers list.
   if (saved.length > 0) {

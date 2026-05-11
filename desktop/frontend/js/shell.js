@@ -10,6 +10,24 @@
 
 import { subsonicClient } from "./api.js";
 
+// Lucide-sourced SVG icon set. Paths copied verbatim from lucide.dev so
+// migrating to `lucide-react` once the desktop SPA moves to React is
+// purely mechanical (`${ICONS.heart}` → `<Heart />`, same shape data,
+// same `currentColor` theming). Sizes are controlled by font-size on
+// the wrapper via `.icon svg { width:1em; height:1em }` — see shell.css.
+const ICONS = {
+  play: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>`,
+  pause: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>`,
+  skipBack: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg>`,
+  skipForward: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg>`,
+  heart: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg>`,
+  heartFilled: `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg>`,
+  radio: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>`,
+  volumeHigh: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>`,
+  volumeLow: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/></svg>`,
+  volumeMute: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>`,
+};
+
 /** Mount the shell into `root`. Takes the SubsonicClient + session. */
 export function renderShell(root, client, session, hooks = {}) {
   root.innerHTML = `
@@ -34,7 +52,6 @@ export function renderShell(root, client, session, hooks = {}) {
         </div>
       </div>
       <div class="topbar-center">
-        <span class="brand">MusicKit</span>
         <span class="version" id="server-info"></span>
       </div>
       <div class="topbar-right">
@@ -65,18 +82,18 @@ export function renderShell(root, client, session, hooks = {}) {
           <div class="np-controls">
             <button type="button" class="np-button" data-action="prev"
                     id="prev-button" disabled aria-label="Previous track">
-              <span aria-hidden="true">⏮</span>
+              <span aria-hidden="true">${ICONS.skipBack}</span>
             </button>
             <button type="button" class="play-button" data-action="play-pause"
                     id="play-button" disabled aria-label="Play / pause">
-              <span aria-hidden="true">▶</span>
+              <span aria-hidden="true">${ICONS.play}</span>
             </button>
             <button type="button" class="np-button" data-action="next"
                     id="next-button" disabled aria-label="Next track">
-              <span aria-hidden="true">⏭</span>
+              <span aria-hidden="true">${ICONS.skipForward}</span>
             </button>
             <button type="button" class="np-button np-mute" id="mute-button" aria-label="Mute">
-              <span aria-hidden="true" id="mute-glyph">🔊</span>
+              <span aria-hidden="true" id="mute-glyph">${ICONS.volumeHigh}</span>
             </button>
             <input type="range" id="volume-slider" class="volume-slider"
                    min="0" max="1" step="0.01" value="1" aria-label="Volume">
@@ -101,14 +118,14 @@ export function renderShell(root, client, session, hooks = {}) {
         <section class="panel" aria-label="Radio">
           <h2 class="panel-title">Radio</h2>
           <button type="button" class="row-button" id="radio-toggle">
-            <span class="row-icon">📻</span> Stations
+            <span class="row-icon">${ICONS.radio}</span> Stations
           </button>
         </section>
 
         <section class="panel" aria-label="Starred">
           <h2 class="panel-title">Starred</h2>
           <button type="button" class="row-button" id="starred-toggle">
-            <span class="row-icon">♥</span> Tracks
+            <span class="row-icon">${ICONS.heart}</span> Tracks
           </button>
         </section>
 
@@ -306,7 +323,7 @@ export function renderShell(root, client, session, hooks = {}) {
         button.dataset.streamUrl = s.streamUrl;
         button.dataset.stationName = s.name;
         button.innerHTML = `
-          <span class="row-icon">📻</span>
+          <span class="row-icon">${ICONS.radio}</span>
           <span class="album-text">
             <span class="album-title">${escapeHtml(s.name || "—")}</span>
             ${
@@ -580,7 +597,7 @@ export function renderShell(root, client, session, hooks = {}) {
       <span class="track-title"><span class="marquee-inner">${escapeHtml(song.title || "—")}</span></span>
       <span class="track-artist">${escapeHtml(song.artist || album.artist || "—")}</span>
       <span class="track-time">${fmtTime(song.duration ?? 0)}</span>
-      <span class="track-star ${isStarred ? "is-starred" : ""}" aria-label="${isStarred ? "Unstar" : "Star"}" role="button">${isStarred ? "♥" : "♡"}</span>
+      <span class="track-star ${isStarred ? "is-starred" : ""}" aria-label="${isStarred ? "Unstar" : "Star"}" role="button">${isStarred ? ICONS.heartFilled : ICONS.heart}</span>
     `;
     return button;
   }
@@ -594,7 +611,7 @@ export function renderShell(root, client, session, hooks = {}) {
     // call rejects (rare but possible if the server's stars.toml is
     // read-only or auth expired).
     starEl.classList.toggle("is-starred", !wasStarred);
-    starEl.textContent = wasStarred ? "♡" : "♥";
+    starEl.innerHTML = wasStarred ? ICONS.heart : ICONS.heartFilled;
     starEl.setAttribute("aria-label", wasStarred ? "Star" : "Unstar");
     if (wasStarred) {
       delete rowButton.dataset.starred;
@@ -634,7 +651,7 @@ export function renderShell(root, client, session, hooks = {}) {
     } catch (e) {
       // Revert on failure.
       starEl.classList.toggle("is-starred", wasStarred);
-      starEl.textContent = wasStarred ? "♥" : "♡";
+      starEl.innerHTML = wasStarred ? ICONS.heartFilled : ICONS.heart;
       starEl.setAttribute("aria-label", wasStarred ? "Unstar" : "Star");
       if (wasStarred) {
         rowButton.dataset.starred = "rollback";
@@ -862,17 +879,17 @@ export function renderShell(root, client, session, hooks = {}) {
   const stateIconEl = document.getElementById("np-state-icon");
   const playGlyph = playButton.firstElementChild;
   audio.addEventListener("play", () => {
-    playGlyph.textContent = "‖";
+    playGlyph.innerHTML = ICONS.pause;
     stateIconEl.textContent = "▶";
     if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
   });
   audio.addEventListener("pause", () => {
-    playGlyph.textContent = "▶";
+    playGlyph.innerHTML = ICONS.play;
     stateIconEl.textContent = "‖";
     if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
   });
   audio.addEventListener("ended", () => {
-    playGlyph.textContent = "▶";
+    playGlyph.innerHTML = ICONS.play;
     stateIconEl.textContent = "■";
     nextTrack();
   });
@@ -1000,7 +1017,7 @@ export function renderShell(root, client, session, hooks = {}) {
   audio.addEventListener("volumechange", () => {
     volumeSlider.value = String(audio.volume);
     const silent = audio.muted || audio.volume === 0;
-    muteGlyph.textContent = silent ? "🔇" : audio.volume < 0.5 ? "🔉" : "🔊";
+    muteGlyph.innerHTML = silent ? ICONS.volumeMute : audio.volume < 0.5 ? ICONS.volumeLow : ICONS.volumeHigh;
     muteButton.setAttribute("aria-label", audio.muted ? "Unmute" : "Mute");
     try {
       localStorage.setItem(LS_VOLUME, String(audio.volume));

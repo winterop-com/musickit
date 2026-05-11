@@ -47,3 +47,8 @@ desktop/tauri/src-tauri/gen/
 desktop/electron/node_modules/
 desktop/electron/dist/
 desktop/electron/package-lock.json
+
+# Generated bundle so `musickit ui` can serve the SPA from an installed
+# wheel. `scripts/copy_ui_static.py` mirrors `desktop/frontend/` into
+# here; the canonical source lives in `desktop/frontend/`.
+src/musickit/_ui_static/
