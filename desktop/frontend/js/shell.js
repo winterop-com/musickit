@@ -16,7 +16,22 @@ export function renderShell(root, client, session, hooks = {}) {
     <header class="topbar">
       <div class="topbar-left">
         <input type="search" id="search" class="search-input"
-               placeholder="filter / search…  (/)" autocomplete="off" spellcheck="false">
+               placeholder="search…  (/)" autocomplete="off" spellcheck="false">
+        <div class="search-dropdown" id="search-dropdown" hidden>
+          <section class="search-section" data-kind="artist" hidden>
+            <h3 class="search-section-title">Artists</h3>
+            <ul class="search-section-list"></ul>
+          </section>
+          <section class="search-section" data-kind="album" hidden>
+            <h3 class="search-section-title">Albums</h3>
+            <ul class="search-section-list"></ul>
+          </section>
+          <section class="search-section" data-kind="song" hidden>
+            <h3 class="search-section-title">Tracks</h3>
+            <ul class="search-section-list"></ul>
+          </section>
+          <p class="search-empty" hidden>No matches.</p>
+        </div>
       </div>
       <div class="topbar-center">
         <span class="brand">MusicKit</span>
@@ -853,6 +868,264 @@ export function renderShell(root, client, session, hooks = {}) {
     } else if (event.key === "?") {
       event.preventDefault();
       toggleShortcutHelp();
+    }
+  });
+
+  // -----------------------------------------------------------------
+  // Search dropdown — typeahead under #search.
+  //
+  // Calls `/rest/search3` on a 250ms debounce and shows top hits for
+  // Artists / Albums / Tracks in a popover below the input. Clicking
+  // a hit routes through the existing drill-in / playback paths so
+  // post-click state matches what you'd get from manual navigation.
+  // Stale-response guard via a monotonic sequence counter — a slow
+  // request that lands after a newer one is discarded.
+  // -----------------------------------------------------------------
+  const searchInput = document.getElementById("search");
+  const searchDropdown = document.getElementById("search-dropdown");
+  const searchEmptyMsg = searchDropdown.querySelector(".search-empty");
+  const sectionByKind = {
+    artist: searchDropdown.querySelector('.search-section[data-kind="artist"]'),
+    album: searchDropdown.querySelector('.search-section[data-kind="album"]'),
+    song: searchDropdown.querySelector('.search-section[data-kind="song"]'),
+  };
+  let searchDebounce = null;
+  let searchSeq = 0;
+  let searchActiveIdx = -1;
+
+  function searchItemButtons() {
+    return Array.from(searchDropdown.querySelectorAll(".search-item-button"));
+  }
+
+  function setSearchActive(idx) {
+    const buttons = searchItemButtons();
+    if (buttons.length === 0) {
+      searchActiveIdx = -1;
+      return;
+    }
+    if (idx < 0) idx = buttons.length - 1;
+    if (idx >= buttons.length) idx = 0;
+    buttons.forEach((b, i) => b.classList.toggle("is-active", i === idx));
+    buttons[idx].scrollIntoView({ block: "nearest" });
+    searchActiveIdx = idx;
+  }
+
+  function closeSearchDropdown() {
+    searchDropdown.hidden = true;
+    searchActiveIdx = -1;
+  }
+
+  function clearSearch() {
+    searchInput.value = "";
+    closeSearchDropdown();
+  }
+
+  function buildSearchItem(kind, item) {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "search-item-button";
+    if (kind === "artist") {
+      btn.innerHTML = `<span class="search-item-primary">${escapeHtml(item.name || "—")}</span>`;
+      btn.addEventListener("click", () => {
+        clearSearch();
+        // Route through the existing artist button so highlighting and
+        // active-pane state match what manual navigation would produce.
+        const target = document.querySelector(
+          `.pane-sidebar .row-button[data-artist-id="${cssEscape(item.id)}"]`,
+        );
+        if (target) {
+          target.scrollIntoView({ block: "nearest" });
+          target.click();
+        } else {
+          loadArtist(item.id, null);
+        }
+      });
+    } else if (kind === "album") {
+      const meta = [item.artist, item.year ? String(item.year) : null].filter(Boolean).join(" · ");
+      btn.innerHTML = `
+        <span class="search-item-primary">${escapeHtml(item.name || "—")}</span>
+        <span class="search-item-secondary">${escapeHtml(meta || "—")}</span>
+      `;
+      btn.addEventListener("click", async () => {
+        clearSearch();
+        // Drill via the artist first so the sidebar highlight + albums
+        // pane content reflect where the album lives. Then click the
+        // album button once it renders so the album-row gets `is-active`.
+        if (item.artistId) {
+          const artistBtn = document.querySelector(
+            `.pane-sidebar .row-button[data-artist-id="${cssEscape(item.artistId)}"]`,
+          );
+          if (artistBtn) {
+            artistBtn.scrollIntoView({ block: "nearest" });
+            artistBtn.click();
+          } else {
+            await loadArtist(item.artistId, null);
+          }
+        }
+        const albumBtn = await waitForElement(
+          `.pane-albums .row-button[data-album-id="${cssEscape(item.id)}"]`,
+        );
+        if (albumBtn) {
+          albumBtn.scrollIntoView({ block: "nearest" });
+          albumBtn.click();
+        } else {
+          loadAlbum(item.id, null);
+        }
+      });
+    } else {
+      // song
+      const meta = [item.artist, item.album].filter(Boolean).join(" · ");
+      btn.innerHTML = `
+        <span class="search-item-primary">${escapeHtml(item.title || "—")}</span>
+        <span class="search-item-secondary">${escapeHtml(meta || "—")}</span>
+      `;
+      btn.addEventListener("click", async () => {
+        clearSearch();
+        // Drill artist -> album so the surrounding context (sidebar
+        // highlight + albums pane + full track list) is visible, then
+        // click the track row so onTrackClick builds the proper queue
+        // (whole album, with `nextTrack` etc) and marks the row as
+        // `is-playing`.
+        if (item.artistId) {
+          const artistBtn = document.querySelector(
+            `.pane-sidebar .row-button[data-artist-id="${cssEscape(item.artistId)}"]`,
+          );
+          if (artistBtn) {
+            artistBtn.scrollIntoView({ block: "nearest" });
+            artistBtn.click();
+          }
+        }
+        if (item.albumId) {
+          const albumBtn = await waitForElement(
+            `.pane-albums .row-button[data-album-id="${cssEscape(item.albumId)}"]`,
+          );
+          if (albumBtn) {
+            albumBtn.scrollIntoView({ block: "nearest" });
+            albumBtn.click();
+          }
+        }
+        const trackBtn = await waitForElement(
+          `.pane-tracks .row-button[data-track-id="${cssEscape(item.id)}"]`,
+        );
+        if (trackBtn) {
+          trackBtn.scrollIntoView({ block: "center" });
+          trackBtn.click();
+        } else {
+          // Fallback when we can't drill (search hit a track whose
+          // artist or album isn't in the indexed list): play as a
+          // one-item queue so the Now Playing card still updates.
+          state.queue = [
+            {
+              id: item.id,
+              title: item.title || "—",
+              artist: item.artist || "—",
+              albumId: item.albumId || null,
+              albumTitle: item.album || "",
+              albumYear: item.year ? String(item.year) : "",
+              suffix: item.suffix || "",
+              rowEl: null,
+            },
+          ];
+          state.currentTrackId = item.id;
+          updateHash();
+          playQueueIndex(0);
+        }
+      });
+    }
+    li.appendChild(btn);
+    return li;
+  }
+
+  function renderSearchResults(result) {
+    const artists = result?.artist || [];
+    const albums = result?.album || [];
+    const songs = result?.song || [];
+    const buckets = { artist: artists, album: albums, song: songs };
+    let anyVisible = false;
+    for (const kind of ["artist", "album", "song"]) {
+      const section = sectionByKind[kind];
+      const list = section.querySelector(".search-section-list");
+      list.innerHTML = "";
+      const items = buckets[kind];
+      if (items.length === 0) {
+        section.hidden = true;
+        continue;
+      }
+      section.hidden = false;
+      anyVisible = true;
+      for (const item of items) {
+        list.appendChild(buildSearchItem(kind, item));
+      }
+    }
+    searchEmptyMsg.hidden = anyVisible;
+    searchDropdown.hidden = false;
+    // Reset highlight to "none" — Down arrow will land on the first
+    // result; results re-rendering should not silently keep an old
+    // pointer that might now reference a different row.
+    searchActiveIdx = -1;
+    searchItemButtons().forEach((b) => b.classList.remove("is-active"));
+  }
+
+  async function runSearch(query) {
+    const mySeq = ++searchSeq;
+    try {
+      const inner = await client.query("search3", {
+        query,
+        artistCount: 6,
+        albumCount: 8,
+        songCount: 12,
+      });
+      if (mySeq !== searchSeq) return;
+      renderSearchResults(inner?.searchResult3 || {});
+    } catch (e) {
+      if (mySeq !== searchSeq) return;
+      console.warn("search3 failed:", e);
+    }
+  }
+
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchDebounce);
+    const q = searchInput.value.trim();
+    if (!q) {
+      closeSearchDropdown();
+      return;
+    }
+    searchDebounce = setTimeout(() => runSearch(q), 250);
+  });
+
+  searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      clearSearch();
+      searchInput.blur();
+      return;
+    }
+    if (searchDropdown.hidden) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSearchActive(searchActiveIdx + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSearchActive(searchActiveIdx - 1);
+    } else if (event.key === "Enter") {
+      const buttons = searchItemButtons();
+      if (searchActiveIdx >= 0 && searchActiveIdx < buttons.length) {
+        event.preventDefault();
+        buttons[searchActiveIdx].click();
+      }
+    }
+  });
+
+  // Click outside the dropdown closes it (the input itself is part of
+  // its own container so typing keeps it open).
+  document.addEventListener("click", (event) => {
+    if (
+      !searchDropdown.contains(event.target) &&
+      event.target !== searchInput &&
+      !searchDropdown.hidden
+    ) {
+      closeSearchDropdown();
     }
   });
 }
