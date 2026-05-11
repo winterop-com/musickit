@@ -288,7 +288,15 @@ export function renderShell(root, client, session, hooks = {}) {
   }
 
   function playStation(s, button) {
-    audio.src = s.streamUrl;
+    // Route radio through musickit serve's `/rest/radioStream` proxy
+    // (Subsonic-auth'd) instead of the raw Icecast / SHOUTcast URL.
+    // The visualizer leaves `audio.crossOrigin = "anonymous"` set so it
+    // can read FFT samples; raw upstream radio servers almost never
+    // return CORS headers, which would make the browser block the
+    // cross-origin fetch and playback never starts. The server-side
+    // proxy adds open CORS headers and parses inline ICY metadata.
+    // Only the configured `radio.toml` stations are allowed through.
+    audio.src = client.mediaUrl("radioStream", { url: s.streamUrl });
     audio.play().catch((err) => console.warn("station playback failed:", err));
 
     document.querySelectorAll(".row-button.is-playing").forEach((el) => {

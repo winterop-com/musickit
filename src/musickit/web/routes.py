@@ -15,24 +15,16 @@ Fragments are returned as plain HTML so the page's JS can do
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
-import httpx
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from musickit import __version__, radio
 from musickit.serve.auth import AuthError, verify
+from musickit.serve.radio_proxy import latest_icy_title, proxy_station_stream
 from musickit.web.session import SESSION_PW_KEY, SESSION_USER_KEY, new_csrf_token
-
-# Per-URL last-seen ICY StreamTitle, populated by the radio-stream proxy as
-# it parses inline ICY metadata frames. The web client polls
-# `/web/radio-meta?url=...` to retrieve the current value. Single-process
-# scope only — multi-worker uvicorn would need a shared store.
-_icy_titles: dict[str, str] = {}
-_ICY_TITLE_RE = re.compile(rb"StreamTitle='([^']*)';")
 
 router = APIRouter()
 
@@ -174,112 +166,17 @@ async def web_radio(request: Request) -> Response:
 
 @router.get("/web/radio-stream", include_in_schema=False)
 async def web_radio_stream(request: Request, url: str) -> Response:
-    """Same-origin proxy for a radio station's upstream stream.
+    """Same-origin proxy for a radio station's upstream stream (session-auth'd).
 
-    Why: the visualizer sets `audio.crossOrigin = "anonymous"` so Web
-    Audio can read samples for the FFT. Once that's set, browsers issue
-    a CORS preflight for any cross-origin `audio.src`, and most radio
-    servers (Icecast / SHOUTcast) don't return CORS headers — playback
-    fails silently. Routing the stream through the same origin
-    sidesteps CORS entirely; the visualizer keeps working over the
-    live stream.
-
-    Security: the URL must match a station from `radio.load_stations()`.
-    Without that gate this endpoint would be an open proxy.
+    The proxy logic lives in `musickit.serve.radio_proxy` and is shared
+    with the Subsonic-auth'd `/rest/radioStream` endpoint used by the
+    desktop wrappers; the rationale (visualizer's CORS-tagged audio
+    element + Icecast servers without CORS headers) is documented there.
     """
     redirect = _require_auth_or_redirect(request)
     if redirect is not None:
         return redirect
-    allowed = {s.url for s in radio.load_stations()}
-    if url not in allowed:
-        return Response("Unknown station", status_code=403)
-
-    client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=None))
-    upstream = await client.send(
-        client.build_request(
-            "GET",
-            url,
-            # `Icy-MetaData: 1` opts into inline ICY metadata frames so
-            # the proxy can parse "StreamTitle='Artist - Song';" updates
-            # and surface them via /web/radio-meta. The browser cannot
-            # read these frames itself.
-            headers={"User-Agent": f"musickit/{__version__}", "Icy-MetaData": "1"},
-        ),
-        stream=True,
-        follow_redirects=True,
-    )
-    if upstream.status_code >= 400:
-        await upstream.aclose()
-        await client.aclose()
-        return Response(f"Upstream {upstream.status_code}", status_code=502)
-
-    metaint_header = upstream.headers.get("icy-metaint")
-    metaint = int(metaint_header) if metaint_header and metaint_header.isdigit() else 0
-
-    async def streamer():  # type: ignore[no-untyped-def]
-        try:
-            if metaint == 0:
-                # No inline metadata advertised — straight pass-through.
-                async for chunk in upstream.aiter_raw():
-                    yield chunk
-                return
-            # Inline ICY metadata: every `metaint` audio bytes, the upstream
-            # interleaves a metadata frame:
-            #   1 byte: length / 16
-            #   N bytes: padded ASCII (e.g. "StreamTitle='...';").
-            # We forward only the audio bytes to the browser and stash the
-            # parsed StreamTitle in `_icy_titles` for /web/radio-meta to
-            # read.
-            buf = bytearray()
-            state = "audio"  # audio -> meta_len -> meta_body -> audio
-            audio_left = metaint
-            meta_len = 0
-            async for chunk in upstream.aiter_raw():
-                buf.extend(chunk)
-                # Drain the buffer in whatever states we can satisfy.
-                while True:
-                    if state == "audio":
-                        if not buf:
-                            break
-                        n = min(audio_left, len(buf))
-                        yield bytes(buf[:n])
-                        del buf[:n]
-                        audio_left -= n
-                        if audio_left == 0:
-                            state = "meta_len"
-                        continue
-                    if state == "meta_len":
-                        if not buf:
-                            break
-                        meta_len = buf[0] * 16
-                        del buf[:1]
-                        if meta_len == 0:
-                            audio_left = metaint
-                            state = "audio"
-                        else:
-                            state = "meta_body"
-                        continue
-                    # meta_body
-                    if len(buf) < meta_len:
-                        break  # wait for more bytes
-                    meta_bytes = bytes(buf[:meta_len])
-                    del buf[:meta_len]
-                    text = meta_bytes.rstrip(b"\x00")
-                    match = _ICY_TITLE_RE.search(text)
-                    if match:
-                        title = match.group(1).decode("utf-8", errors="replace").strip()
-                        if title:
-                            _icy_titles[url] = title
-                    audio_left = metaint
-                    state = "audio"
-        finally:
-            await upstream.aclose()
-            await client.aclose()
-
-    return StreamingResponse(
-        streamer(),
-        media_type=upstream.headers.get("content-type", "audio/mpeg"),
-    )
+    return await proxy_station_stream(url)
 
 
 @router.get("/web/radio-meta", include_in_schema=False)
@@ -293,7 +190,7 @@ async def web_radio_meta(request: Request, url: str) -> Response:
     redirect = _require_auth_or_redirect(request)
     if redirect is not None:
         return redirect
-    return JSONResponse({"title": _icy_titles.get(url, "")})
+    return JSONResponse({"title": latest_icy_title(url)})
 
 
 @router.get("/web/artist/{ar_id}", response_class=HTMLResponse, include_in_schema=False)
