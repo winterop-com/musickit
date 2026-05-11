@@ -16,10 +16,9 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-from fastapi import Depends, FastAPI, Request, Security
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from fastapi.security import APIKeyQuery
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from musickit import __version__
@@ -185,54 +184,12 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
         expose_headers=["*"],
     )
 
-    # OpenAPI security schemes — `Security(...)` declarations propagate to
-    # the schema so Swagger UI renders an "Authorize" dialog with these
-    # four fields. Filling them once applies to every `Try it out` call
-    # for every endpoint, instead of pasting `u=admin&t=...` into every
-    # form. Functionally these are just query-string params — same as
-    # before, the dialog is purely a UX wrapper.
-    # Distinct `scheme_name` per APIKeyQuery — without that, FastAPI
-    # deduplicates them under the same `APIKeyQuery` entry in the
-    # OpenAPI `securitySchemes` and Swagger's Authorize dialog shows
-    # only the last one. Naming each scheme means all four appear with
-    # their own description + value box.
-    api_key_u = APIKeyQuery(
-        name="u",
-        scheme_name="u (username)",
-        auto_error=False,
-        description="Subsonic username (required for every endpoint).",
-    )
-    api_key_p = APIKeyQuery(
-        name="p",
-        scheme_name="p (plain password)",
-        auto_error=False,
-        description=(
-            "Plain-text password. Legacy form — exposes the password in URL "
-            "logs / browser history. Prefer `t` + `s` (salted token) below."
-        ),
-    )
-    api_key_t = APIKeyQuery(
-        name="t",
-        scheme_name="t (salted token)",
-        auto_error=False,
-        description=(
-            "Salted MD5 token: `md5(password + s)`. Modern Subsonic-spec auth — "
-            "password never appears on the wire. Pair with `s`."
-        ),
-    )
-    api_key_s = APIKeyQuery(
-        name="s",
-        scheme_name="s (salt)",
-        auto_error=False,
-        description="Random salt used to compute `t`. Any string the client chooses.",
-    )
-
     async def require_auth(
         request: Request,
-        u: str | None = Security(api_key_u),
-        p: str | None = Security(api_key_p),
-        t: str | None = Security(api_key_t),
-        s: str | None = Security(api_key_s),
+        u: str | None = Query(default=None, include_in_schema=False),
+        p: str | None = Query(default=None, include_in_schema=False),
+        t: str | None = Query(default=None, include_in_schema=False),
+        s: str | None = Query(default=None, include_in_schema=False),
     ) -> None:
         """FastAPI dependency that enforces Subsonic auth on every endpoint.
 
@@ -244,6 +201,14 @@ def create_app(*, root: Path, cfg: ServeConfig, use_cache: bool = True) -> FastA
         The `v=` (client API version) and `c=` (client name) params are also
         part of the spec but not enforced here — clients send them for
         compatibility but we don't gate on them.
+
+        These four params are hidden from the OpenAPI schema
+        (`include_in_schema=False`). They apply identically to every
+        endpoint and would otherwise drown each per-endpoint param list
+        in boilerplate. Subsonic's multi-field auth (with optional
+        `t`+`s` token pair) doesn't model cleanly as an OpenAPI security
+        scheme, so the contract lives in this docstring + the app
+        `description` instead.
         """
         del request
         try:
