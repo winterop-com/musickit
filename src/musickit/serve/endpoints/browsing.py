@@ -40,7 +40,7 @@ def _index_letter(name: str) -> str:
 
 
 @router.api_route("/getArtists", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getArtists.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getArtists.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_artists(request: Request) -> dict:
     """Alphabetically grouped artist list — the modern (ID3) browse root."""
     cache = _get_cache(request)
@@ -56,7 +56,7 @@ async def get_artists(request: Request) -> dict:
 
 
 @router.api_route("/getIndexes", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getIndexes.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getIndexes.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_indexes(request: Request) -> dict:
     """Legacy folder-based browse — same shape as getArtists, different envelope key."""
     cache = _get_cache(request)
@@ -75,8 +75,11 @@ async def get_indexes(request: Request) -> dict:
 
 
 @router.api_route("/getArtist", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getArtist.view", methods=["GET", "POST", "HEAD"])
-async def get_artist(request: Request, id: str = Query(...)) -> dict:
+@router.api_route("/getArtist.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
+async def get_artist(
+    request: Request,
+    id: str = Query(..., description="Artist id, e.g. `ar_abc123`. Returned by `getArtists`."),
+) -> dict:
     """Albums for one artist."""
     cache = _get_cache(request)
     stars = _get_stars(request)
@@ -96,8 +99,13 @@ async def get_artist(request: Request, id: str = Query(...)) -> dict:
 
 
 @router.api_route("/getAlbum", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getAlbum.view", methods=["GET", "POST", "HEAD"])
-async def get_album(request: Request, id: str = Query(...)) -> dict:
+@router.api_route("/getAlbum.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
+async def get_album(
+    request: Request,
+    id: str = Query(
+        ..., description="Album id, e.g. `al_abc123`. Returned by `getArtist` / `getAlbumList2` / `search3`."
+    ),
+) -> dict:
     """One album with its tracks."""
     cache = _get_cache(request)
     stars = _get_stars(request)
@@ -112,8 +120,11 @@ async def get_album(request: Request, id: str = Query(...)) -> dict:
 
 
 @router.api_route("/getSong", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getSong.view", methods=["GET", "POST", "HEAD"])
-async def get_song(request: Request, id: str = Query(...)) -> dict:
+@router.api_route("/getSong.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
+async def get_song(
+    request: Request,
+    id: str = Query(..., description="Song id, e.g. `tr_abc123`. Returned by `getAlbum` / `search3` / `getStarred2`."),
+) -> dict:
     """One track."""
     cache = _get_cache(request)
     pair = cache.tracks_by_id.get(id)
@@ -124,15 +135,23 @@ async def get_song(request: Request, id: str = Query(...)) -> dict:
 
 
 @router.api_route("/getAlbumList2", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getAlbumList2.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getAlbumList2.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_album_list2(  # noqa: PLR0912 — Subsonic's `type` enum has many cases
     request: Request,
-    type: str = Query(default="alphabeticalByName"),
-    size: int = Query(default=10, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
-    fromYear: int | None = Query(default=None),
-    toYear: int | None = Query(default=None),
-    genre: str | None = Query(default=None),
+    type: str = Query(
+        default="alphabeticalByName",
+        description=(
+            "Sort / filter mode. Subsonic spec values: `alphabeticalByName`, "
+            "`alphabeticalByArtist`, `newest`, `recent`, `frequent`, `starred`, "
+            "`random`, `byYear` (needs `fromYear`/`toYear`), `byGenre` (needs "
+            "`genre`)."
+        ),
+    ),
+    size: int = Query(default=10, ge=1, le=500, description="Max albums to return (1-500)."),
+    offset: int = Query(default=0, ge=0, description="Skip this many albums (pagination)."),
+    fromYear: int | None = Query(default=None, description="`byYear` only: inclusive lower bound."),
+    toYear: int | None = Query(default=None, description="`byYear` only: inclusive upper bound."),
+    genre: str | None = Query(default=None, description="`byGenre` only: genre name to filter on."),
 ) -> dict:
     """Flat album list for browse-screens (NEW / RANDOM / A-Z / By Year / By Genre)."""
     cache = _get_cache(request)

@@ -127,12 +127,21 @@ def test_get_music_folders_returns_one_library(tmp_path: Path) -> None:
 
 
 def test_root_returns_200_with_server_info(tmp_path: Path) -> None:
-    """Amperfy probes GET / before /rest/ping — must return 200 or it refuses to log in."""
+    """Amperfy probes GET / before /rest/ping — must return 200 or it refuses to log in.
+
+    Root used to return JSON; since 0.20.6 it's an HTML landing page so a
+    browser visiting `/` gets clickable links to `/docs` and the API root.
+    Subsonic clients (Amperfy / play:Sub) treat any 200 response on `/`
+    as "server reachable" and then issue `/rest/ping` separately, so the
+    content-type doesn't matter to them — only the status code does.
+    """
     response = _client(tmp_path).get("/")
     assert response.status_code == 200
-    body = response.json()
-    assert body["name"] == "musickit"
-    assert body["api"] == "/rest/"
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    assert "MusicKit" in body
+    assert "/rest/" in body
+    assert "/docs" in body
 
 
 def test_resolve_credentials_falls_back_to_admin_defaults() -> None:

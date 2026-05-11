@@ -14,14 +14,14 @@ router = APIRouter()
 
 
 @router.api_route("/ping", methods=["GET", "POST", "HEAD"])
-@router.api_route("/ping.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/ping.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def ping() -> dict:
     """Auth check — clients ping before doing anything else."""
     return envelope()
 
 
 @router.api_route("/getLicense", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getLicense.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getLicense.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_license() -> dict:
     """Subsonic was paid software; clients still check this. Always return valid."""
     return envelope(
@@ -35,7 +35,7 @@ async def get_license() -> dict:
 
 
 @router.api_route("/getMusicFolders", methods=["GET", "POST", "HEAD"])
-@router.api_route("/getMusicFolders.view", methods=["GET", "POST", "HEAD"])
+@router.api_route("/getMusicFolders.view", methods=["GET", "POST", "HEAD"], include_in_schema=False)
 async def get_music_folders() -> dict:
     """One folder for the whole library — we don't multi-mount."""
     return envelope(
