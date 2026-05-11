@@ -73,18 +73,19 @@ def serve(
     the server reachable over Tailscale as well as the LAN.
     """
     from musickit.serve import create_app, resolve_credentials
+    from musickit.serve.logging import configure_logging
+
+    log = configure_logging()
 
     cfg, used_defaults = resolve_credentials(cli_user=user, cli_password=password)
     if used_defaults:
-        typer.secho(
-            "WARNING: using default credentials admin/admin — pass --user/--password "
-            "or write `~/.config/musickit/serve.toml` for anything beyond a private LAN.",
-            fg=typer.colors.YELLOW,
-            err=True,
+        log.warning(
+            "using default credentials admin/admin — pass --user/--password "
+            "or write ~/.config/musickit/serve.toml for anything beyond a private LAN",
         )
 
     fastapi_app = create_app(root=target_dir.resolve(), cfg=cfg, use_cache=not no_cache)
-    _print_startup_banner(host=host, port=port, root=target_dir.resolve())
+    _log_startup_banner(log, host=host, port=port, root=target_dir.resolve())
 
     # Block on the initial scan so the first client request hits a populated
     # cache. Show a transient progress bar — large libraries on slow drives
@@ -115,7 +116,12 @@ def serve(
 
         fastapi_app.state.cache.rebuild(on_album=on_album, force=full_rescan)
     cache = fastapi_app.state.cache
-    typer.echo(f"  {cache.artist_count} artists, {cache.album_count} albums, {cache.track_count} tracks\n")
+    log.info(
+        "library scanned",
+        artists=cache.artist_count,
+        albums=cache.album_count,
+        tracks=cache.track_count,
+    )
 
     mdns_handle = None
     if not no_mdns:
@@ -124,7 +130,7 @@ def serve(
         mdns_handle = register_service(port=port)
         if mdns_handle is not None:
             _, info = mdns_handle
-            typer.echo(f"  mDNS: advertising as {info.name.rstrip('.')}")
+            log.info("mDNS advertising", name=info.name.rstrip("."))
 
     watcher = None
     if not no_watch:
@@ -132,18 +138,15 @@ def serve(
 
         watcher = LibraryWatcher(fastapi_app.state.cache)
         watcher.start()
-        typer.echo(f"  watching {target_dir.resolve()} for changes (auto-rescan on add/remove/rename)")
+        log.info("filesystem watcher started", root=str(target_dir.resolve()))
 
     import uvicorn
 
     try:
-        # `log_level="warning"` silences uvicorn's three-line "Started /
-        # Waiting / Running" boilerplate that fires AFTER our banner —
-        # printing them out of order makes the banner look stale ("we
-        # said the server's up but it actually wasn't yet"). Errors
-        # still surface at warning+; the request log isn't useful for
-        # a single-user library server anyway.
-        uvicorn.run(fastapi_app, host=host, port=port, log_level="warning")
+        # `log_config=None` keeps our structlog handler the sole sink —
+        # uvicorn would otherwise install its own basicConfig that
+        # adds a second formatter and we'd get two timestamps per line.
+        uvicorn.run(fastapi_app, host=host, port=port, log_config=None)
     finally:
         if watcher is not None:
             watcher.stop()
@@ -154,18 +157,22 @@ def serve(
             unregister_service(zc, info)
 
 
-def _print_startup_banner(*, host: str, port: int, root: Path) -> None:
-    """Show LAN + Tailscale URLs on startup so the user can copy/paste into a client."""
-    typer.echo(f"musickit serve — Subsonic API for {root}")
-    typer.echo(f"  bind: {host}:{port}")
+def _log_startup_banner(log, *, host: str, port: int, root: Path) -> None:  # type: ignore[no-untyped-def]
+    """Emit the LAN + Tailscale URLs as structured log entries on startup.
+
+    `log` is a `structlog.stdlib.BoundLogger` (untyped here to avoid the
+    forward-reference dance; structlog's stub types are awkward in
+    function signatures). Each line carries enough kwargs that JSON-mode
+    shippers can pivot on `event` to spot the startup ones.
+    """
+    log.info("musickit serve starting", root=str(root), host=host, port=port)
     if host in ("0.0.0.0", "::"):
         lan = _local_lan_ip()
         if lan:
-            typer.echo(f"  LAN:  http://{lan}:{port}")
+            log.info("LAN URL", url=f"http://{lan}:{port}")
         ts = _tailscale_hostname()
         if ts:
-            typer.echo(f"  Tailscale: http://{ts}:{port}")
-    typer.echo("")
+            log.info("Tailscale URL", url=f"http://{ts}:{port}")
 
 
 def _local_lan_ip() -> str | None:
