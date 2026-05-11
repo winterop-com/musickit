@@ -137,7 +137,13 @@ def serve(
     import uvicorn
 
     try:
-        uvicorn.run(fastapi_app, host=host, port=port, log_level="info")
+        # `log_level="warning"` silences uvicorn's three-line "Started /
+        # Waiting / Running" boilerplate that fires AFTER our banner —
+        # printing them out of order makes the banner look stale ("we
+        # said the server's up but it actually wasn't yet"). Errors
+        # still surface at warning+; the request log isn't useful for
+        # a single-user library server anyway.
+        uvicorn.run(fastapi_app, host=host, port=port, log_level="warning")
     finally:
         if watcher is not None:
             watcher.stop()
