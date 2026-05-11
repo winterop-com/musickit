@@ -35,6 +35,12 @@ class LibraryTrack(BaseModel):
     # Subsonic client mode so the same widgets/format helpers work for both
     # local files and remote streams.
     stream_url: str | None = None
+    # ISO 8601 timestamp the track was starred at, or None when not starred.
+    # Populated by Subsonic-client mode from `getAlbum` / `getStarred2`
+    # responses (the server enriches every payload via `StarStore.enrich`).
+    # The TUI surfaces it as a ♥ glyph in the track row; toggling fires
+    # `/rest/star` / `/rest/unstar` and rewrites this field optimistically.
+    starred: str | None = None
 
 
 class LibraryAlbum(BaseModel):

@@ -57,8 +57,21 @@ def format_track_row(
     marker: bool,
     title_width: int = DEFAULT_TITLE_WIDTH,
 ) -> str:
-    """Render one library track row. `marker=True` gets the ▶ glyph + warm accent."""
-    glyph = f"[bold {C_ACTIVE}]▶[/]" if marker else " "
+    """Render one library track row. `marker=True` gets the ▶ glyph + warm accent.
+
+    When the track has `starred` set (an ISO timestamp from the server's
+    `StarStore.enrich`), a ♥ glyph occupies the marker slot — but the
+    `▶` for the currently-playing track wins when both apply, so the
+    eye still tracks playback first. This is a deliberate "minimum
+    visible" decision; a dedicated star column would shift every
+    header offset, so we reuse the existing single-char marker slot.
+    """
+    if marker:
+        glyph = f"[bold {C_ACTIVE}]▶[/]"
+    elif track.starred:
+        glyph = f"[{C_ACTIVE}]♥[/]"
+    else:
+        glyph = " "
     title_padded = _pad(track.title or track.path.stem, title_width)
     artist_padded = _pad(track.artist or album.artist_dir, ARTIST_WIDTH)
     time_str = fmt_mmss(track.duration_s) if track.duration_s > 0 else "  —  "
