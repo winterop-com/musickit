@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://winterop-com.github.io/musickit/guides/inspect/">
+        <link rel="canonical" href="https://winterop-com.github.io/musickit/guides/ui/">
       
       
-        <link rel="prev" href="../library/">
+        <link rel="prev" href="../serve/">
       
       
-        <link rel="next" href="../tui/">
+        <link rel="next" href="../playlist/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>inspect - MusicKit</title>
+        <title>ui - MusicKit</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#musickit-inspect" class="md-skip">
+        <a href="#musickit-ui" class="md-skip">
           Skip to content
         </a>
       
@@ -116,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              inspect
+              ui
             
           </span>
         </div>
@@ -418,19 +418,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../inspect/" class="md-nav__link">
         
   
   
@@ -446,7 +437,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -512,10 +502,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../ui/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ui
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -531,6 +548,59 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-reach-for-musickit-ui-instead-of-the-desktop-wrappers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to reach for musickit ui instead of the desktop wrappers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-filling-the-picker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-filling the picker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-as-a-background-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running as a background service
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -990,6 +1060,47 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-reach-for-musickit-ui-instead-of-the-desktop-wrappers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to reach for musickit ui instead of the desktop wrappers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-filling-the-picker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-filling the picker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-as-a-background-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running as a background service
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1008,43 +1119,50 @@
   
 
 
-<h1 id="musickit-inspect"><code>musickit inspect</code><a class="headerlink" href="#musickit-inspect" title="Permanent link">&para;</a></h1>
-<p>Quick tag + cover summary for a single audio file.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>inspect<span class="w"> </span>PATH
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>inspect<span class="w"> </span>PATH<span class="w"> </span>--json<span class="w">   </span><span class="c1"># raw model dump for scripting / jq</span>
+<h1 id="musickit-ui"><code>musickit ui</code><a class="headerlink" href="#musickit-ui" title="Permanent link">&para;</a></h1>
+<p>Static-serve the desktop SPA as a local web client against any Subsonic-compatible server. Unlike <a href="../serve/"><code>musickit serve</code></a> (which IS a Subsonic server), <code>musickit ui</code> is purely a client — point it at your own server, a friend's, a Navidrome install, anything that speaks the spec.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>musickit<span class="w"> </span>ui<span class="w">                                       </span><span class="c1"># opens http://localhost:1888</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>musickit<span class="w"> </span>ui<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span><span class="w">                           </span><span class="c1"># different port</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>musickit<span class="w"> </span>ui<span class="w"> </span>--url<span class="w"> </span>http://macair:4533<span class="w"> </span><span class="se">\ </span><span class="w">           </span><span class="c1"># pre-fill the picker</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">            </span>--user<span class="w"> </span>admin<span class="w"> </span>--password<span class="w"> </span>admin
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>musickit<span class="w"> </span>ui<span class="w"> </span>--no-open<span class="w">                             </span><span class="c1"># skip auto-opening the browser</span>
 </code></pre></div>
-<p>Prints title, artist, album_artist, album, year, genre, track/disc tuples, BPM, label, catalog, lyrics, replaygain values, MusicBrainz IDs (if present), and embedded picture dimensions, all as labelled rich panels — File, Tags, ReplayGain (when present), Lyrics (when present), Embedded picture (when present). Empty fields are suppressed so the output reflects only what's actually tagged.</p>
-<p>Useful when:</p>
-<ul>
-<li>Debugging "why didn't convert pick up X?" — read the source tags directly.</li>
-<li>Verifying an output file got the tags you expected after a <code>convert</code> run.</li>
-<li>Spot-checking a single file from a problematic rip before running <code>library audit</code> over the whole library.</li>
-</ul>
-<p>Sample output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>─── File ───────────────────────────────────────
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  path      ./output/ABBA/1976 - Arrival/01 - When I Kissed The Teacher.m4a
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  size      6.2 MiB
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  format    M4A
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  duration  3:00
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>─── Tags ───────────────────────────────────────
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  title         When I Kissed The Teacher
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  artist        ABBA
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  album artist  ABBA
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  album         Arrival
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  date          1976
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>  track         1/10
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  disc          1/1
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>  genres        Pop
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>  bpm           113
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>─── Embedded picture ───────────────────────────
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>  mime    image/jpeg
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>  size    245.0 KiB
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>  pixels  ~1,000,000 px
+<p>The SPA is the same code Tauri / Electron bundle, served over a tiny local HTTP server. The picker accepts a URL + credentials, stores them, and the rest of the session talks Subsonic directly to whatever server you typed.</p>
+<h2 id="when-to-reach-for-musickit-ui-instead-of-the-desktop-wrappers">When to reach for <code>musickit ui</code> instead of the desktop wrappers<a class="headerlink" href="#when-to-reach-for-musickit-ui-instead-of-the-desktop-wrappers" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Want a</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Quick browser-based player against any Subsonic server</td>
+<td><code>musickit ui</code></td>
+</tr>
+<tr>
+<td>Standalone macOS app with native window chrome, dock icon, media keys</td>
+<td><code>musickit-tauri.dmg</code> / <code>musickit-electron.dmg</code></td>
+</tr>
+<tr>
+<td>Browser tab against a server you don't admin</td>
+<td><code>musickit ui --url http://...</code></td>
+</tr>
+<tr>
+<td>Dedicated client for daily driving</td>
+<td>desktop wrapper (sticks around in the dock)</td>
+</tr>
+</tbody>
+</table>
+<p>Both surfaces share the same SPA — the visual + interaction is identical. The difference is just packaging.</p>
+<h2 id="pre-filling-the-picker">Pre-filling the picker<a class="headerlink" href="#pre-filling-the-picker" title="Permanent link">&para;</a></h2>
+<p>Optional <code>--url / --user / --password</code> get serialised into the page URL as query parameters that the picker reads on load. Useful for shell aliases or shortcuts:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">alias</span><span class="w"> </span><span class="nv">mkmac</span><span class="o">=</span><span class="s1">&#39;musickit ui --url http://macair:4533 --user admin --password admin&#39;</span>
 </code></pre></div>
-<p>Pass <code>--json</code> to skip the Rich rendering and get the raw <code>SourceTrack</code> model serialised for downstream pipes (<code>uvx musickit inspect track.m4a --json | jq .title</code>).</p>
-<p>Backed by <code>metadata.read_source(path)</code> — the same tag reader the convert pipeline uses. So what you see here is what convert sees.</p>
+<p>Password ends up in shell history this way — fine for a local LAN setup, less great for shared machines.</p>
+<h2 id="running-as-a-background-service">Running as a background service<a class="headerlink" href="#running-as-a-background-service" title="Permanent link">&para;</a></h2>
+<p>Mostly you launch <code>musickit ui</code> on demand (it's a CLI command, not a daemon). If you want it always running on a dedicated kiosk / always-on machine, use the same systemd / launchd patterns documented under <a href="../serve/#running-as-a-background-service"><code>musickit serve</code></a> — substitute the <code>ExecStart</code> / <code>ProgramArguments</code> for <code>musickit ui --no-open --host 0.0.0.0 --port 1888</code>.</p>
 
 
 

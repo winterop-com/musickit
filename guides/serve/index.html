@@ -16,7 +16,7 @@
         <link rel="prev" href="../tui/">
       
       
-        <link rel="next" href="../playlist/">
+        <link rel="next" href="../ui/">
       
       
         
@@ -298,6 +298,8 @@
   
     
     
+      
+        
       
         
       
@@ -728,6 +730,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#running-as-a-background-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running as a background service
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running as a background service">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#systemd-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        systemd (Linux)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#launchd-macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        launchd (macOS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#authentication" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -830,6 +871,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1489,6 +1558,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#running-as-a-background-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running as a background service
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running as a background service">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#systemd-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        systemd (Linux)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#launchd-macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        launchd (macOS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#authentication" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1609,9 +1717,10 @@
 
 <h1 id="musickit-serve"><code>musickit serve</code><a class="headerlink" href="#musickit-serve" title="Permanent link">&para;</a></h1>
 <p>A Subsonic-compatible HTTP server. Any modern Subsonic client (Symfonium, Amperfy, play:Sub, Feishin, Supersonic, DSub) connects, browses, searches, streams, and seeks. Works equally well over LAN and over Tailscale.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>TARGET_DIR<span class="w"> </span><span class="o">[</span>--host<span class="w"> </span>H<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--user<span class="w"> </span>U<span class="o">]</span><span class="w"> </span><span class="o">[</span>--password<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-mdns<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-watch<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-cache<span class="o">]</span><span class="w"> </span><span class="o">[</span>--full-rescan<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-web<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>serve<span class="w"> </span>TARGET_DIR<span class="w"> </span><span class="o">[</span>--host<span class="w"> </span>H<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--user<span class="w"> </span>U<span class="o">]</span><span class="w"> </span><span class="o">[</span>--password<span class="w"> </span>P<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-mdns<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-watch<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-cache<span class="o">]</span><span class="w"> </span><span class="o">[</span>--full-rescan<span class="o">]</span>
 </code></pre></div>
 <p><code>TARGET_DIR</code> is required. <code>--host 0.0.0.0</code>, <code>--port 4533</code>, credentials default to <code>admin</code>/<code>admin</code> with a yellow warning. <code>--no-cache</code> skips the persistent SQLite index at <code>&lt;TARGET_DIR&gt;/.musickit/index.db</code>; <code>--full-rescan</code> rebuilds it from scratch on startup. See <a href="../library/#index-manage-the-persistent-sqlite-cache"><code>musickit library index</code></a> for index management.</p>
+<p><code>musickit serve</code> exposes only the Subsonic <code>/rest/*</code> surface. The browser UI ships separately as the <code>musickit ui</code> command (since 0.20.0) — it static-serves the same SPA the desktop wrappers bundle, with a login picker that points at any Subsonic server. See <a href="../ui/"><code>musickit ui</code></a>.</p>
 <h2 id="startup-banner">Startup banner<a class="headerlink" href="#startup-banner" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>musickit serve — Subsonic API for ~/Music
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  bind: 0.0.0.0:4533
@@ -1919,88 +2028,82 @@
 </code></pre></div>
 <p>Stars live OUTSIDE the SQLite library index because the index is fully derived from the filesystem (delete / rebuild = safe), but stars are real user data. Both files sit under <code>.musickit/</code> so <code>rm -rf &lt;root&gt;/.musickit/index.db*</code> is still a safe "rebuild the cache, keep my favourites" operation.</p>
 <h2 id="browser-ui">Browser UI<a class="headerlink" href="#browser-ui" title="Permanent link">&para;</a></h2>
-<p>Open the server URL in any browser to use the bundled web player. The visual language tracks the TUI's <code>widgets.py</code> exactly — bordered panels with floating titles, the same palette (cyan headers / blue labels / green for playing / orange for the active track), monospace numerics, slim "round 30%"-style scrollbars, ncmpcpp-style KeyBar.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>http://&lt;host&gt;:4533/login          → sign-in form (same creds as the Subsonic API)
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>http://&lt;host&gt;:4533/web            → three-pane browser
+<p>The browser UI used to live inside <code>musickit serve</code> at <code>/login</code> + <code>/web</code>. As of 0.20.4 it's a separate command — <a href="../ui/"><code>musickit ui</code></a> — that static-serves the same SPA the desktop wrappers bundle, with a login picker that points at any Subsonic-compatible server (musickit serve, Navidrome, Airsonic, Gonic, ...). <code>musickit serve</code> now exposes only the Subsonic <code>/rest/*</code> surface.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>musickit<span class="w"> </span>ui<span class="w"> </span>--url<span class="w"> </span>http://&lt;host&gt;:4533<span class="w"> </span>--user<span class="w"> </span>admin<span class="w"> </span>--password<span class="w"> </span>admin
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># opens http://localhost:1888 in the browser, picker pre-filled</span>
 </code></pre></div>
-<p><img alt="Browser UI — three-pane shell" src="../../screenshots/web-shell.png" /></p>
-<p>Click an artist in the left Browse pane to see albums, click an album to see tracks, click a track to start playing. Now Playing card (top-left) shows the active title / artist / album / cover; the Spectrum panel (top-right) is a 48-band FFT bar visualizer driven by the Web Audio API.</p>
-<p><img alt="Drilled into an album" src="../../screenshots/web-album-tracks.png" /></p>
-<p><strong>Internet radio</strong> lives in the same sidebar. Click the Radio panel's Stations entry to load <code>/web/radio</code> — the list comes from <a href="#internet-radio"><code>getInternetRadioStations</code></a>, which is backed by <code>radio.load_stations()</code> (defaults + <code>~/.config/musickit/radio.toml</code>). The grid collapses to two columns in radio mode, the active station gets the orange <code>is-playing</code> highlight, and the Now Playing title flips to the current ICY StreamTitle once the proxy parses one (see below).</p>
-<p><img alt="Radio mode — Stations selected, NRK mP3 streaming" src="../../screenshots/web-radio.png" /></p>
-<p><strong>Press <code>f</code></strong> to fullscreen the Spectrum visualizer. The Now Playing card stays visible at the top, the panes hide, the bars take the rest of the viewport. Press <code>f</code> again to return.</p>
-<p><img alt="Fullscreen Spectrum visualizer" src="../../screenshots/web-spectrum-fullscreen.png" /></p>
-<p><strong>Press <code>?</code></strong> for a slide-in keys panel; <strong>Cmd/Ctrl+P</strong> opens a Textual-style command palette. Both filter their contents by the current playback mode — the help and palette below were captured while a radio stream was playing, so Next / Prev / Seek / Repeat / Shuffle / Lyrics are absent (they don't apply to a live stream).</p>
-<p><img alt="Help panel — radio mode" src="../../screenshots/web-help.png" /></p>
-<p><img alt="Command palette — radio mode" src="../../screenshots/web-palette.png" /></p>
-<p>The UI is hand-rolled vanilla JS + CSS — no bundler, no third-party JS, no build step. Reads the same <code>/rest/getArtists</code> / <code>/rest/getArtist</code> / <code>/rest/getAlbum</code> endpoints the rest of the API uses; track playback hits <code>/rest/stream</code>, radio playback hits <code>/web/radio-stream</code> (a same-origin proxy that strips ICY metadata frames so the Web Audio visualizer keeps working). Login sets a signed session cookie so <code>&lt;audio src="/rest/stream?id=..."&gt;</code> doesn't have to leak the password into HTML.</p>
-<p>Existing Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) keep using <code>?u=&amp;p=</code> query params and never see the cookie path — they're untouched by this addition.</p>
-<p><strong>Disable the web UI</strong> with <code>--no-web</code>. With the flag, <code>/login</code>, <code>/web</code>, and <code>/web-static/*</code> are not mounted — <code>/</code> returns the JSON probe to browsers as well as Subsonic clients. The <code>/rest/*</code> API stays fully available. Useful when you only want the Subsonic surface on a host (smaller attack area) or running headless on an embedded box where nobody hits the URL in a browser.</p>
-<p><strong>Keybinds:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Action</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Space</td>
-<td>Play / pause</td>
-</tr>
-<tr>
-<td><code>n</code> / <code>p</code></td>
-<td>Next / previous track in the current album queue</td>
-</tr>
-<tr>
-<td><code>&lt;</code> / <code>&gt;</code></td>
-<td>Seek backward / forward 5s</td>
-</tr>
-<tr>
-<td><code>9</code> / <code>0</code></td>
-<td>Volume down / up</td>
-</tr>
-<tr>
-<td><code>r</code></td>
-<td>Cycle repeat (off / album / track)</td>
-</tr>
-<tr>
-<td><code>s</code></td>
-<td>Toggle shuffle</td>
-</tr>
-<tr>
-<td><code>l</code></td>
-<td>Toggle the lyrics panel (synced highlight when LRC is available)</td>
-</tr>
-<tr>
-<td><code>f</code></td>
-<td>Toggle the FFT visualizer (Web Audio API + Canvas)</td>
-</tr>
-<tr>
-<td><code>/</code></td>
-<td>Focus the search bar</td>
-</tr>
-<tr>
-<td><code>?</code></td>
-<td>Show keyboard shortcuts (slide-in panel)</td>
-</tr>
-<tr>
-<td>Cmd / Ctrl + P</td>
-<td>Command palette</td>
-</tr>
-<tr>
-<td>Esc</td>
-<td>Close lyrics / visualizer / blur search</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Sidebar Radio panel</strong> — clicking it loads <code>/web/radio</code>, which lists the same stations the TUI plays (defaults + <code>~/.config/musickit/radio.toml</code>). Click a station to start streaming via <code>&lt;audio&gt;</code>; the visualizer keeps working over the live stream.</p>
-<p><strong>Search</strong> uses the same FTS5 index <code>/search3</code> does (sub-ms ranked, prefix-matching, diacritic-folded — <code>bey</code> finds <code>Beyoncé</code>). Results swap into the right pane as artist / album / track sections; click any result to drill in or play.</p>
-<p><strong>Cover art</strong> thumbnails appear in album rows + the now-playing card; sourced from <code>/rest/getCoverArt</code> with the LRU cache from v0.9.1.</p>
-<p><strong>Queue</strong> is the visible album. Click a track → play from there; auto-advance through remaining tracks; <code>n</code>/<code>p</code> step. (Cross-album queueing comes later.)</p>
-<p><strong>FFT visualizer</strong> runs entirely in the browser via the Web Audio API: a <code>MediaElementAudioSourceNode</code> tees the <code>&lt;audio&gt;</code> element into an <code>AnalyserNode</code>, the JS averages the FFT into 48 log-spaced bands (30Hz to 16kHz), and renders bars to a <code>&lt;canvas&gt;</code> at 60fps with red/yellow/green VU gradient — same palette as the TUI. Asymmetric attack/release smoothing so transients pop while sustained tones don't shimmer.</p>
-<p>Follow-ups not yet shipped: custom queue / "play next", playlist creation in the browser.</p>
+<p>Why split: the SPA is a pure Subsonic client, so coupling it to a co-hosted serve instance was an artificial restriction. <code>musickit ui</code> works against a remote server over Tailscale, a local serve on a different port, Navidrome with no musickit installed at all — and <code>musickit serve</code> shrinks to a single-purpose API binary.</p>
+<h2 id="running-as-a-background-service">Running as a background service<a class="headerlink" href="#running-as-a-background-service" title="Permanent link">&para;</a></h2>
+<p>Once you've got <code>musickit serve</code> working interactively, lift it into a managed service so it boots with the machine and auto-restarts on crash. Both flavours below assume musickit is installed system-wide (or in a virtualenv) and your library lives at a stable path.</p>
+<h3 id="systemd-linux">systemd (Linux)<a class="headerlink" href="#systemd-linux" title="Permanent link">&para;</a></h3>
+<p>Drop a unit file at <code>/etc/systemd/system/musickit.service</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">[Unit]</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="na">Description</span><span class="o">=</span><span class="s">MusicKit Subsonic server</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="na">After</span><span class="o">=</span><span class="s">network-online.target</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="na">Wants</span><span class="o">=</span><span class="s">network-online.target</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="k">[Service]</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="na">Type</span><span class="o">=</span><span class="s">simple</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="na">User</span><span class="o">=</span><span class="s">morten</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="na">Group</span><span class="o">=</span><span class="s">morten</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="na">ExecStart</span><span class="o">=</span><span class="s">/usr/local/bin/musickit serve /srv/music --host 0.0.0.0 --port 4533</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="na">Restart</span><span class="o">=</span><span class="s">on-failure</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="na">RestartSec</span><span class="o">=</span><span class="s">5</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="c1"># Hardening — opt out if you actually need broader filesystem / network access.</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="na">NoNewPrivileges</span><span class="o">=</span><span class="s">true</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="na">PrivateTmp</span><span class="o">=</span><span class="s">true</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="na">ProtectSystem</span><span class="o">=</span><span class="s">full</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="na">ProtectHome</span><span class="o">=</span><span class="s">read-only</span>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="k">[Install]</span>
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="na">WantedBy</span><span class="o">=</span><span class="s">multi-user.target</span>
+</code></pre></div>
+<p>Enable + start:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>daemon-reload
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>musickit
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>sudo<span class="w"> </span>journalctl<span class="w"> </span>-fu<span class="w"> </span>musickit<span class="w">          </span><span class="c1"># live logs</span>
+</code></pre></div>
+<p>For a user-level service (no sudo, no <code>/etc</code>), drop the file under <code>~/.config/systemd/user/musickit.service</code> and use <code>systemctl --user</code>.</p>
+<h3 id="launchd-macos">launchd (macOS)<a class="headerlink" href="#launchd-macos" title="Permanent link">&para;</a></h3>
+<p>Drop a property list at <code>~/Library/LaunchAgents/com.winterop.musickit.plist</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="cp">&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">&lt;plist</span><span class="w"> </span><span class="na">version=</span><span class="s">&quot;1.0&quot;</span><span class="nt">&gt;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nt">&lt;dict&gt;</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">&lt;key&gt;</span>Label<span class="nt">&lt;/key&gt;</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">&lt;string&gt;</span>com.winterop.musickit<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">&lt;key&gt;</span>ProgramArguments<span class="nt">&lt;/key&gt;</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">&lt;array&gt;</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">&lt;string&gt;</span>/usr/local/bin/musickit<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">&lt;string&gt;</span>serve<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="nt">&lt;string&gt;</span>/Users/morten/Music<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="nt">&lt;string&gt;</span>--host<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">    </span><span class="nt">&lt;string&gt;</span>0.0.0.0<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">    </span><span class="nt">&lt;string&gt;</span>--port<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">    </span><span class="nt">&lt;string&gt;</span>4533<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">  </span><span class="nt">&lt;/array&gt;</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">  </span><span class="nt">&lt;key&gt;</span>RunAtLoad<span class="nt">&lt;/key&gt;</span>
+<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a><span class="w">  </span><span class="nt">&lt;true/&gt;</span>
+<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a><span class="w">  </span><span class="nt">&lt;key&gt;</span>KeepAlive<span class="nt">&lt;/key&gt;</span>
+<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="w">  </span><span class="nt">&lt;true/&gt;</span>
+<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="w">  </span><span class="nt">&lt;key&gt;</span>StandardOutPath<span class="nt">&lt;/key&gt;</span>
+<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="w">  </span><span class="nt">&lt;string&gt;</span>/Users/morten/Library/Logs/musickit.log<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="w">  </span><span class="nt">&lt;key&gt;</span>StandardErrorPath<span class="nt">&lt;/key&gt;</span>
+<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a><span class="w">  </span><span class="nt">&lt;string&gt;</span>/Users/morten/Library/Logs/musickit.log<span class="nt">&lt;/string&gt;</span>
+<a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a><span class="nt">&lt;/dict&gt;</span>
+<a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="nt">&lt;/plist&gt;</span>
+</code></pre></div>
+<p>Load it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>launchctl<span class="w"> </span>bootstrap<span class="w"> </span>gui/<span class="k">$(</span>id<span class="w"> </span>-u<span class="k">)</span><span class="w"> </span>~/Library/LaunchAgents/com.winterop.musickit.plist
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>launchctl<span class="w"> </span>print<span class="w"> </span>gui/<span class="k">$(</span>id<span class="w"> </span>-u<span class="k">)</span>/com.winterop.musickit<span class="w"> </span><span class="p">|</span><span class="w"> </span>head
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>tail<span class="w"> </span>-f<span class="w"> </span>~/Library/Logs/musickit.log
+</code></pre></div>
+<p>Unload / reload after edits:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>launchctl<span class="w"> </span>bootout<span class="w"> </span>gui/<span class="k">$(</span>id<span class="w"> </span>-u<span class="k">)</span><span class="w"> </span>~/Library/LaunchAgents/com.winterop.musickit.plist
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>launchctl<span class="w"> </span>bootstrap<span class="w"> </span>gui/<span class="k">$(</span>id<span class="w"> </span>-u<span class="k">)</span><span class="w"> </span>~/Library/LaunchAgents/com.winterop.musickit.plist
+</code></pre></div>
+<p>Use a Launch Agent (<code>~/Library/LaunchAgents/</code>) for "runs when this user is logged in" — easy to set up, no root, survives reboots after login. Use a Launch Daemon (<code>/Library/LaunchDaemons/</code>, owned by root) only if you need the server up before login. Most setups want the agent.</p>
+<p>The default <code>--host 0.0.0.0</code> is what makes the server reachable from your phone or another Mac on the same network or Tailnet. Pin it to <code>127.0.0.1</code> in the args list above if you want a single-machine setup.</p>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
 <p>Three forms supported, all per the Subsonic spec:</p>
 <ul>
@@ -2017,45 +2120,45 @@
 <p>This is safe because the auth boundary is the request itself, not the origin. Every <code>/rest/*</code> call is gated by either a salted token (<code>?u=user&amp;t=&lt;md5(password+salt)&gt;&amp;s=&lt;salt&gt;</code>) or plain credentials (<code>?u=user&amp;p=password</code>). An attacker who knows the credentials can hit the API from <code>curl</code> regardless of CORS; CORS controls only what cross-origin browser JavaScript may <em>read</em>. Wildcard <code>*</code> doesn't widen the auth surface.</p>
 <p>If you expose the server publicly, terminate TLS at a reverse proxy (Caddy / nginx / Tailscale Funnel) and use a strong password. Don't rely on CORS as a defense.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># ~/.config/musickit/musickit.toml</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[server]</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># ~/.config/musickit/musickit.toml</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">[server]</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span>
 </code></pre></div>
 <p>Override per-run via <code>--user</code> / <code>--password</code>; or via env vars (<code>MUSICKIT_SERVER__USERNAME</code>, <code>MUSICKIT_SERVER__PASSWORD</code>). Resolution order: <strong>CLI flags &gt; env vars &gt; TOML &gt; admin/admin default</strong> (with a yellow warning printed for the default).</p>
 <p>Run <code>musickit config show</code> to print the resolved config (sensitive values masked) and <code>musickit config path</code> to find the file.</p>
 <p><strong>Migrating from <code>serve.toml</code> (pre-v0.11):</strong> the old <code>~/.config/musickit/serve.toml</code> is still read transparently. Run <code>musickit config migrate</code> once to move it to the new format and drop the deprecation hint.</p>
 <h2 id="scrobble-forwarder">Scrobble forwarder<a class="headerlink" href="#scrobble-forwarder" title="Permanent link">&para;</a></h2>
 <p>Subsonic clients (Symfonium, Amperfy, Feishin, play:Sub) call <code>/scrobble</code> after every track. By default that's a no-op. Add a <code>[server.scrobble.webhook]</code> and/or <code>[server.scrobble.mqtt]</code> block to forward each play event:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># ~/.config/musickit/musickit.toml</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">[server.scrobble.webhook]</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://my-bridge.example.com/play&quot;</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shh&quot;</span><span class="w">          </span><span class="c1"># optional — sent as `X-Musickit-Secret` header</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">timeout_s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">5.0</span><span class="w">         </span><span class="c1"># optional — defaults to 5s</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">[server.scrobble.mqtt]</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">broker</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mqtt://homeassistant.local:1883&quot;</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">topic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit/scrobble&quot;</span><span class="w">   </span><span class="c1"># default shown</span>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="w">          </span><span class="c1"># optional</span>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span><span class="w">       </span><span class="c1"># optional</span>
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="n">client_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="w">          </span><span class="c1"># optional</span>
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
-<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="c1"># Optional: forward `submission=false` (&quot;now playing&quot;) probes too.</span>
-<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="c1"># Default false — Home Assistant &quot;currently playing&quot; automations want true.</span>
-<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="k">[server.scrobble]</span>
-<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="n">include_now_playing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># ~/.config/musickit/musickit.toml</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">[server.scrobble.webhook]</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://my-bridge.example.com/play&quot;</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">secret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shh&quot;</span><span class="w">          </span><span class="c1"># optional — sent as `X-Musickit-Secret` header</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">timeout_s</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">5.0</span><span class="w">         </span><span class="c1"># optional — defaults to 5s</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="k">[server.scrobble.mqtt]</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="n">broker</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;mqtt://homeassistant.local:1883&quot;</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="n">topic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit/scrobble&quot;</span><span class="w">   </span><span class="c1"># default shown</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="w">          </span><span class="c1"># optional</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="n">password</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;supersecret&quot;</span><span class="w">       </span><span class="c1"># optional</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="n">client_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;musickit&quot;</span><span class="w">          </span><span class="c1"># optional</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="c1"># Optional: forward `submission=false` (&quot;now playing&quot;) probes too.</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="c1"># Default false — Home Assistant &quot;currently playing&quot; automations want true.</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="k">[server.scrobble]</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="n">include_now_playing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
 </code></pre></div>
 <p>Each event is JSON like:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">&quot;user&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">&quot;track_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tr_abc123&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Levitating&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">&quot;artist&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Dua Lipa&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">&quot;album&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Future Nostalgia&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span><span class="nt">&quot;duration_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">203.0</span><span class="p">,</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">&quot;played_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-05-06T18:42:11Z&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span><span class="nt">&quot;submission&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">&quot;user&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;mort&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">&quot;track_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;tr_abc123&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Levitating&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">&quot;artist&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Dua Lipa&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">  </span><span class="nt">&quot;album&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Future Nostalgia&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">  </span><span class="nt">&quot;duration_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">203.0</span><span class="p">,</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">  </span><span class="nt">&quot;played_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-05-06T18:42:11Z&quot;</span><span class="p">,</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">  </span><span class="nt">&quot;submission&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="p">}</span>
 </code></pre></div>
 <p>Forwarding is fire-and-forget on a small thread pool; webhook + MQTT failures are logged at WARNING and swallowed so a dead bridge never 500s the client's <code>/scrobble</code> request. MQTT is optional — the dispatcher lazy-imports <code>paho-mqtt</code>; missing the dep just disables the MQTT half.</p>
 <p>Common destinations:</p>
@@ -2068,8 +2171,8 @@
 <h2 id="mdns-bonjour">mDNS / Bonjour<a class="headerlink" href="#mdns-bonjour" title="Permanent link">&para;</a></h2>
 <p>Default-on: <code>serve</code> advertises <code>_subsonic._tcp.local</code> so Symfonium / Amperfy / Feishin auto-list the server in their setup screens without anyone typing the URL. Same service type Navidrome uses, so existing client ecosystems pick it up automatically.</p>
 <p>The <code>musickit tui</code> itself can also discover servers:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                  </span><span class="c1"># list and exit</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w">                             </span><span class="c1"># quick browse + show hint</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w"> </span>--discover<span class="w">                  </span><span class="c1"># list and exit</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>uvx<span class="w"> </span>musickit<span class="w"> </span>tui<span class="w">                             </span><span class="c1"># quick browse + show hint</span>
 </code></pre></div>
 <p><code>--no-mdns</code> opts out.</p>
 <p>Tailscale users still need to type the tailnet URL once — mDNS doesn't traverse the WireGuard tunnel.</p>
@@ -2091,26 +2194,26 @@
 </ul>
 <p>Subprocess invocation: <code>ffmpeg -i &lt;path&gt; -vn -c:a libmp3lame -b:a Nk -f mp3 -</code>. The <code>-vn</code> drops the embedded picture stream. The async generator pumps 64 KiB chunks; on client disconnect a <code>finally</code> block kills the subprocess so it doesn't pin a CPU.</p>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>src/musickit/serve/
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  app.py             FastAPI factory + envelope helpers + auth dep + middleware
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  auth.py            plain / enc: / token verification
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  config.py          serve.toml loader + admin/admin defaults
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  ids.py             sha1[:16] of artist_dir / album path / track path
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  index.py           IndexCache with reverse-lookup dicts
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>  payloads.py        Subsonic dict builders shared across endpoints
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>  covers.py          Sidecar-first cover loader + Pillow resize
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>  xml.py             JSON → Subsonic XML converter
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>  discovery.py       mDNS register / unregister
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>  watcher.py         watchdog-backed filesystem watcher
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>  endpoints/
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    system.py        ping / getLicense / getMusicFolders
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>    browsing.py      getArtists / getArtist / getAlbum / getAlbumList2 / getSong / getIndexes
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    search.py        search3 / search2
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>    media.py         stream / download / getCoverArt
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>    scan.py          startScan / getScanStatus
-<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    extras.py        scrobble / getArtistInfo / getMusicDirectory / getRandomSongs /
-<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>                     getStarred / star / unstar / getPlaylists / getUser / getUsers /
-<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>                     getOpenSubsonicExtensions / getGenres
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>src/musickit/serve/
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>  app.py             FastAPI factory + envelope helpers + auth dep + middleware
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>  auth.py            plain / enc: / token verification
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>  config.py          serve.toml loader + admin/admin defaults
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>  ids.py             sha1[:16] of artist_dir / album path / track path
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>  index.py           IndexCache with reverse-lookup dicts
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>  payloads.py        Subsonic dict builders shared across endpoints
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>  covers.py          Sidecar-first cover loader + Pillow resize
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>  xml.py             JSON → Subsonic XML converter
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>  discovery.py       mDNS register / unregister
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>  watcher.py         watchdog-backed filesystem watcher
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>  endpoints/
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>    system.py        ping / getLicense / getMusicFolders
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>    browsing.py      getArtists / getArtist / getAlbum / getAlbumList2 / getSong / getIndexes
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>    search.py        search3 / search2
+<a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a>    media.py         stream / download / getCoverArt
+<a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a>    scan.py          startScan / getScanStatus
+<a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a>    extras.py        scrobble / getArtistInfo / getMusicDirectory / getRandomSongs /
+<a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a>                     getStarred / star / unstar / getPlaylists / getUser / getUsers /
+<a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a>                     getOpenSubsonicExtensions / getGenres
 </code></pre></div>
 <p>The cache is built at startup (synchronously, blocking the CLI before <code>uvicorn.run</code>) so the first client request hits a populated index. Background rescans (manual via <code>/rest/startScan</code> or automatic via the filesystem watcher) reuse the same <code>IndexCache.start_background_rescan()</code> path.</p>
 
