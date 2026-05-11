@@ -1352,6 +1352,41 @@ export function renderShell(root, client, session, hooks = {}) {
       closeSearchDropdown();
     }
   });
+
+  // -----------------------------------------------------------------
+  // Cross-client refresh — when the window regains focus or becomes
+  // visible again, re-fetch the currently-shown view so star changes
+  // made from another client (the web UI, an iPhone Subsonic client)
+  // appear without a manual Cmd+R. Refresh-on-focus is zero-cost when
+  // idle (no polling) and instantly current when the user comes back
+  // to the window — the right tradeoff for syncs that happen rarely
+  // but matter when they do (star a track on the phone during a
+  // commute, open the desktop at home, see it already ♥).
+  // -----------------------------------------------------------------
+  async function refreshCurrentView() {
+    if (document.body.classList.contains("is-starred")) {
+      await loadStarred();
+      return;
+    }
+    if (state.currentAlbumId) {
+      // Re-fetch the album; this regenerates the track rows with
+      // fresh `starred` state. We avoid touching the queue so the
+      // currently-playing track isn't disturbed.
+      await loadAlbum(state.currentAlbumId, null);
+    }
+  }
+  // Both events fire on the same return-to-window action depending on
+  // OS / engine; together they cover Electron, Tauri, and any plain
+  // browser tab. The handler is idempotent so a double fire just
+  // costs one extra fetch.
+  window.addEventListener("focus", () => {
+    refreshCurrentView().catch((e) => console.warn("focus-refresh failed:", e));
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      refreshCurrentView().catch((e) => console.warn("visibility-refresh failed:", e));
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

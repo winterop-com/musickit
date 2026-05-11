@@ -284,6 +284,57 @@
     button.classList.add("is-active");
   }
 
+  // Toggle the starred state of a track. `starEl` is the `.track-star`
+  // span itself (data-id = track id). Optimistic flip first for instant
+  // feedback, then fire `/rest/star` or `/rest/unstar`. In the Starred
+  // view (body.is-starred), unstarring also prunes the row from the DOM
+  // since the track no longer belongs in this list.
+  async function toggleStar(starEl) {
+    const id = starEl.dataset.id;
+    if (!id) return;
+    const wasStarred = starEl.classList.contains("is-starred");
+    const inStarredView = document.body.classList.contains("is-starred");
+    starEl.classList.toggle("is-starred", !wasStarred);
+    starEl.textContent = wasStarred ? "♡" : "♥";
+    starEl.setAttribute("aria-label", wasStarred ? "Star" : "Unstar");
+    const endpoint = wasStarred ? "/rest/unstar" : "/rest/star";
+    try {
+      const r = await fetch(endpoint + "?id=" + encodeURIComponent(id) + "&f=json", {
+        credentials: "same-origin",
+      });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (inStarredView && wasStarred) {
+        const row = starEl.closest("li");
+        const trackBtn = starEl.closest(".track-row");
+        // Remove from queue + walk back the index so prev / next still
+        // refers to the right neighbour after the splice.
+        const removedIdx = state.queue.findIndex((q) => q.id === id);
+        if (removedIdx >= 0) {
+          state.queue.splice(removedIdx, 1);
+          if (state.queueIndex > removedIdx) state.queueIndex -= 1;
+          else if (state.queueIndex === removedIdx) state.queueIndex = -1;
+        }
+        row?.remove();
+        // Renumber the visible rows + refresh the "N tracks" caption.
+        const remaining = document.querySelectorAll("#tracks-pane .track-row .track-no");
+        remaining.forEach((el, i) => {
+          el.textContent = String(i + 1).padStart(2, " ");
+        });
+        const heading = document.querySelector("#tracks-pane .album-heading-artist");
+        if (heading) heading.textContent = remaining.length + " tracks";
+        // `trackBtn` was the row's play target; nothing further to do
+        // since the row is gone.
+        void trackBtn;
+      }
+    } catch (e) {
+      // Revert on failure.
+      starEl.classList.toggle("is-starred", wasStarred);
+      starEl.textContent = wasStarred ? "♥" : "♡";
+      starEl.setAttribute("aria-label", wasStarred ? "Unstar" : "Star");
+      console.warn("toggleStar failed:", e);
+    }
+  }
+
   // -------------------------------------------------------------------- //
   // Queue                                                                //
   // -------------------------------------------------------------------- //
@@ -750,7 +801,30 @@
       loadInto("/web/album/" + encodeURIComponent(button.dataset.id), tracksPane);
       state.currentAlbumId = button.dataset.id;
       state.currentTrackId = null;
+      // Leaving starred mode restores the three-pane grid.
+      document.body.classList.remove("is-starred");
       updateHash();
+    } else if (action === "load-starred") {
+      // Flat list of every starred track. `body.is-starred` collapses
+      // the middle pane (mirrors `body.is-radio`); the tracks pane spans
+      // the remaining width since starred tracks come from many albums
+      // and there's no single album to show in the middle column.
+      markActiveRow(button, ".pane-sidebar");
+      document.body.classList.add("is-starred");
+      document.body.classList.remove("is-radio");
+      state.currentArtistId = null;
+      state.currentAlbumId = null;
+      state.currentTrackId = null;
+      updateHash();
+      loadInto("/web/starred", tracksPane);
+    } else if (action === "toggle-star") {
+      // The star span lives INSIDE a `play-track` button, so we relied
+      // on its own `data-action` getting matched first by `closest()`.
+      // Stop here so the bubble doesn't also fire play-track on the
+      // parent button.
+      event.stopPropagation();
+      event.preventDefault();
+      toggleStar(button);
     } else if (action === "play-track") {
       // Defer queue construction until after the click bubbles, so the
       // .is-playing class set inside playQueueIndex applies cleanly.
@@ -1011,4 +1085,33 @@
       // localStorage unavailable.
     }
   }, 0);
+
+  // -------------------------------------------------------------------- //
+  // Cross-client refresh — when the window regains focus or the tab     //
+  // becomes visible again, re-fetch whatever is currently shown so      //
+  // star changes made from another client (phone Subsonic app, the     //
+  // desktop SPA, another browser tab) are picked up without a manual   //
+  // reload. Refresh-on-focus is zero-cost when idle (no polling) and   //
+  // instantly current when the user comes back — picking the right     //
+  // tradeoff for syncs that happen rarely but matter when they do      //
+  // (e.g. starring tracks on the phone during a commute, then opening  //
+  // the desktop at home).                                              //
+  // -------------------------------------------------------------------- //
+  function refreshCurrentView() {
+    if (document.body.classList.contains("is-starred")) {
+      loadInto("/web/starred", tracksPane);
+      return;
+    }
+    if (state.currentAlbumId) {
+      loadInto("/web/album/" + encodeURIComponent(state.currentAlbumId), tracksPane);
+    }
+  }
+  // Both events fire on the same return-to-window action depending on
+  // the OS / browser; together they cover Electron, Tauri (webview),
+  // and a normal browser tab. The handler is idempotent so a double
+  // fire just costs one extra fetch.
+  window.addEventListener("focus", refreshCurrentView);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshCurrentView();
+  });
 })();

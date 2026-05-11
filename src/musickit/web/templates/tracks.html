@@ -7,6 +7,7 @@
   <span class="th-title">Title</span>
   <span class="th-artist">Artist</span>
   <span class="th-time">Time</span>
+  <span class="th-star"></span>
 </div>
 <div class="track-table-rule"></div>
 <ul class="row-list track-list">
@@ -16,16 +17,21 @@
             class="row-button track-row"
             data-action="play-track"
             data-id="{{ track.id }}"
-            data-album-id="{{ album_id }}"
+            data-album-id="{{ track.album_id|default(album_id, true) }}"
             data-title="{{ track.title|e }}"
             data-artist="{{ track.artist|e }}">
       <span class="track-no">{{ "%2d" % track.track_no }}</span>
       <span class="track-title"><span class="marquee-inner">{{ track.title }}</span></span>
       <span class="track-artist">{{ track.artist }}</span>
       <span class="track-time">{{ track.duration }}</span>
+      <span class="track-star{% if track.starred %} is-starred{% endif %}"
+            data-action="toggle-star"
+            data-id="{{ track.id }}"
+            role="button"
+            aria-label="{% if track.starred %}Unstar{% else %}Star{% endif %}">{% if track.starred %}♥{% else %}♡{% endif %}</span>
     </button>
   </li>
   {% else %}
-  <li class="empty">No tracks on this album.</li>
+  <li class="empty">{{ empty_message|default("No tracks on this album.", true) }}</li>
   {% endfor %}
 </ul>
