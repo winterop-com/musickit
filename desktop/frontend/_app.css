@@ -602,6 +602,17 @@ button:focus-visible {
 .three-pane {
   display: grid;
   grid-template-columns: 260px 340px 1fr;
+  /* Without `grid-template-rows`, the implicit row defaults to `auto`
+     and grows to fit content — so a long tracks list stretched the
+     row, the `.pane` (a grid-stretch child) stretched with it, and
+     the inner `.row-list`'s `overflow-y: auto` never engaged. The
+     overflow then bubbled up to the document and scrolling on tracks
+     scrolled the entire window (topbar and now-playing-region rolled
+     off the top). `minmax(0, 1fr)` constrains the row to the
+     container's flex-allotted height regardless of content, so the
+     row-list does its own scrolling — same trick already used at the
+     mobile breakpoint via `grid-auto-rows`. */
+  grid-template-rows: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
   overflow: hidden;
