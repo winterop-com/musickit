@@ -460,3 +460,59 @@ body.is-viz .viz-panel {
   color: var(--text-muted);
   font-size: 0.85rem;
 }
+
+/* ------------------------------------------------------------------ */
+/* Volume slider + mute toggle, both inside `.np-controls`.           */
+/* ------------------------------------------------------------------ */
+
+.np-mute {
+  /* `.np-button` brings sizing + hover; we just nudge the glyph size
+     down a hair so the speaker emoji doesn't overpower the transport
+     arrows. */
+  font-size: 0.95rem;
+  padding-left: 0.4rem;
+}
+
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 90px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  margin: 0 0.2rem 0 0.1rem;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--label);
+  cursor: pointer;
+  border: 0;
+  box-shadow: 0 0 0 2px var(--bg-elevated);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--label);
+  cursor: pointer;
+  border: 0;
+  box-shadow: 0 0 0 2px var(--bg-elevated);
+}
+
+.volume-slider:hover::-webkit-slider-thumb,
+.volume-slider:focus-visible::-webkit-slider-thumb {
+  background: var(--header);
+}
+
+.volume-slider:hover::-moz-range-thumb,
+.volume-slider:focus-visible::-moz-range-thumb {
+  background: var(--header);
+}

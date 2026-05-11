@@ -102,8 +102,23 @@
         // Lower the dB floor so quiet signals still register on the bars.
         analyser.minDecibels = -90;
         analyser.maxDecibels = -10;
+        // Insert a GainNode after the analyser so the `<audio>` element's
+        // `volume` property keeps working once the element is routed
+        // through MediaElementSource. Without this, `audio.volume = X`
+        // is silently ignored after the visualizer first initialises
+        // (the audio bypasses the element and flows straight to the
+        // AudioContext destination). Mirroring `audio.volume` /
+        // `audio.muted` here gives the host page a single source of
+        // truth (the audio element) regardless of whether the graph
+        // is wired up yet.
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = audio.muted ? 0 : audio.volume;
         source.connect(analyser);
-        analyser.connect(audioCtx.destination);
+        analyser.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        audio.addEventListener("volumechange", function () {
+          gainNode.gain.value = audio.muted ? 0 : audio.volume;
+        });
         freqData = new Float32Array(analyser.frequencyBinCount);
         computeBandRanges(audioCtx.sampleRate);
         return true;
