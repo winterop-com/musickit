@@ -715,8 +715,9 @@ button:focus-visible {
   font-family: var(--mono);
 }
 
-/* Library stats panel — fixed-height; Browse panel below grows. */
-.pane-sidebar .panel:first-child {
+/* Quick panels (Radio, Starred) — fixed-height; the Browse panel
+   below them takes the remaining space via `.panel-grow`. */
+.pane-sidebar .panel:not(.panel-grow) {
   flex-shrink: 0;
 }
 
@@ -882,7 +883,9 @@ button:focus-visible {
 
 .track-table-header {
   display: grid;
-  grid-template-columns: 2.5rem 1fr 1fr 4rem;
+  /* Matches `.track-row` so columns line up. The last cell is the
+     star column header, intentionally blank. */
+  grid-template-columns: 2.5rem 1fr 1fr 4rem 1.5rem;
   gap: 0.5rem;
   padding: 0 0.5rem 0.15rem;
   color: var(--header);
@@ -904,7 +907,10 @@ button:focus-visible {
 
 .track-row {
   display: grid;
-  grid-template-columns: 2.5rem 1fr 1fr 4rem;
+  /* Star column added on the right so the heart sits flush with the
+     time column. Stays narrow (1.5rem) — a single glyph + a hair of
+     hover room. */
+  grid-template-columns: 2.5rem 1fr 1fr 4rem 1.5rem;
   align-items: baseline;
   gap: 0.5rem;
   font-variant-numeric: tabular-nums;
@@ -937,6 +943,32 @@ button:focus-visible {
 .track-time {
   color: var(--text-muted);
   text-align: right;
+}
+
+/* Track-row star glyph — toggles `is-starred` on click. The empty
+   state is dim and only visible on row hover so unstarred tracks
+   don't carry visual weight; once starred it stays lit. */
+.track-star {
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms ease, color 100ms ease;
+  user-select: none;
+}
+
+.track-row:hover .track-star,
+.track-star.is-starred,
+.track-star:focus-visible {
+  opacity: 1;
+}
+
+.track-star.is-starred {
+  color: var(--active);
+}
+
+.track-star:hover {
+  color: var(--active);
 }
 
 .track-row.is-playing .track-title,
@@ -1035,6 +1067,17 @@ body.is-radio .three-pane {
 }
 
 body.is-radio .pane-tracks {
+  display: none;
+}
+
+/* Starred: a flat list of tracks across the library — no album column
+   makes sense (each track has its own album), so collapse the middle
+   pane and let the tracks pane span the remaining width. */
+body.is-starred .three-pane {
+  grid-template-columns: 260px 1fr;
+}
+
+body.is-starred .pane-albums {
   display: none;
 }
 

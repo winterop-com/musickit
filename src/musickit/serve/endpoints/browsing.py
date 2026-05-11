@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, Request
 from musickit.serve.app import envelope, error_envelope
 from musickit.serve.index import IndexCache
 from musickit.serve.payloads import album_payload, artist_summary, song_payload
+from musickit.serve.stars import StarStore
 
 router = APIRouter()
 
@@ -18,6 +19,10 @@ _IGNORED_ARTICLES = "The El La Los Las Le Les"
 
 def _get_cache(request: Request) -> IndexCache:
     return request.app.state.cache  # type: ignore[no-any-return]
+
+
+def _get_stars(request: Request) -> StarStore:
+    return request.app.state.stars  # type: ignore[no-any-return]
 
 
 def _index_letter(name: str) -> str:
@@ -74,20 +79,20 @@ async def get_indexes(request: Request) -> dict:
 async def get_artist(request: Request, id: str = Query(...)) -> dict:
     """Albums for one artist."""
     cache = _get_cache(request)
+    stars = _get_stars(request)
     albums = cache.artists_by_id.get(id)
     if albums is None:
         return error_envelope(70, f"Artist not found: {id}")
     sorted_albums = sorted(albums, key=lambda a: (a.tag_year or "9999", (a.tag_album or a.album_dir).casefold()))
-    return envelope(
-        "artist",
-        {
-            "id": id,
-            "name": cache.artist_name_by_id[id],
-            "albumCount": len(sorted_albums),
-            "coverArt": id,
-            "album": [album_payload(a, with_songs=False) for a in sorted_albums],
-        },
-    )
+    payload = {
+        "id": id,
+        "name": cache.artist_name_by_id[id],
+        "albumCount": len(sorted_albums),
+        "coverArt": id,
+        "album": [stars.enrich(album_payload(a, with_songs=False)) for a in sorted_albums],
+    }
+    stars.enrich(payload)
+    return envelope("artist", payload)
 
 
 @router.api_route("/getAlbum", methods=["GET", "POST", "HEAD"])
@@ -95,10 +100,15 @@ async def get_artist(request: Request, id: str = Query(...)) -> dict:
 async def get_album(request: Request, id: str = Query(...)) -> dict:
     """One album with its tracks."""
     cache = _get_cache(request)
+    stars = _get_stars(request)
     album = cache.albums_by_id.get(id)
     if album is None:
         return error_envelope(70, f"Album not found: {id}")
-    return envelope("album", album_payload(album, with_songs=True))
+    payload = album_payload(album, with_songs=True)
+    stars.enrich(payload)
+    for song in payload.get("song", []):
+        stars.enrich(song)
+    return envelope("album", payload)
 
 
 @router.api_route("/getSong", methods=["GET", "POST", "HEAD"])

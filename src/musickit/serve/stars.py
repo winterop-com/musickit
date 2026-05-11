@@ -94,6 +94,23 @@ class StarStore:
         with self._lock:
             return {sid: ts for sid, ts in self._items.items() if sid.startswith(prefix)}
 
+    def enrich(self, payload: dict, *, key: str = "id") -> dict:
+        """Mutate `payload`: if `payload[key]` is starred, set `payload["starred"] = <iso>`.
+
+        The Subsonic spec expects every artist / album / song payload to carry a
+        `starred` ISO timestamp when applicable — not just the `/getStarred*`
+        responses. Clients (Symfonium, Amperfy, our own desktop SPA) read that
+        field directly when rendering each row's heart icon. Helper kept here
+        rather than scattered across endpoints so the lookup is a single
+        `starred_at` call per payload.
+        """
+        sid = payload.get(key)
+        if isinstance(sid, str):
+            ts = self.starred_at(sid)
+            if ts is not None:
+                payload["starred"] = ts
+        return payload
+
     def prune(self, valid_ids: set[str]) -> int:
         """Drop starred IDs that are no longer in `valid_ids`. Returns the count removed."""
         with self._lock:
