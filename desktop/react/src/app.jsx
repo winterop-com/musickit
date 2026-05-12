@@ -58,6 +58,10 @@ function App() {
   // Session state
   const [authed, setAuthed] = uS(false);
   const [user, setUser] = uS("admin");
+  // WIRING: lazy-initialise so the splash shows on first render if a
+  // saved session exists. Without this we'd flash the login form for
+  // 3-4 seconds while MK_RESUME does the library load on every launch.
+  const [resuming, setResuming] = uS(() => !!window.MK_API?.loadSession?.());
 
   // Browse selection
   const [section, setSection] = uS("library"); // "library" | "stations" | "starred"
@@ -270,15 +274,22 @@ function App() {
   handleNextRef.current = handleNext;
 
   // WIRING: on first mount, see if there's a saved session and skip
-  // the login form entirely if MK_DATA is already populated for it.
+  // the login form entirely if one is found. While the resume runs we
+  // render a splash (see the early-return below); without it the login
+  // form would briefly flash on every launch.
   uE(() => {
-    if (authed || !window.MK_RESUME) return;
+    if (authed || !window.MK_RESUME) { setResuming(false); return; }
+    if (!window.MK_API?.loadSession?.()) { setResuming(false); return; }
     let cancelled = false;
-    window.MK_RESUME().then((session) => {
-      if (cancelled || !session) return;
-      setAuthed(true);
-      setUser(session.user);
-    });
+    window.MK_RESUME()
+      .then((session) => {
+        if (cancelled) return;
+        if (session) {
+          setAuthed(true);
+          setUser(session.user);
+        }
+      })
+      .finally(() => { if (!cancelled) setResuming(false); });
     return () => { cancelled = true; };
   }, []);
 
@@ -368,6 +379,13 @@ function App() {
   };
 
   if (!authed) {
+    // WIRING: if a saved session is being restored, render a splash
+    // instead of flashing the login form. The splash itself lives in
+    // index.html (#mk-splash) so it can paint immediately on first
+    // load, before React even mounts; here we just keep it visible.
+    if (resuming) {
+      return <div className="mk-resume-shell" />;
+    }
     return (
       <>
         <window.MK_LoginView themeMode={t.theme} onConnect={({ url, user }) => { setAuthed(true); setUser(user); }} />

@@ -100,62 +100,47 @@
   // ---------------------------------------------------------------
   // 3. Library loader — populate window.MK_DATA from the API.
   // ---------------------------------------------------------------
+  //
+  // The artifact's chrome reads `window.MK_DATA.ARTISTS` (and friends)
+  // at every render. To support partial loads we mutate the same
+  // MK_DATA in place — first with `getArtists` (a flat artist list,
+  // arrives in ~1 round-trip), then with `getArtist`/`getAlbum`
+  // details fired in parallel. A consumer who renders early will see
+  // an artist list with empty `albums` arrays; once the per-artist
+  // details land the arrays fill in. Same approach for stations
+  // (also a single round-trip).
+  //
+  // Concurrency: we kick all `getArtist` calls in parallel (Promise.all)
+  // rather than serialising them. The musickit serve bump-tested its
+  // thread pool to 256 for exactly this; other Subsonic servers handle
+  // it fine too. For libraries with hundreds of artists this turns a
+  // multi-second waterfall into a single round-trip + the slowest
+  // per-artist call.
   async function loadLibrary(session) {
     const api = window.MK_API;
 
-    // getArtists is cheap; pull it first so the sidebar renders fast.
-    const artists = await api.getArtists(session);
+    // Phase 1: roots — flat artist list + radio stations in parallel.
+    const [artists, radio] = await Promise.all([
+      api.getArtists(session),
+      api.getInternetRadioStations(session).catch(() => []),
+    ]);
 
-    // For each artist, fetch the album list. Then for each album, the
-    // track list. This is O(artists + albums) round-trips — fine on a
-    // small library, slow on a big one. A lazy-on-click variant lives
-    // in TODO once we know the design holds.
-    const flatArtists = [];
-    for (const a of artists) {
-      const detail = await api.getArtist(session, a.id);
-      const albums = detail.album || [];
-      const wiredAlbums = await Promise.all(
-        albums.map(async (al) => {
-          const full = await api.getAlbum(session, al.id);
-          const tracks = (full.song || []).map((s) => ({
-            n: s.track ?? 0,
-            title: s.title || "",
-            time: formatDuration(s.duration),
-            starred: !!s.starred,
-            trackId: s.id,
-            artistId: a.id,
-            albumId: al.id,
-            artist: s.artist || a.name,
-            suffix: s.suffix || "",
-          }));
-          return {
-            id: al.id,
-            name: al.name,
-            year: al.year || "",
-            trackCount: al.songCount || tracks.length,
-            color: "#444",
-            cover: api.coverArtUrl(session, al.coverArt || al.id, 200),
-            coverArtUrl: api.coverArtUrl(session, al.coverArt || al.id, 600),
-            tracks,
-          };
-        })
-      );
-      flatArtists.push({
-        id: a.id,
-        name: a.name,
-        sortName: a.name,
-        albumCount: a.albumCount || wiredAlbums.length,
-        trackCount: wiredAlbums.reduce((n, al) => n + (al.trackCount || 0), 0),
-        bio: "",
-        color: "#444",
-        cover: api.coverArtUrl(session, a.coverArt || a.id, 200),
-        albums: wiredAlbums,
-      });
-    }
-    flatArtists.sort((x, y) => x.name.localeCompare(y.name));
+    // Pre-populate ARTISTS with placeholder shells (empty albums) so a
+    // consumer that renders right now sees the sidebar populated.
+    const seed = artists.map((a) => ({
+      id: a.id,
+      name: a.name,
+      sortName: a.name,
+      albumCount: a.albumCount || 0,
+      trackCount: 0,
+      bio: "",
+      color: "#444",
+      cover: api.coverArtUrl(session, a.coverArt || a.id, 200),
+      albums: [],
+    }));
+    seed.sort((x, y) => x.name.localeCompare(y.name));
 
-    const radio = await api.getInternetRadioStations(session);
-    const stations = radio.map((s) => ({
+    const stations = (radio || []).map((s) => ({
       id: s.id,
       name: s.name,
       streamUrl: s.streamUrl,
@@ -164,13 +149,64 @@
     }));
 
     window.MK_DATA = {
-      ARTISTS: flatArtists,
+      ARTISTS: seed,
       STATIONS: stations,
       LYRICS_BOADICEA: [],
     };
-    // Stash the active session on window so app.jsx patches can read
-    // it without us having to thread a prop through the artifact tree.
     window.MK_SESSION = session;
+
+    // Phase 2: per-artist album + per-album track fetches, all in
+    // parallel. Each artist's slot in `seed` gets filled in place so
+    // any in-flight UI re-render picks it up.
+    const slots = new Map(seed.map((s) => [s.id, s]));
+    await Promise.all(
+      artists.map(async (a) => {
+        const slot = slots.get(a.id);
+        if (!slot) return;
+        let detail;
+        try {
+          detail = await api.getArtist(session, a.id);
+        } catch (err) {
+          console.warn("[wiring] getArtist failed for", a.id, err);
+          return; // leave the slot's empty albums in place; UI shows skeleton
+        }
+        const albums = detail.album || [];
+        const wiredAlbums = await Promise.all(
+          albums.map(async (al) => {
+            let full;
+            try {
+              full = await api.getAlbum(session, al.id);
+            } catch (err) {
+              console.warn("[wiring] getAlbum failed for", al.id, err);
+              return null;
+            }
+            const tracks = (full.song || []).map((s) => ({
+              n: s.track ?? 0,
+              title: s.title || "",
+              time: formatDuration(s.duration),
+              starred: !!s.starred,
+              trackId: s.id,
+              artistId: a.id,
+              albumId: al.id,
+              artist: s.artist || a.name,
+              suffix: s.suffix || "",
+            }));
+            return {
+              id: al.id,
+              name: al.name,
+              year: al.year || "",
+              trackCount: al.songCount || tracks.length,
+              color: "#444",
+              cover: api.coverArtUrl(session, al.coverArt || al.id, 200),
+              coverArtUrl: api.coverArtUrl(session, al.coverArt || al.id, 600),
+              tracks,
+            };
+          })
+        );
+        slot.albums = wiredAlbums.filter(Boolean);
+        slot.trackCount = slot.albums.reduce((n, al) => n + (al.trackCount || 0), 0);
+      })
+    );
   }
 
   function formatDuration(seconds) {
@@ -184,16 +220,40 @@
   // 4. Auto-resume — if we have a stored session, populate MK_DATA
   //    before App() first mounts and skip the login form.
   // ---------------------------------------------------------------
+  //
+  // Only clear the persisted session on AUTH failures (Subsonic 40,
+  // HTTP 401). A transient network error or a one-off bad-album
+  // response shouldn't kick the user back to the login screen and
+  // wipe their stored credentials — they'd lose the ability to retry
+  // once their wifi comes back, even though the credentials are still
+  // valid. We re-throw non-auth errors to the caller so the UI can
+  // decide whether to show a banner or retry.
+  function isAuthError(err) {
+    const msg = String(err?.message || err);
+    return /Subsonic 40\b/i.test(msg) || /HTTP 401/i.test(msg);
+  }
+
   window.MK_RESUME = async function resume() {
     const session = window.MK_API.loadSession();
     if (!session) return null;
     try {
+      // Phase 1 (getArtists + radio) is the auth-checking call. If it
+      // fails with 40/401, the credentials are stale; clear and return
+      // null. If it fails for any other reason, keep the session and
+      // surface the error so the user can retry.
       await loadLibrary(session);
       return session;
     } catch (err) {
-      console.warn("[wiring] resume failed, clearing session:", err);
-      window.MK_API.clearSession();
-      return null;
+      if (isAuthError(err)) {
+        console.warn("[wiring] resume: auth failed, clearing session:", err);
+        window.MK_API.clearSession();
+        return null;
+      }
+      console.warn("[wiring] resume: transient failure, keeping session:", err);
+      // Keep the session so the user can retry without re-entering creds.
+      // Return the session anyway — partial data may have been populated
+      // by phase 1, and the shell can render with what we have.
+      return session;
     }
   };
 })();

@@ -188,6 +188,17 @@ body[data-platform="darwin"] .mk-topbar input {
   background: var(--row-hover);
 }
 
+/* Resume splash — covers the viewport while the auto-resume re-loads
+ * the library on a saved-session launch. Without this, the login form
+ * flashes for a couple of seconds before the shell appears. Plain dark
+ * background; a future iteration can add a brand mark or spinner. */
+.mk-resume-shell {
+  position: fixed;
+  inset: 0;
+  background: var(--bg, #16161e);
+  z-index: 9999;
+}
+
 /* ---------------------------------------------------------------------
  * Themed scrollbars. Default macOS / Chrome scrollbars are a wide
  * light-grey track that clashes with the dark palette. Thin them out
