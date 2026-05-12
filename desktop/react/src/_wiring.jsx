@@ -34,12 +34,12 @@
   }
 
   function WiredLoginView(props) {
-    const [error, setError] = React.useState(null);
-    const [busy, setBusy] = React.useState(false);
-
     async function handleConnect({ url, user, pass }) {
-      setError(null);
-      setBusy(true);
+      // Authenticate against the real server, then preload the library
+      // tree. Re-throw on failure so views.jsx's submit() catch sets
+      // the LoginView's `err` state, which renders the .mk-login-error
+      // message. Without re-throw the form silently looks like nothing
+      // happened on connection-refused / wrong-credentials.
       try {
         const session = await window.MK_API.login({
           baseUrl: url,
@@ -51,25 +51,25 @@
         props.onConnect({ url: session.baseUrl, user: session.user, pass });
       } catch (err) {
         console.error("[wiring] login failed:", err);
-        setError(err.message || String(err));
-      } finally {
-        setBusy(false);
+        // Map raw fetch/network errors to something a human can act on.
+        const raw = String(err?.message || err);
+        let friendly = raw;
+        if (/Failed to fetch|NetworkError|ERR_CONNECTION_REFUSED/i.test(raw)) {
+          friendly = `Couldn't reach the server at ${url}. Is it running and reachable from this device?`;
+        } else if (/Subsonic 40/i.test(raw)) {
+          friendly = "Wrong username or password.";
+        } else if (/HTTP 401/i.test(raw)) {
+          friendly = "Server rejected the credentials (HTTP 401).";
+        } else if (/HTTP 5\d\d/i.test(raw)) {
+          friendly = `Server error (${raw}). Check the serve logs.`;
+        }
+        throw new Error(friendly);
       }
     }
-
-    // The artifact's LoginView prop contract is `onConnect({url, user})`.
-    // We accept an extra `pass` field by wrapping the underlying form;
-    // see the patched app.jsx for how the form passes it through.
-    return React.createElement(
-      "div",
-      { className: "mk-login-wrap" },
-      React.createElement(OriginalLoginView, {
-        ...props,
-        onConnect: handleConnect,
-        busy,
-        error,
-      })
-    );
+    return React.createElement(OriginalLoginView, {
+      ...props,
+      onConnect: handleConnect,
+    });
   }
   window.MK_LoginView = WiredLoginView;
 
