@@ -1,11 +1,18 @@
 // Subsonic API client — talks to any spec-compliant `/rest/*` server
 // (musickit serve, Navidrome, Airsonic, Gonic, ...).
 //
-// Auth model: salted-token per request. The user submits password ONCE
-// at the login screen; from then on we compute `t = md5(password + s)`
-// with a fresh random salt for every request, so the plaintext
-// password never crosses the wire and never persists. Token + salt do
-// persist (in localStorage) so refreshing the page keeps the session.
+// Auth model: salted-token. The user submits the password ONCE at the
+// login screen; we immediately compute `(salt, token=md5(password +
+// salt))` and only the (salt, token) pair is persisted. The plaintext
+// password is dropped after that submit and never touches localStorage.
+//
+// The Subsonic spec doesn't require a *fresh* salt per request — the
+// server validates `md5(password + salt) == token` for whatever salt
+// you send, so reusing a single (salt, token) across requests is
+// well-supported. That's the trade we make to avoid persisting the
+// password just to be able to regenerate fresh tokens. Rotation
+// requires a re-login, which is the same UX as any other client that
+// expires its derived token after a while.
 //
 // Lives outside the Claude Designer artifact (note the leading
 // underscore) so future zip drops only replace src/*.jsx + musickit.css
@@ -27,12 +34,13 @@
   }
 
   function buildAuthQuery(session) {
-    const salt = genSalt();
-    const token = window.MK_md5(session.password + salt);
+    // The (salt, token) pair was computed at login time from the
+    // plaintext password and is now the only thing we persist. Reuse
+    // it for every request — the spec doesn't require fresh salts.
     const qs = new URLSearchParams({
       u: session.user,
-      t: token,
-      s: salt,
+      t: session.token,
+      s: session.salt,
       v: API_VERSION,
       c: CLIENT_NAME,
       f: "json",
@@ -81,7 +89,11 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
       const s = JSON.parse(raw);
-      if (!s.baseUrl || !s.user || !s.password) return null;
+      // Sessions persisted by older builds carried `password` instead of
+      // (token, salt). Treat them as invalid so the user is sent back
+      // through the login screen — the plaintext credential then leaves
+      // localStorage on first save.
+      if (!s.baseUrl || !s.user || !s.token || !s.salt) return null;
       return s;
     } catch {
       return null;
@@ -107,8 +119,15 @@
 
     async login({ baseUrl, user, password }) {
       const base = baseUrl.replace(/\/+$/, "");
-      const session = { baseUrl: base, user, password };
-      // Pings throws if creds bad, so login itself is the validation.
+      // Derive the (salt, token) pair NOW and discard the password.
+      // `genSalt()` returns 24 hex chars (96 bits of entropy) which is
+      // plenty against offline guessing of the underlying password
+      // given the md5 weakness — Subsonic's wire format constrains us
+      // to md5 regardless.
+      const salt = genSalt();
+      const token = window.MK_md5(password + salt);
+      const session = { baseUrl: base, user, salt, token };
+      // Ping first so an invalid credential doesn't pollute storage.
       await call(session, "ping");
       saveSession(session);
       return session;

@@ -327,6 +327,17 @@ function App() {
     setNow(null);
     setPlaying(false);
     setArtistId(null); setAlbumId(null);
+    // WIRING: also clear the persisted Subsonic session so the next
+    // launch doesn't auto-resume into the same account. Without this,
+    // MK_RESUME() rehydrates from localStorage and bypasses the login
+    // form — contradicting the "Clear session and sign out" tooltip.
+    window.MK_API?.clearSession?.();
+    window.MK_SESSION = null;
+    if (window.MK_DATA) {
+      window.MK_DATA.ARTISTS = [];
+      window.MK_DATA.STATIONS = [];
+    }
+    window.MK_AUDIO?.pause?.();
   };
 
   // Palette command runner — minimal subset that maps to existing actions.
