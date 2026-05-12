@@ -57,20 +57,23 @@ def update_json_version(path: Path, version: str) -> bool:
 
 
 _META_TAG_RE = re.compile(r'(<meta\s+name="mk-version"\s+content=")[^"]*(")')
+_SCRIPT_VERSION_RE = re.compile(r'(<script[^>]*\bsrc="[^"]*?\?v=)[^"]*(")')
 
 
 def update_html_meta_version(path: Path, version: str) -> bool:
-    """Update `<meta name="mk-version" content="...">` in an HTML file.
+    """Update `<meta name=mk-version>` and `<script src=...?v=X.Y.Z>` busters.
 
-    The login screen reads this tag for its `desktop · vX.Y.Z` label so
-    the user-facing version stays in step with pyproject.toml. Regex
-    rather than a real HTML parser keeps this script free of extra
-    dependencies; the tag's shape is locked in our own index.html.
+    The meta tag drives the login / topbar `vX.Y.Z` label. The `?v=` cache
+    buster on every script src forces Electron / Tauri webviews to
+    re-download the JS bundle on each release instead of running a stale
+    cached copy. Regex rather than a real HTML parser keeps this script
+    dependency-free.
     """
     text = path.read_text(encoding="utf-8")
-    new_text, n = _META_TAG_RE.subn(rf"\g<1>{version}\g<2>", text)
-    if n == 0:
+    new_text, meta_n = _META_TAG_RE.subn(rf"\g<1>{version}\g<2>", text)
+    if meta_n == 0:
         raise SystemExit(f"meta[name=mk-version] not found in {path}")
+    new_text = _SCRIPT_VERSION_RE.sub(rf"\g<1>{version}\g<2>", new_text)
     if new_text == text:
         return False
     path.write_text(new_text, encoding="utf-8")

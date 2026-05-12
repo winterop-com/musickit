@@ -139,20 +139,27 @@ function App() {
   const handleNextRef = uR(null);
 
   // Load the right URL whenever `now` changes (track click, prev/next,
-  // station click, search-result pick all funnel through here).
+  // station click, search-result pick all funnel through here). Also
+  // call play() right after load — when the user clicks a second track
+  // while the first is playing, setPlaying(true) is a no-op (value
+  // unchanged) and the separate [playing] effect doesn't re-fire. Without
+  // an explicit play() here the new track loads but stays paused.
   uE(() => {
     if (!now || !window.MK_AUDIO) return;
+    let loaded = false;
     if (now.stationId) {
       const st = window.MK_DATA.STATIONS.find((s) => s.id === now.stationId);
-      if (st?.streamUrl) window.MK_AUDIO.load(st.streamUrl);
+      if (st?.streamUrl) { window.MK_AUDIO.load(st.streamUrl); loaded = true; }
     } else if (window.MK_SESSION) {
       const a = window.MK_DATA.ARTISTS.find((x) => x.id === now.artistId);
       const al = a?.albums.find((x) => x.id === now.albumId);
       const tr = al?.tracks.find((x) => x.n === now.trackN);
       if (tr?.trackId) {
         window.MK_AUDIO.load(window.MK_API.streamUrl(window.MK_SESSION, tr.trackId));
+        loaded = true;
       }
     }
+    if (loaded) window.MK_AUDIO.play();
   }, [now]);
 
   // Forward play/pause state to the audio element.
