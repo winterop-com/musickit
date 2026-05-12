@@ -380,11 +380,19 @@ function App() {
 
   if (!authed) {
     // WIRING: if a saved session is being restored, render a splash
-    // instead of flashing the login form. The splash itself lives in
-    // index.html (#mk-splash) so it can paint immediately on first
-    // load, before React even mounts; here we just keep it visible.
+    // instead of flashing the login form. The label below is the only
+    // user-visible signal that something's happening, so keep it
+    // short and recognisable.
     if (resuming) {
-      return <div className="mk-resume-shell" />;
+      return (
+        <div className="mk-resume-shell">
+          <div className="mk-resume-card">
+            <div className="mk-resume-brand">MusicKit</div>
+            <div className="mk-resume-spinner" aria-hidden="true" />
+            <div className="mk-resume-label">Loading library…</div>
+          </div>
+        </div>
+      );
     }
     return (
       <>

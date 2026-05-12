@@ -34,6 +34,7 @@
   }
 
   function WiredLoginView(props) {
+    const [busyLabel, setBusyLabel] = React.useState(null);
     async function handleConnect({ url, user, pass }) {
       // Authenticate against the real server, then preload the library
       // tree. Re-throw on failure so views.jsx's submit() catch sets
@@ -41,11 +42,13 @@
       // message. Without re-throw the form silently looks like nothing
       // happened on connection-refused / wrong-credentials.
       try {
+        setBusyLabel("Connecting…");
         const session = await window.MK_API.login({
           baseUrl: url,
           user,
           password: pass,
         });
+        setBusyLabel("Loading library…");
         await loadLibrary(session);
         // Tell the artifact's App() to flip into the shell view.
         props.onConnect({ url: session.baseUrl, user: session.user, pass });
@@ -70,12 +73,15 @@
         } else if (/HTTP 5\d\d/i.test(raw)) {
           friendly = `Server error (${raw}). Check the serve logs.`;
         }
+        // Reset the busy label so the next attempt starts cleanly.
+        setBusyLabel(null);
         throw new Error(friendly);
       }
     }
     return React.createElement(OriginalLoginView, {
       ...props,
       onConnect: handleConnect,
+      busyLabel,
     });
   }
   window.MK_LoginView = WiredLoginView;

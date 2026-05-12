@@ -2,7 +2,7 @@
 
 const { useEffect: useEff_v, useState: useSt_v, useRef: useRef_v } = React;
 
-function LoginView({ onConnect, themeMode }) {
+function LoginView({ onConnect, themeMode, busyLabel }) {
   const [url, setUrl] = useSt_v("http://localhost:4533");
   const [user, setUser] = useSt_v("admin");
   const [pw, setPw] = useSt_v("");
@@ -59,7 +59,7 @@ function LoginView({ onConnect, themeMode }) {
           </label>
           {err && <div className="mk-login-error">{err}</div>}
           <button type="submit" className="mk-btn-primary" disabled={busy}>
-            {busy ? "Connecting…" : "Connect"}
+            {busy ? (busyLabel || "Connecting…") : "Connect"}
           </button>
           <div className="mk-login-foot">
             Credentials are sent via <code>?u=&amp;p=</code> over your Subsonic endpoint —

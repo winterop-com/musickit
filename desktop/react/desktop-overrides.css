@@ -190,13 +190,45 @@ body[data-platform="darwin"] .mk-topbar input {
 
 /* Resume splash — covers the viewport while the auto-resume re-loads
  * the library on a saved-session launch. Without this, the login form
- * flashes for a couple of seconds before the shell appears. Plain dark
- * background; a future iteration can add a brand mark or spinner. */
+ * flashes for a couple of seconds before the shell appears. */
 .mk-resume-shell {
   position: fixed;
   inset: 0;
   background: var(--bg, #16161e);
   z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mk-resume-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.mk-resume-brand {
+  font-family: var(--mk-mono, ui-monospace, monospace);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--accent, #7aa2f7);
+  letter-spacing: 0.5px;
+}
+.mk-resume-label {
+  font-family: var(--mk-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--text-soft, #a9b1d6);
+  letter-spacing: 0.4px;
+}
+.mk-resume-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid var(--line, #2a2e3f);
+  border-top-color: var(--accent, #7aa2f7);
+  animation: mk-spin 0.8s linear infinite;
+}
+@keyframes mk-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ---------------------------------------------------------------------
