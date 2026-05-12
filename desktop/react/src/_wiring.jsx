@@ -52,9 +52,16 @@
       } catch (err) {
         console.error("[wiring] login failed:", err);
         // Map raw fetch/network errors to something a human can act on.
+        // Each browser emits a different message for "couldn't connect":
+        //   Chromium: "Failed to fetch", "TypeError: NetworkError"
+        //   WebKit (Safari / Tauri on macOS): "Load failed"
+        //   Firefox: "NetworkError when attempting to fetch"
+        // Plus DNS / TLS / timeout variants. Treat anything that smells
+        // like a network-layer failure as connection-refused.
         const raw = String(err?.message || err);
+        const networkSignals = /Failed to fetch|NetworkError|ERR_CONNECTION_REFUSED|Load failed|Could not connect|ENOTFOUND|timed? out/i;
         let friendly = raw;
-        if (/Failed to fetch|NetworkError|ERR_CONNECTION_REFUSED/i.test(raw)) {
+        if (networkSignals.test(raw) || err instanceof TypeError) {
           friendly = `Couldn't reach the server at ${url}. Is it running and reachable from this device?`;
         } else if (/Subsonic 40/i.test(raw)) {
           friendly = "Wrong username or password.";
