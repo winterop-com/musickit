@@ -96,9 +96,20 @@ function App() {
     if (!tr?.trackId) return;
     const wasStarred = starred.has(key);
     const fn = wasStarred ? window.MK_API.unstar : window.MK_API.star;
-    fn(window.MK_SESSION, { id: tr.trackId }).catch((err) =>
-      console.warn("[wiring] star/unstar failed:", err)
-    );
+    fn(window.MK_SESSION, { id: tr.trackId }).catch((err) => {
+      console.warn("[wiring] star/unstar failed:", err);
+      // Roll back the optimistic local toggle so the heart matches
+      // what the server actually thinks.
+      setStarred((prev) => {
+        const next = new Set(prev);
+        if (wasStarred) next.add(key); else next.delete(key);
+        return next;
+      });
+      window.MK_setConnError?.({
+        message: `Couldn't update star on the server: ${err?.message || err}`,
+        retry: () => toggleStar(key),
+      });
+    });
   };
 
   // Playback state
@@ -117,6 +128,11 @@ function App() {
   const [showLyrics, setShowLyrics] = uS(false);
   const [fullscreenViz, setFullscreenViz] = uS(false);
   const [showConn, setShowConn] = uS(false);
+  // WIRING: `connError` is a richer connection-error state populated
+  // by the wiring layer when a fetch fails or audio can't play.
+  // Shape: { message, retry? }. When set, the ConnectionBanner shows
+  // the message and (if present) wires Retry to the retry callback.
+  const [connError, setConnError] = uS(null);
 
   // Search
   const [q, setQ] = uS("");
@@ -273,6 +289,15 @@ function App() {
   // the latest handleNext closure (which captures the current `now`).
   handleNextRef.current = handleNext;
 
+  // WIRING: expose the connection-error setter so non-React code
+  // (wiring layer, audio controller, fetch wrappers) can pop the
+  // banner when a network call fails. The setter is wiped on unmount
+  // so stale references don't fire into a dead React tree.
+  uE(() => {
+    window.MK_setConnError = setConnError;
+    return () => { window.MK_setConnError = null; };
+  }, []);
+
   // WIRING: on first mount, see if there's a saved session and skip
   // the login form entirely if one is found. While the resume runs we
   // render a splash (see the early-return below); without it the login
@@ -419,6 +444,18 @@ function App() {
           message="GET /rest/getArtists timed out after 8s. Will retry automatically."
           onRetry={() => setShowConn(false)}
           onDismiss={() => setShowConn(false)}
+        />
+      )}
+
+      {connError && (
+        <window.MK_ConnectionBanner
+          message={connError.message}
+          onRetry={() => {
+            const r = connError.retry;
+            setConnError(null);
+            if (typeof r === "function") r();
+          }}
+          onDismiss={() => setConnError(null)}
         />
       )}
 

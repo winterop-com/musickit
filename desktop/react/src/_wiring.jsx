@@ -126,6 +126,10 @@
     const api = window.MK_API;
 
     // Phase 1: roots — flat artist list + radio stations in parallel.
+    // getArtists is the auth-checking call; let it surface errors so
+    // MK_RESUME / handleConnect can classify (auth vs. transient).
+    // getInternetRadioStations is allowed to soft-fail (some servers
+    // don't expose it; a missing radio list is not fatal).
     const [artists, radio] = await Promise.all([
       api.getArtists(session),
       api.getInternetRadioStations(session).catch(() => []),
@@ -164,6 +168,11 @@
     // Phase 2: per-artist album + per-album track fetches, all in
     // parallel. Each artist's slot in `seed` gets filled in place so
     // any in-flight UI re-render picks it up.
+    // We count failures so a partial-but-mostly-broken load (server
+    // went offline mid-load) can pop a single banner instead of
+    // logging silently into the void.
+    let failedCount = 0;
+    let firstError = null;
     const slots = new Map(seed.map((s) => [s.id, s]));
     await Promise.all(
       artists.map(async (a) => {
@@ -174,6 +183,8 @@
           detail = await api.getArtist(session, a.id);
         } catch (err) {
           console.warn("[wiring] getArtist failed for", a.id, err);
+          failedCount++;
+          if (!firstError) firstError = err;
           return; // leave the slot's empty albums in place; UI shows skeleton
         }
         const albums = detail.album || [];
@@ -184,6 +195,8 @@
               full = await api.getAlbum(session, al.id);
             } catch (err) {
               console.warn("[wiring] getAlbum failed for", al.id, err);
+              failedCount++;
+              if (!firstError) firstError = err;
               return null;
             }
             const tracks = (full.song || []).map((s) => ({
@@ -213,6 +226,18 @@
         slot.trackCount = slot.albums.reduce((n, al) => n + (al.trackCount || 0), 0);
       })
     );
+
+    // If a non-trivial chunk of phase 2 failed, surface a banner so
+    // the user knows the library is incomplete rather than wondering
+    // why some artists have no albums. One fetch occasionally failing
+    // (e.g. a single corrupt album entry) is fine; we only complain
+    // when it's likely network / server trouble.
+    if (failedCount >= 3) {
+      window.MK_setConnError?.({
+        message: `Library partially loaded — ${failedCount} fetches failed. Server may be flaky.`,
+        retry: () => loadLibrary(session),
+      });
+    }
   }
 
   function formatDuration(seconds) {
@@ -266,10 +291,34 @@
         return null;
       }
       console.warn("[wiring] resume: transient failure or timeout, keeping session:", err);
+      // Surface a banner so the user knows why the sidebar is empty,
+      // with a Retry that re-runs the load against the same session.
+      window.MK_setConnError?.({
+        message: `Couldn't reach ${session.baseUrl}. Server may be offline.`,
+        retry: () => {
+          loadLibrary(session).catch((e) => {
+            window.MK_setConnError?.({
+              message: `Still can't reach ${session.baseUrl}. ${e?.message || ""}`.trim(),
+              retry: () => window.MK_setConnError?.(null),
+            });
+          });
+        },
+      });
       // Keep the session and the (possibly partial) data so the shell
-      // can render with what we have. A retry from the UI will
-      // re-trigger loadLibrary fresh.
+      // can render with what we have.
       return session;
     }
   };
+
+  // Audio errors → banner. The audio element fires `error` on stream
+  // failure, e.g. when the server is unreachable mid-track or a radio
+  // station drops its connection.
+  if (window.MK_AUDIO?.onError) {
+    window.MK_AUDIO.onError(() => {
+      window.MK_setConnError?.({
+        message: "Stream failed. The server may have gone offline.",
+        retry: () => window.MK_AUDIO?.play?.(),
+      });
+    });
+  }
 })();
