@@ -58,7 +58,19 @@ body[data-platform="darwin"] .mk-topbar input {
   min-width: 0;
   margin: 1px 0;
 }
-.mk-album-name,
+/* Album rows: title wraps up to two lines (graceful for long titles
+ * like "Now That's What I Call Music — 50 Hits"), while the sub-line
+ * (year + track count) stays a single ellipsis'd line. -webkit-line-clamp
+ * is the standard "clamp at N lines with ellipsis" trick; supported in
+ * every Chromium / WebKit / Firefox we ship to. */
+.mk-album-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.25;
+}
 .mk-album-sub {
   white-space: nowrap;
   overflow: hidden;
