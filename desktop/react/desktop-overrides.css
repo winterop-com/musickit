@@ -1,0 +1,63 @@
+/*
+ * Desktop-wrapper overrides for the design-v2 prototype.
+ *
+ * The Claude Designer artifact (musickit.css) is plain-web styling. When
+ * the prototype runs inside the Tauri / Electron windows that use macOS
+ * `hiddenInset` / `Overlay` title bars, the native traffic-light buttons
+ * are placed OVER the top-left of the page — they punch a hole into the
+ * topbar area, ~78px wide.
+ *
+ * Without compensation, the search box in `.mk-topbar-left` ends up
+ * under those buttons. The legacy `desktop/frontend/_app.css` solves
+ * this with a `body[data-platform="darwin"] .topbar` rule. We do the
+ * same here, in a SEPARATE file so it survives the next time someone
+ * drops a new Claude Designer zip on top of `musickit.css` + `src/`.
+ *
+ * The body attribute is set by the wrapper's preload (Electron) or by
+ * a script tag in index.html that detects `navigator.platform`.
+ */
+
+body[data-platform="darwin"] .mk-topbar {
+  /* Push the entire topbar grid right of the traffic lights. The 80px
+   * matches the legacy frontend's value — three buttons + padding. */
+  padding-left: 80px;
+  /* The native title-bar buttons sit inside a 28px-tall strip; the
+   * topbar's own 40px height already swallows that, but make the
+   * region draggable like a real title bar so Cmd-click + drag works.
+   * `-webkit-app-region` is respected by Electron's Chromium. */
+  -webkit-app-region: drag;
+}
+
+/* Restore default cursor / clickability on the interactive children —
+ * without this, the search box, sign-out button, etc. inherit the
+ * `drag` region and become unclickable. */
+body[data-platform="darwin"] .mk-topbar .mk-search-wrap,
+body[data-platform="darwin"] .mk-topbar .mk-signout,
+body[data-platform="darwin"] .mk-topbar button,
+body[data-platform="darwin"] .mk-topbar input {
+  -webkit-app-region: no-drag;
+}
+
+/* Search-dropdown row selection state — used by the keyboard nav added
+ * in `overlays.jsx`. The artifact's CSS only had `:hover` styling; we
+ * mirror it for the explicit `.is-selected` class. */
+.mk-search-row.is-selected {
+  background: var(--row-hover);
+}
+
+/* Fullscreen visualizer header — the artifact's 24px top padding put
+ * the cover *just* inside the traffic-light strip on macOS. Bump it
+ * down a few px so the cover starts cleanly below them. Don't shift
+ * horizontally — the original alignment with the spectrum bars below
+ * was the intended look. The header strip is marked drag so the
+ * window can be moved by grabbing alongside the cover; close button
+ * and transport controls get `no-drag` so they stay clickable. */
+body[data-platform="darwin"] .mk-fs-head {
+  padding-top: 36px;
+  -webkit-app-region: drag;
+}
+body[data-platform="darwin"] .mk-fs-close,
+body[data-platform="darwin"] .mk-fs-controls,
+body[data-platform="darwin"] .mk-fs-controls button {
+  -webkit-app-region: no-drag;
+}

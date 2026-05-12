@@ -1,7 +1,7 @@
 {
-  "name": "musickit-desktop-electron",
+  "name": "musickit-desktop-electron-react",
   "version": "0.22.0",
-  "description": "Electron sibling of the MusicKit desktop wrapper \u2014 for comparison with the Tauri build.",
+  "description": "Electron wrapper around the MusicKit design-v2 React prototype. Installs side-by-side with the production MusicKit Electron build.",
   "main": "src/main.js",
   "private": true,
   "type": "commonjs",
@@ -20,21 +20,21 @@
     "electron-builder": "^26.0.0"
   },
   "build": {
-    "appId": "com.winterop.musickit.electron",
-    "productName": "MusicKit",
-    "artifactName": "MusicKit-Electron-${version}-${arch}.${ext}",
+    "appId": "com.winterop.musickit.electron.react",
+    "productName": "MusicKit Design",
+    "artifactName": "MusicKit-Design-Electron-${version}-${arch}.${ext}",
     "asar": true,
     "directories": {
       "output": "dist"
     },
     "files": [
       "src/**/*",
-      "../frontend/**/*"
+      "../react/**/*"
     ],
     "extraResources": [
       {
-        "from": "../frontend",
-        "to": "frontend"
+        "from": "../react",
+        "to": "react"
       }
     ],
     "mac": {

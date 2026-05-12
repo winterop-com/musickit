@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MusicKit (design v2)</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="musickit.css" />
+  <!-- Desktop-wrapper overrides — loads AFTER musickit.css so it can
+       override designer-output styles without editing them. Survives
+       the next design-zip drop. -->
+  <link rel="stylesheet" href="desktop-overrides.css" />
+  <script>
+    // Tag the platform on <body> so desktop-overrides.css can apply
+    // macOS-only rules (traffic-light clearance, app-region: drag).
+    // navigator.platform is deprecated but still set in Electron/Tauri
+    // webviews and is the fastest sync way to detect Darwin.
+    document.addEventListener("DOMContentLoaded", () => {
+      const ua = (navigator.userAgent || "").toLowerCase();
+      const plat = (navigator.platform || "").toLowerCase();
+      document.body.dataset.platform =
+        plat.startsWith("mac") || ua.includes("mac os") ? "darwin" :
+        plat.startsWith("win") || ua.includes("windows") ? "win32" : "linux";
+      // Tauri's WebKit ignores `-webkit-app-region: drag` (we use that
+      // for Electron). Tauri uses an HTML attribute instead. The
+      // designer artifact's `.mk-topbar` is rendered by React after
+      // mount, so we add the attribute via MutationObserver as soon
+      // as the element appears in the tree. Cheap and idempotent.
+      const tagDrag = () => {
+        const bar = document.querySelector(".mk-topbar");
+        if (bar && !bar.hasAttribute("data-tauri-drag-region")) {
+          bar.setAttribute("data-tauri-drag-region", "");
+        }
+        document.querySelectorAll(
+          ".mk-topbar input, .mk-topbar button, .mk-topbar .mk-search-wrap"
+        ).forEach((el) => {
+          if (!el.hasAttribute("data-tauri-drag-region-disabled")) {
+            // Tauri honours this negation pattern by simply not having
+            // the drag attribute on children — but setting an explicit
+            // marker helps readers see the intent.
+            el.setAttribute("data-tauri-drag-region-disabled", "");
+          }
+        });
+      };
+      tagDrag();
+      const mo = new MutationObserver(tagDrag);
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+    });
+
+    // Tauri 2 runtime drag handler — `data-tauri-drag-region` alone is
+    // flaky on dynamically-rendered DOM, and `-webkit-app-region: drag`
+    // is ignored by WKWebView. The legacy frontend uses the same
+    // mousedown-delegation pattern; we mirror it here so the design-v2
+    // window can be moved by grabbing the topbar or the fullscreen
+    // header. No-op on Electron (Chromium honours app-region).
+    function getTauriWindow() {
+      const t = window.__TAURI__;
+      if (!t) return null;
+      if (typeof t.window?.getCurrentWindow === "function") return t.window.getCurrentWindow();
+      if (typeof t.webviewWindow?.getCurrentWebviewWindow === "function") {
+        return t.webviewWindow.getCurrentWebviewWindow();
+      }
+      if (typeof t.window?.getCurrent === "function") return t.window.getCurrent();
+      return null;
+    }
+    document.addEventListener("mousedown", (event) => {
+      if (event.buttons !== 1) return;
+      const target = event.target;
+      const dragRegion = target.closest?.(".mk-topbar, .mk-fs-head");
+      if (!dragRegion) return;
+      if (target.closest("input, button, a, [role='button']")) return;
+      const tauriWin = getTauriWindow();
+      if (!tauriWin?.startDragging) return;
+      tauriWin.startDragging().catch((e) => console.warn("startDragging failed:", e));
+    });
+  </script>
+  <!--
+    Runtime model: load React UMD + Babel-standalone in the page, then
+    drop the designer's JSX files in dependency order. Each file
+    registers its exports on `window.MK_*`; main.jsx pulls MK_App off
+    window and renders it. No build step — matches the Claude Designer
+    preview environment so the design zip can be replaced as-is.
+    A real Vite build can come later without touching these source files.
+  -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <!-- Wiring layer — plain JS, no JSX. Loads first so MK_md5 /
+       MK_API / MK_AUDIO exist before any artifact code runs. The
+       leading underscore on filenames marks "not from the design zip
+       — survives drop-in updates". -->
+  <script src="src/_md5.js"></script>
+  <script src="src/_api.js"></script>
+  <script src="src/_audio.js"></script>
+
+  <!-- Designer artifact. Dependency order: data → covers → visualizer →
+       views → overlays → tweaks-panel → chrome → app. Each declares
+       globals the later files read. Keep this list in sync with
+       desktop/react/src/. -->
+  <script type="text/babel" data-presets="react" src="src/data.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/covers.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/visualizer.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/views.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/overlays.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/tweaks-panel.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/chrome.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/app.jsx"></script>
+
+  <!-- Wiring layer (continued) — _wiring.jsx monkey-patches the
+       artifact's MK_LoginView / MK_makeCover and registers the
+       library-loader before main.jsx renders <App />. -->
+  <script type="text/babel" data-presets="react" src="src/_wiring.jsx"></script>
+  <script type="text/babel" data-presets="react" src="main.jsx"></script>
+</body>
+</html>

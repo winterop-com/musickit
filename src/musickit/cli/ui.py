@@ -41,9 +41,11 @@ def _resolve_static_dir() -> Path:
     Two layouts to support:
       - PyPI install: `src/musickit/_ui_static/` (copied in by
         `scripts/copy_ui_static.py` at `make build` time).
-      - Source checkout: `desktop/frontend/` from the repo root —
-        useful for `uv run musickit ui` during development before the
-        bundle has been generated.
+      - Source checkout: `desktop/react/` from the repo root — useful
+        for `uv run musickit ui` during development before the bundle
+        has been generated. The legacy `desktop/frontend/` is still
+        what the Tauri/Electron production wrappers load, but
+        `musickit ui` now serves the React design-v2 client.
     """
     bundled = files("musickit") / "_ui_static"
     bundled_path = Path(str(bundled))
@@ -52,13 +54,14 @@ def _resolve_static_dir() -> Path:
     here = Path(__file__).resolve()
     # ui.py -> cli/ -> musickit/ -> src/ -> repo root
     repo_root = here.parents[3]
-    dev_dir = repo_root / "desktop" / "frontend"
-    if dev_dir.is_dir() and (dev_dir / "index.html").exists():
-        return dev_dir
+    for candidate_name in ("react", "frontend"):
+        dev_dir = repo_root / "desktop" / candidate_name
+        if dev_dir.is_dir() and (dev_dir / "index.html").exists():
+            return dev_dir
     raise FileNotFoundError(
         "Couldn't find the SPA static files. Either install musickit via pip "
         "(the wheel bundles them) or run from a source checkout where "
-        "`desktop/frontend/` is present."
+        "`desktop/react/` or `desktop/frontend/` is present."
     )
 
 
