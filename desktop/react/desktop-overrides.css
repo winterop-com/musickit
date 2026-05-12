@@ -44,3 +44,19 @@ body[data-platform="darwin"] .mk-topbar input {
 .mk-search-row.is-selected {
   background: var(--row-hover);
 }
+
+/* Fullscreen visualizer header overlaps the macOS traffic lights —
+ * same problem as the regular topbar. Shift the cover + title block
+ * right by enough to clear all three buttons. The close button (×) in
+ * the top-right is fine where it is. The whole header strip is also
+ * marked drag so the window can be moved by grabbing above the title;
+ * the close button gets `no-drag` so it stays clickable. */
+body[data-platform="darwin"] .mk-fs-head {
+  padding-left: 80px;
+  -webkit-app-region: drag;
+}
+body[data-platform="darwin"] .mk-fs-close,
+body[data-platform="darwin"] .mk-fs-controls,
+body[data-platform="darwin"] .mk-fs-controls button {
+  -webkit-app-region: no-drag;
+}
