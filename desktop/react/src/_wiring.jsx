@@ -233,15 +233,25 @@
     return /Subsonic 40\b/i.test(msg) || /HTTP 401/i.test(msg);
   }
 
+  // Hard ceiling on how long MK_RESUME can block before the splash
+  // gives up and falls through to the shell anyway. The splash overlay
+  // covers the whole window, so a hang here = a fully-black UI the
+  // user can't escape. Real network + library load (~52 artists, 250
+  // tracks) on a LAN takes under 2 seconds; a 12-second cap is well
+  // beyond that but still under the user's "what is happening?"
+  // threshold. The library populates in the background after that.
+  const RESUME_SOFT_TIMEOUT_MS = 12000;
+
   window.MK_RESUME = async function resume() {
     const session = window.MK_API.loadSession();
     if (!session) return null;
     try {
-      // Phase 1 (getArtists + radio) is the auth-checking call. If it
-      // fails with 40/401, the credentials are stale; clear and return
-      // null. If it fails for any other reason, keep the session and
-      // surface the error so the user can retry.
-      await loadLibrary(session);
+      await Promise.race([
+        loadLibrary(session),
+        new Promise((_, rej) =>
+          setTimeout(() => rej(new Error("resume timeout")), RESUME_SOFT_TIMEOUT_MS)
+        ),
+      ]);
       return session;
     } catch (err) {
       if (isAuthError(err)) {
@@ -249,10 +259,10 @@
         window.MK_API.clearSession();
         return null;
       }
-      console.warn("[wiring] resume: transient failure, keeping session:", err);
-      // Keep the session so the user can retry without re-entering creds.
-      // Return the session anyway — partial data may have been populated
-      // by phase 1, and the shell can render with what we have.
+      console.warn("[wiring] resume: transient failure or timeout, keeping session:", err);
+      // Keep the session and the (possibly partial) data so the shell
+      // can render with what we have. A retry from the UI will
+      // re-trigger loadLibrary fresh.
       return session;
     }
   };

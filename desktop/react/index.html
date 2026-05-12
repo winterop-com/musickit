@@ -6,7 +6,7 @@
   <!-- Bumped by scripts/sync_desktop_versions.py from pyproject.toml so
        the login screen / About string stays in sync with the released
        Python package. Hand-edit only if you're also editing pyproject. -->
-  <meta name="mk-version" content="0.23.8" />
+  <meta name="mk-version" content="0.23.9" />
   <title>MusicKit (design v2)</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="musickit.css" />
@@ -103,27 +103,27 @@
        — survives drop-in updates".
        The `?v=` query string is rewritten by scripts/sync_desktop_versions.py
        so every release busts the webview cache. -->
-  <script src="src/_md5.js?v=0.23.8"></script>
-  <script src="src/_api.js?v=0.23.8"></script>
-  <script src="src/_audio.js?v=0.23.8"></script>
+  <script src="src/_md5.js?v=0.23.9"></script>
+  <script src="src/_api.js?v=0.23.9"></script>
+  <script src="src/_audio.js?v=0.23.9"></script>
 
   <!-- Designer artifact. Dependency order: data → covers → visualizer →
        views → overlays → tweaks-panel → chrome → app. Each declares
        globals the later files read. Keep this list in sync with
        desktop/react/src/. -->
-  <script type="text/babel" data-presets="react" src="src/data.jsx?v=0.23.8"></script>
-  <script type="text/babel" data-presets="react" src="src/covers.jsx?v=0.23.8"></script>
-  <script type="text/babel" data-presets="react" src="src/visualizer.jsx?v=0.23.8"></script>
-  <script type="text/babel" data-presets="react" src="src/views.jsx?v=0.23.8"></script>
-  <script type="text/babel" data-presets="react" src="src/overlays.jsx?v=0.23.8"></script>
-  <script type="text/babel" data-presets="react" src="src/tweaks-panel.jsx?v=0.23.8"></script>
-  <script type="text/babel" data-presets="react" src="src/chrome.jsx?v=0.23.8"></script>
-  <script type="text/babel" data-presets="react" src="src/app.jsx?v=0.23.8"></script>
+  <script type="text/babel" data-presets="react" src="src/data.jsx?v=0.23.9"></script>
+  <script type="text/babel" data-presets="react" src="src/covers.jsx?v=0.23.9"></script>
+  <script type="text/babel" data-presets="react" src="src/visualizer.jsx?v=0.23.9"></script>
+  <script type="text/babel" data-presets="react" src="src/views.jsx?v=0.23.9"></script>
+  <script type="text/babel" data-presets="react" src="src/overlays.jsx?v=0.23.9"></script>
+  <script type="text/babel" data-presets="react" src="src/tweaks-panel.jsx?v=0.23.9"></script>
+  <script type="text/babel" data-presets="react" src="src/chrome.jsx?v=0.23.9"></script>
+  <script type="text/babel" data-presets="react" src="src/app.jsx?v=0.23.9"></script>
 
   <!-- Wiring layer (continued) — _wiring.jsx monkey-patches the
        artifact's MK_LoginView / MK_makeCover and registers the
        library-loader before main.jsx renders <App />. -->
-  <script type="text/babel" data-presets="react" src="src/_wiring.jsx?v=0.23.8"></script>
-  <script type="text/babel" data-presets="react" src="main.jsx?v=0.23.8"></script>
+  <script type="text/babel" data-presets="react" src="src/_wiring.jsx?v=0.23.9"></script>
+  <script type="text/babel" data-presets="react" src="main.jsx?v=0.23.9"></script>
 </body>
 </html>
