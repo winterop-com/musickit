@@ -170,23 +170,58 @@ body[data-platform="darwin"] .mk-topbar input {
 
 /* Fullscreen × close button — Slack / Linear pattern: a subtle rounded
  * square appears behind the icon on hover so the click target reads
- * visually. The designer's CSS gives it only a colour change, which
- * makes the icon feel a bit floating. Bumping the click target by
- * adding internal padding keeps the absolute-positioning math the
- * same (the parent's `top/right` still anchors the visual top-right
- * of the box). */
+ * visually. Designer CSS gives it only a colour change. Keep the
+ * existing layout (font-size, position) intact and just add padding
+ * + a hover background. The previous attempt set explicit width /
+ * height / display: flex and made the × character disappear in some
+ * webview render paths; this simpler form sidesteps that. */
 .mk-fs-close {
-  width: 32px;
-  height: 32px;
+  /* `[data-tooltip] { position: relative }` (above) would otherwise
+   * stomp the artifact's `position: absolute`, stretching the button
+   * across the viewport. Restore the original positioning. */
+  position: absolute;
+  padding: 0 8px;
   border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
   transition: background 0.12s ease, color 0.12s ease;
 }
 .mk-fs-close:hover {
   background: var(--row-hover);
+}
+
+/* ---------------------------------------------------------------------
+ * Themed scrollbars. Default macOS / Chrome scrollbars are a wide
+ * light-grey track that clashes with the dark palette. Thin them out
+ * and palette-match — works in Chromium, WebKit, and Firefox.
+ * Applied globally; auto-applies to every scroll container in the SPA
+ * (sidebar, album list, track list).
+ * ------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line, #2a2e3f);
+  border-radius: 6px;
+  /* Pad the thumb so it doesn't touch the track edges — softens it
+   * against tight layout edges. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim, #565f89);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* Firefox doesn't honour ::-webkit-* but supports the standard
+ * scrollbar-* properties. Coverage covers ~all browsers we ship to. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line, #2a2e3f) transparent;
 }
 
 /* Fullscreen visualizer header — the artifact's 24px top padding put

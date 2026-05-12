@@ -56,6 +56,27 @@ def update_json_version(path: Path, version: str) -> bool:
     return True
 
 
+_META_TAG_RE = re.compile(r'(<meta\s+name="mk-version"\s+content=")[^"]*(")')
+
+
+def update_html_meta_version(path: Path, version: str) -> bool:
+    """Update `<meta name="mk-version" content="...">` in an HTML file.
+
+    The login screen reads this tag for its `desktop · vX.Y.Z` label so
+    the user-facing version stays in step with pyproject.toml. Regex
+    rather than a real HTML parser keeps this script free of extra
+    dependencies; the tag's shape is locked in our own index.html.
+    """
+    text = path.read_text(encoding="utf-8")
+    new_text, n = _META_TAG_RE.subn(rf"\g<1>{version}\g<2>", text)
+    if n == 0:
+        raise SystemExit(f"meta[name=mk-version] not found in {path}")
+    if new_text == text:
+        return False
+    path.write_text(new_text, encoding="utf-8")
+    return True
+
+
 def main() -> None:
     """CLI entrypoint: sync user-visible desktop versions to pyproject.toml."""
     version = read_pyproject_version()
@@ -70,6 +91,11 @@ def main() -> None:
             targets.append((path, "updated"))
         else:
             targets.append((path, "already in sync"))
+    html_path = REPO_ROOT / "desktop" / "react" / "index.html"
+    if update_html_meta_version(html_path, version):
+        targets.append((html_path, "updated"))
+    else:
+        targets.append((html_path, "already in sync"))
     for path, status in targets:
         print(f"    {status:18} {path.relative_to(REPO_ROOT)}")
     sys.exit(0)

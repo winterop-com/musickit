@@ -36,7 +36,7 @@ function LoginView({ onConnect, themeMode }) {
     <div className="mk-login-shell">
       <div className="mk-login-brand">
         <div className="mk-login-logo">MusicKit</div>
-        <div className="mk-login-tag">desktop · v0.22</div>
+        <div className="mk-login-tag">desktop · v{document.querySelector('meta[name="mk-version"]')?.content || "?"}</div>
       </div>
       <form className="mk-login-card" onSubmit={submit}>
         <div className="mk-login-title">Connect to a Subsonic server</div>

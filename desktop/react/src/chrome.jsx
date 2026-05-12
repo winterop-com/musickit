@@ -25,7 +25,7 @@ function TopBar({ user, q, setQ, onFocusSearch, onSignOut, searchInputRef }) {
       </div>
       <div className="mk-topbar-center">
         <span className="mk-brand">musickit</span>
-        <span className="mk-version">v0.22.0</span>
+        <span className="mk-version">v{document.querySelector('meta[name="mk-version"]')?.content || "?"}</span>
       </div>
       <div className="mk-topbar-right">
         <span className="mk-user">{user}</span>
