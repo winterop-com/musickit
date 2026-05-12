@@ -81,6 +81,20 @@ function App() {
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+    // WIRING: forward to /rest/star or /rest/unstar so the server
+    // sees the change too. `key` is "artistId/albumId/trackN" — we
+    // resolve back to the real song id via the cached library tree.
+    if (!window.MK_API || !window.MK_SESSION) return;
+    const [aId, alId, trN] = key.split("/");
+    const a = window.MK_DATA.ARTISTS.find((x) => x.id === aId);
+    const al = a?.albums.find((x) => x.id === alId);
+    const tr = al?.tracks.find((x) => String(x.n) === trN);
+    if (!tr?.trackId) return;
+    const wasStarred = starred.has(key);
+    const fn = wasStarred ? window.MK_API.unstar : window.MK_API.star;
+    fn(window.MK_SESSION, { id: tr.trackId }).catch((err) =>
+      console.warn("[wiring] star/unstar failed:", err)
+    );
   };
 
   // Playback state
@@ -113,21 +127,53 @@ function App() {
     return () => clearTimeout(t);
   }, [authed]);
 
-  // Playback simulation
+  // === WIRING (added on top of the designer artifact) ===
+  // The original artifact ran a `setInterval` to fake a playback clock
+  // because the design preview had no audio. Now `_audio.js` owns a
+  // real `<audio>` element and `_api.js` builds Subsonic stream URLs.
+  // These effects bridge React state <-> that audio element. Keep this
+  // block together so the next design-zip drop is easy to forward-port.
+
+  // handleNext is declared below; ref it so the audio-ended listener,
+  // bound once, doesn't capture a stale first-render closure.
+  const handleNextRef = uR(null);
+
+  // Load the right URL whenever `now` changes (track click, prev/next,
+  // station click, search-result pick all funnel through here).
   uE(() => {
-    if (!playing || muted) return;
-    const id = setInterval(() => {
-      setPos((p) => {
-        if (p >= dur) {
-          // auto-advance
-          handleNext();
-          return 0;
-        }
-        return p + 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [playing, dur, muted]);
+    if (!now || !window.MK_AUDIO) return;
+    if (now.stationId) {
+      const st = window.MK_DATA.STATIONS.find((s) => s.id === now.stationId);
+      if (st?.streamUrl) window.MK_AUDIO.load(st.streamUrl);
+    } else if (window.MK_SESSION) {
+      const a = window.MK_DATA.ARTISTS.find((x) => x.id === now.artistId);
+      const al = a?.albums.find((x) => x.id === now.albumId);
+      const tr = al?.tracks.find((x) => x.n === now.trackN);
+      if (tr?.trackId) {
+        window.MK_AUDIO.load(window.MK_API.streamUrl(window.MK_SESSION, tr.trackId));
+      }
+    }
+  }, [now]);
+
+  // Forward play/pause state to the audio element.
+  uE(() => {
+    if (!window.MK_AUDIO) return;
+    if (playing) window.MK_AUDIO.play();
+    else window.MK_AUDIO.pause();
+  }, [playing]);
+
+  // Forward volume / muted to the audio element.
+  uE(() => { window.MK_AUDIO?.setVolume(vol); }, [vol]);
+  uE(() => { window.MK_AUDIO?.setMuted(muted); }, [muted]);
+
+  // Real audio time/duration/end -> React state.
+  uE(() => {
+    if (!window.MK_AUDIO) return;
+    const offT = window.MK_AUDIO.onTimeUpdate((t) => setPos(t));
+    const offD = window.MK_AUDIO.onDurationChange((d) => { if (d > 0) setDur(d); });
+    const offE = window.MK_AUDIO.onEnded(() => handleNextRef.current?.());
+    return () => { offT(); offD(); offE(); };
+  }, []);
 
   // Theme toggle on root.
   uE(() => {
@@ -211,6 +257,23 @@ function App() {
     setNow({ ...now, trackN: prev.n });
     setPos(0); setDur(parseDur(prev.time));
   };
+
+  // WIRING: keep the ref the audio-ended listener uses in sync with
+  // the latest handleNext closure (which captures the current `now`).
+  handleNextRef.current = handleNext;
+
+  // WIRING: on first mount, see if there's a saved session and skip
+  // the login form entirely if MK_DATA is already populated for it.
+  uE(() => {
+    if (authed || !window.MK_RESUME) return;
+    let cancelled = false;
+    window.MK_RESUME().then((session) => {
+      if (cancelled || !session) return;
+      setAuthed(true);
+      setUser(session.user);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Keyboard shortcuts
   uE(() => {

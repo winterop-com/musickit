@@ -2,6 +2,12 @@
 // Each cover is a 256x256 SVG returned as a data URL.
 
 function makeCover(kind, baseColor) {
+  // WIRED: if the caller passed a real cover-art URL (the wiring layer
+  // sets `al.cover` to the Subsonic /rest/getCoverArt URL), bypass the
+  // procedural generator and let <img src=...> hit the network.
+  if (typeof kind === "string" && /^https?:\/\//.test(kind)) {
+    return kind;
+  }
   let inner = "";
   const c = baseColor || "#444";
   const c2 = shade(baseColor, -25);

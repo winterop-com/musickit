@@ -17,10 +17,15 @@ function LoginView({ onConnect, themeMode }) {
       return;
     }
     setBusy(true);
-    setTimeout(() => {
-      setBusy(false);
-      onConnect({ url, user });
-    }, 700);
+    // Wiring layer (`_wiring.jsx`) replaces `props.onConnect` with an
+    // async function that does real Subsonic auth + library fetch. The
+    // original fake 700ms timeout fired regardless of result; we await
+    // the real call instead so "Connecting…" stays on while the network
+    // round-trip is in flight.
+    Promise.resolve()
+      .then(() => onConnect({ url, user, pass: pw }))
+      .catch((e) => setErr(String(e?.message || e)))
+      .finally(() => setBusy(false));
   };
 
   return (

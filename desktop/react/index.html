@@ -37,9 +37,18 @@
 </head>
 <body>
   <div id="root"></div>
-  <!-- Dependency order: data → covers → visualizer → views → overlays →
-       tweaks-panel → chrome → app → main. Each declares globals the
-       later files read. Keep this list in sync with desktop/react/src/. -->
+  <!-- Wiring layer — plain JS, no JSX. Loads first so MK_md5 /
+       MK_API / MK_AUDIO exist before any artifact code runs. The
+       leading underscore on filenames marks "not from the design zip
+       — survives drop-in updates". -->
+  <script src="src/_md5.js"></script>
+  <script src="src/_api.js"></script>
+  <script src="src/_audio.js"></script>
+
+  <!-- Designer artifact. Dependency order: data → covers → visualizer →
+       views → overlays → tweaks-panel → chrome → app. Each declares
+       globals the later files read. Keep this list in sync with
+       desktop/react/src/. -->
   <script type="text/babel" data-presets="react" src="src/data.jsx"></script>
   <script type="text/babel" data-presets="react" src="src/covers.jsx"></script>
   <script type="text/babel" data-presets="react" src="src/visualizer.jsx"></script>
@@ -48,6 +57,11 @@
   <script type="text/babel" data-presets="react" src="src/tweaks-panel.jsx"></script>
   <script type="text/babel" data-presets="react" src="src/chrome.jsx"></script>
   <script type="text/babel" data-presets="react" src="src/app.jsx"></script>
+
+  <!-- Wiring layer (continued) — _wiring.jsx monkey-patches the
+       artifact's MK_LoginView / MK_makeCover and registers the
+       library-loader before main.jsx renders <App />. -->
+  <script type="text/babel" data-presets="react" src="src/_wiring.jsx"></script>
   <script type="text/babel" data-presets="react" src="main.jsx"></script>
 </body>
 </html>
