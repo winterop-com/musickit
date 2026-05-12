@@ -61,16 +61,21 @@ def main() -> None:
     version = read_pyproject_version()
     print(f">>> Syncing desktop versions to {version}")
     targets: list[tuple[Path, str]] = []
-    tauri_conf = REPO_ROOT / "desktop" / "tauri" / "src-tauri" / "tauri.conf.json"
-    electron_pkg = REPO_ROOT / "desktop" / "electron" / "package.json"
-    if update_json_version(tauri_conf, version):
-        targets.append((tauri_conf, "updated"))
-    else:
-        targets.append((tauri_conf, "already in sync"))
-    if update_json_version(electron_pkg, version):
-        targets.append((electron_pkg, "updated"))
-    else:
-        targets.append((electron_pkg, "already in sync"))
+    json_paths = [
+        REPO_ROOT / "desktop" / "tauri" / "src-tauri" / "tauri.conf.json",
+        REPO_ROOT / "desktop" / "electron" / "package.json",
+        # Design-v2 wrappers — same bundle metadata story as the
+        # production pair, just installed as separate apps.
+        REPO_ROOT / "desktop" / "tauri-react" / "src-tauri" / "tauri.conf.json",
+        REPO_ROOT / "desktop" / "electron-react" / "package.json",
+    ]
+    for path in json_paths:
+        if not path.exists():
+            continue
+        if update_json_version(path, version):
+            targets.append((path, "updated"))
+        else:
+            targets.append((path, "already in sync"))
     for path, status in targets:
         print(f"    {status:18} {path.relative_to(REPO_ROOT)}")
     sys.exit(0)

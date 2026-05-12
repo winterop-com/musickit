@@ -1,6 +1,6 @@
 {
   "name": "musickit-desktop-electron-react",
-  "version": "0.21.1",
+  "version": "0.22.0",
   "description": "Electron wrapper around the MusicKit design-v2 React prototype. Installs side-by-side with the production MusicKit Electron build.",
   "main": "src/main.js",
   "private": true,
