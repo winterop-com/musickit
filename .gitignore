@@ -38,6 +38,9 @@ output/*
 # Ad-hoc debug logs
 *.log
 
+# Ad-hoc screenshots from local debugging / playwright captures.
+screenshots/
+
 # mkdocs build output
 site/
 
