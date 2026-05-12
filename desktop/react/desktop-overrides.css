@@ -152,6 +152,22 @@ body[data-platform="darwin"] .mk-topbar input {
   border-bottom: 5px solid var(--line, #2a2e3f);
 }
 
+/* Horizontal-alignment overrides. CSS-only tooltips can't measure the
+ * viewport, so we expose explicit `data-tooltip-align="right"` /
+ * `="left"` flags for elements near the window edge — anchor the
+ * tooltip's right (or left) edge to the button instead of centering.
+ * The triangle stays roughly centered above the button. */
+[data-tooltip][data-tooltip-align="right"]::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+[data-tooltip][data-tooltip-align="left"]::after {
+  left: 0;
+  right: auto;
+  transform: none;
+}
+
 /* Fullscreen × close button — Slack / Linear pattern: a subtle rounded
  * square appears behind the icon on hover so the click target reads
  * visually. The designer's CSS gives it only a colour change, which

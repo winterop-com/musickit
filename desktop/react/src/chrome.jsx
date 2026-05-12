@@ -29,7 +29,7 @@ function TopBar({ user, q, setQ, onFocusSearch, onSignOut, searchInputRef }) {
       </div>
       <div className="mk-topbar-right">
         <span className="mk-user">{user}</span>
-        <button className="mk-signout" onClick={onSignOut} data-tooltip="Sign out and clear session" data-tooltip-placement="bottom">Sign out</button>
+        <button className="mk-signout" onClick={onSignOut} data-tooltip="Clear session and sign out" data-tooltip-placement="bottom" data-tooltip-align="right">Sign out</button>
       </div>
     </div>
   );
