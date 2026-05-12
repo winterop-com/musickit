@@ -121,6 +121,42 @@ function CommandPalette({ open, onClose, onRun }) {
 }
 
 function SearchDropdown({ q, results, onPick, onClose, anchorEl }) {
+  // WIRED: flatten the three result sections into a single keyboard-
+  // navigable list. The visual sections (ARTISTS / ALBUMS / TRACKS)
+  // stay; ArrowUp/Down moves a `sel` cursor through the flat list;
+  // Enter picks the selected row.
+  const flat = useMemo(() => {
+    if (!results) return [];
+    const list = [];
+    for (const a of (results.artists || []).slice(0, 3)) {
+      list.push({ pick: { kind: "artist", id: a.id }, _id: `a:${a.id}` });
+    }
+    for (const al of (results.albums || []).slice(0, 3)) {
+      list.push({ pick: { kind: "album", artistId: al.artistId, id: al.id }, _id: `al:${al.id}` });
+    }
+    for (const t of (results.tracks || []).slice(0, 8)) {
+      list.push({ pick: { kind: "track", artistId: t.artistId, albumId: t.albumId, trackN: t.n }, _id: `t:${t.artistId}/${t.albumId}/${t.n}` });
+    }
+    return list;
+  }, [results]);
+
+  const [sel, setSel] = useState(0);
+  useEffect(() => { setSel(0); }, [q, flat.length]);
+
+  useEffect(() => {
+    if (!q || !anchorEl) return;
+    const onKey = (e) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(flat.length - 1, s + 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setSel((s) => Math.max(0, s - 1)); }
+      else if (e.key === "Enter") {
+        const hit = flat[sel];
+        if (hit) { e.preventDefault(); onPick(hit.pick); }
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [q, anchorEl, flat, sel, onPick]);
+
   if (!q || !anchorEl) return null;
   const rect = anchorEl.getBoundingClientRect();
   const style = {
@@ -130,6 +166,14 @@ function SearchDropdown({ q, results, onPick, onClose, anchorEl }) {
     width: rect.width,
   };
   const empty = !results.artists.length && !results.albums.length && !results.tracks.length;
+  let cursor = 0;
+  const rowProps = (id) => {
+    const idx = cursor++;
+    return {
+      className: "mk-search-row" + (idx === sel ? " is-selected" : ""),
+      onMouseEnter: () => setSel(idx),
+    };
+  };
   return (
     <>
       <div className="mk-search-shield" onClick={onClose} />
@@ -139,7 +183,7 @@ function SearchDropdown({ q, results, onPick, onClose, anchorEl }) {
           <>
             <div className="mk-search-section">ARTISTS</div>
             {results.artists.slice(0, 3).map((a) => (
-              <div key={a.id} className="mk-search-row" onClick={() => onPick({ kind: "artist", id: a.id })}>
+              <div key={a.id} {...rowProps(`a:${a.id}`)} onClick={() => onPick({ kind: "artist", id: a.id })}>
                 <div className="mk-search-row-title">{a.name}</div>
               </div>
             ))}
@@ -149,7 +193,7 @@ function SearchDropdown({ q, results, onPick, onClose, anchorEl }) {
           <>
             <div className="mk-search-section">ALBUMS</div>
             {results.albums.slice(0, 3).map((al) => (
-              <div key={al.id} className="mk-search-row" onClick={() => onPick({ kind: "album", artistId: al.artistId, id: al.id })}>
+              <div key={al.id} {...rowProps(`al:${al.id}`)} onClick={() => onPick({ kind: "album", artistId: al.artistId, id: al.id })}>
                 <div className="mk-search-row-title">{al.name}</div>
                 <div className="mk-search-row-sub">{al.artistName} · {al.year}</div>
               </div>
@@ -160,7 +204,7 @@ function SearchDropdown({ q, results, onPick, onClose, anchorEl }) {
           <>
             <div className="mk-search-section">TRACKS</div>
             {results.tracks.slice(0, 8).map((t, i) => (
-              <div key={i} className="mk-search-row" onClick={() => onPick({ kind: "track", artistId: t.artistId, albumId: t.albumId, trackN: t.n })}>
+              <div key={i} {...rowProps(`t:${i}`)} onClick={() => onPick({ kind: "track", artistId: t.artistId, albumId: t.albumId, trackN: t.n })}>
                 <div className="mk-search-row-title">{t.title}</div>
                 <div className="mk-search-row-sub">{t.artistName} · {t.albumName}</div>
               </div>

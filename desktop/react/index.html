@@ -21,6 +21,30 @@
       document.body.dataset.platform =
         plat.startsWith("mac") || ua.includes("mac os") ? "darwin" :
         plat.startsWith("win") || ua.includes("windows") ? "win32" : "linux";
+      // Tauri's WebKit ignores `-webkit-app-region: drag` (we use that
+      // for Electron). Tauri uses an HTML attribute instead. The
+      // designer artifact's `.mk-topbar` is rendered by React after
+      // mount, so we add the attribute via MutationObserver as soon
+      // as the element appears in the tree. Cheap and idempotent.
+      const tagDrag = () => {
+        const bar = document.querySelector(".mk-topbar");
+        if (bar && !bar.hasAttribute("data-tauri-drag-region")) {
+          bar.setAttribute("data-tauri-drag-region", "");
+        }
+        document.querySelectorAll(
+          ".mk-topbar input, .mk-topbar button, .mk-topbar .mk-search-wrap"
+        ).forEach((el) => {
+          if (!el.hasAttribute("data-tauri-drag-region-disabled")) {
+            // Tauri honours this negation pattern by simply not having
+            // the drag attribute on children — but setting an explicit
+            // marker helps readers see the intent.
+            el.setAttribute("data-tauri-drag-region-disabled", "");
+          }
+        });
+      };
+      tagDrag();
+      const mo = new MutationObserver(tagDrag);
+      mo.observe(document.documentElement, { childList: true, subtree: true });
     });
   </script>
   <!--

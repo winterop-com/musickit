@@ -40,24 +40,49 @@ function Visualizer({ style = "bars", running = true, accent, height, ambient = 
       stateRef.current.t += 1;
       const t = stateRef.current.t;
 
-      // synthesise a "spectrum": low-freq dominant envelope * noise * slow LFO
-      for (let i = 0; i < N_BINS; i++) {
-        // 0..1 across bins; low i = bass.
-        const x = i / N_BINS;
-        // low-pass envelope (more energy in lows)
-        const env = Math.pow(1 - x, 1.25) * 0.85 + 0.15;
-        // slow modulation per bin
-        const lfo = 0.55 + 0.45 * Math.sin(t * 0.04 + i * 0.6);
-        // fast jitter
-        const jitter = 0.7 + 0.3 * Math.sin(t * (0.11 + i * 0.013) + i);
-        // occasional peak
-        const peak = Math.random() < 0.02 ? 1.4 : 1;
-        let target = env * lfo * jitter * peak;
-        if (!running) target = bins[i] * 0.92; // decay when paused
-        // ease toward target (attack fast, release slow)
-        const cur = bins[i];
-        const k = target > cur ? 0.45 : 0.12;
-        bins[i] = cur + (target - cur) * k;
+      // WIRED: prefer real FFT data from the audio element when the
+      // wiring layer has wired up an AnalyserNode (see _audio.js).
+      // Falls through to the synthesised spectrum below if the
+      // analyser isn't ready (no track played yet) or the source isn't
+      // running.
+      const real = running && window.MK_AUDIO?.getFrequencyData?.();
+      if (real && real.length) {
+        // Downsample the analyser's bins to N_BINS. The analyser
+        // produces frequencyBinCount values across 0..nyquist; we map
+        // them onto our 32 / 48 visual bins via a log-ish curve so
+        // bass takes up more visual space (matches how the eye
+        // perceives spectra).
+        for (let i = 0; i < N_BINS; i++) {
+          const lo = Math.floor(Math.pow(i / N_BINS, 1.7) * real.length);
+          const hi = Math.floor(Math.pow((i + 1) / N_BINS, 1.7) * real.length);
+          let sum = 0;
+          let count = 0;
+          for (let k = lo; k < Math.max(lo + 1, hi); k++) {
+            sum += real[k];
+            count++;
+          }
+          const avg = count > 0 ? sum / count / 255 : 0;
+          const target = Math.min(1, avg * 1.3);
+          const cur = bins[i];
+          const ek = target > cur ? 0.5 : 0.18;
+          bins[i] = cur + (target - cur) * ek;
+        }
+      } else {
+        // Synthesised spectrum — original artifact behaviour. Used
+        // before any track has played AND while paused (so the bars
+        // decay gracefully instead of snapping to zero).
+        for (let i = 0; i < N_BINS; i++) {
+          const x = i / N_BINS;
+          const env = Math.pow(1 - x, 1.25) * 0.85 + 0.15;
+          const lfo = 0.55 + 0.45 * Math.sin(t * 0.04 + i * 0.6);
+          const jitter = 0.7 + 0.3 * Math.sin(t * (0.11 + i * 0.013) + i);
+          const peak = Math.random() < 0.02 ? 1.4 : 1;
+          let target = env * lfo * jitter * peak;
+          if (!running) target = bins[i] * 0.92;
+          const cur = bins[i];
+          const k = target > cur ? 0.45 : 0.12;
+          bins[i] = cur + (target - cur) * k;
+        }
       }
 
       // draw

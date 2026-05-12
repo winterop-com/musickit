@@ -37,3 +37,10 @@ body[data-platform="darwin"] .mk-topbar button,
 body[data-platform="darwin"] .mk-topbar input {
   -webkit-app-region: no-drag;
 }
+
+/* Search-dropdown row selection state — used by the keyboard nav added
+ * in `overlays.jsx`. The artifact's CSS only had `:hover` styling; we
+ * mirror it for the explicit `.is-selected` class. */
+.mk-search-row.is-selected {
+  background: var(--row-hover);
+}

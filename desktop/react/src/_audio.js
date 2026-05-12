@@ -25,6 +25,35 @@
   audio.style.display = "none";
   document.documentElement.appendChild(audio);
 
+  // Web Audio graph for the spectrum visualizer. We don't construct it
+  // until the user clicks play once, because creating an AudioContext
+  // before a user gesture leaves it in 'suspended' state on Chromium
+  // and most browsers log a warning.
+  //
+  // Once created we leave it in place — destroying / recreating the
+  // graph per-track introduces clicks. `MediaElementSource` can only
+  // be created ONCE per <audio> element so this is a one-shot setup.
+  let audioCtx = null;
+  let analyser = null;
+  let freqData = null;
+  function ensureAnalyser() {
+    if (audioCtx) return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = new Ctx();
+    const source = audioCtx.createMediaElementSource(audio);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.78;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    // Chain: <audio> -> source -> analyser -> destination. Without
+    // routing to destination, audio plays silently (browser cuts the
+    // chain). The legacy frontend hit this exact bug — see
+    // _app.css / visualizer.js for the original fix.
+    source.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  }
+
   const listeners = {
     time: new Set(),
     ended: new Set(),
@@ -53,6 +82,10 @@
       audio.load();
     },
     async play() {
+      ensureAnalyser();
+      if (audioCtx && audioCtx.state === "suspended") {
+        try { await audioCtx.resume(); } catch { /* ignore */ }
+      }
       try {
         await audio.play();
       } catch (err) {
@@ -61,6 +94,13 @@
         // this should not fire in practice.
         console.warn("MK_AUDIO.play rejected:", err);
       }
+    },
+    // Pull a fresh FFT frame for the visualizer. Returns null if the
+    // analyser hasn't been wired yet (no play() call ever happened).
+    getFrequencyData() {
+      if (!analyser || !freqData) return null;
+      analyser.getByteFrequencyData(freqData);
+      return freqData;
     },
     pause() { audio.pause(); },
     seek(seconds) {
