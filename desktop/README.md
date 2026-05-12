@@ -1,42 +1,51 @@
 # MusicKit Desktop
 
-Generic Subsonic clients for the desktop. Two parallel implementations
-under `tauri/` and `electron/` both load the same SPA from
-`desktop/frontend/`. The SPA talks to **any spec-compliant Subsonic
-server** (musickit serve, Navidrome, Airsonic, Gonic, …) via the
-`/rest/*` JSON API; the password never crosses the wire after login
-because we use the spec's salted-token auth (`token = md5(password +
-salt)`).
+Generic Subsonic clients for the desktop. Two parallel wrappers under
+`tauri/` and `electron/` both load the same SPA from `desktop/react/`
+(React + Babel-standalone, no build step). The SPA talks to **any
+spec-compliant Subsonic server** (musickit serve, Navidrome, Airsonic,
+Gonic, …) via the `/rest/*` JSON API; the password never crosses the
+wire after login because we use the spec's salted-token auth
+(`token = md5(password + salt)`).
 
-In parallel, the **design-v2 prototype** lives at `desktop/react/`
-(the Claude Designer React output) with its own pair of wrappers
-under `tauri-react/` and `electron-react/`. Those are separate apps
-with their own bundle identifiers, so they install side-by-side with
-the production MusicKit app. Run them with `make desktop-react-tauri-dev`
-or `make desktop-react-electron-dev`. The production frontend +
-wrappers below are NOT affected by the redesign work.
+Before v0.23 there was a parallel legacy vanilla-JS frontend at
+`desktop/frontend/` plus shim `desktop/tauri-react/` and
+`desktop/electron-react/` wrappers — both are gone now that the React
+client is the only frontend.
 
 ## Layout
 
 ```
 desktop/
-├── frontend/                 ← shared SPA (HTML/CSS/JS, host-agnostic)
-│   ├── index.html               entry — boots into login or shell
-│   ├── shell.css                desktop-specific styles (login + tweaks)
-│   ├── _app.css              → ../../src/musickit/web/static/app.css   (symlink)
-│   ├── _palette.css          → ../../src/musickit/web/static/_palette.css
-│   ├── favicon.svg           → ../../src/musickit/web/static/favicon.svg
-│   └── js/
-│       ├── app.js               state machine: login OR shell
-│       ├── api.js               Subsonic API client (token auth, fetch wrapper)
-│       ├── store.js             host-agnostic persistence (Tauri / Electron)
-│       ├── shell.js             main browser (artists / albums / tracks / now-playing)
-│       └── md5.js               pure-JS MD5 for salted-token computation
+├── react/                    ← shared SPA (React + Babel-standalone, no build step)
+│   ├── index.html               entry — boots React UMD + Babel + script tags in order
+│   ├── main.jsx                 renders <window.MK_App /> into #root
+│   ├── musickit.css             designer-authored styles, theme tokens, layout variants
+│   ├── desktop-overrides.css    wrapper-specific overrides (macOS traffic-light clearance, etc.)
+│   ├── favicon.svg
+│   └── src/
+│       ├── _md5.js              MD5 helper for the Subsonic salted token
+│       ├── _api.js              Subsonic API client (auth, getArtists, /rest/stream URL, ...)
+│       ├── _audio.js            <audio> + AnalyserNode controller (MK_AUDIO)
+│       ├── _wiring.jsx          login wrapper, library loader, cover-art bridge
+│       ├── data.jsx             MK_DATA placeholders (populated by _wiring at login)
+│       ├── covers.jsx           procedural cover SVGs + URL passthrough
+│       ├── visualizer.jsx       Canvas FFT (bars / mirror / radial / ambient)
+│       ├── views.jsx            LoginView + small reusable components
+│       ├── overlays.jsx         shortcuts panel, command palette, search dropdown, lyrics
+│       ├── tweaks-panel.jsx     designer-time tweak controls
+│       ├── chrome.jsx           TopBar, Sidebar, NowPlaying, MainArea, FullscreenViz
+│       └── app.jsx              <App /> — wires state + actions, registers window.MK_App
 ├── tauri/                    Rust backend
 │   └── src-tauri/
 └── electron/                 Node main + preload bridge
     └── src/
 ```
+
+Files in `desktop/react/src/` prefixed with `_` are the wiring layer
+(API, audio, login wrapper); files without the prefix are the
+Claude Designer artifact and get replaced wholesale when a new
+design zip lands.
 
 The login page accepts **URL + Username + Password**. On submit:
 

@@ -1,15 +1,10 @@
 """Copy `desktop/react/` → `src/musickit/_ui_static/` so the wheel bundles it.
 
 `musickit ui` discovers the SPA static files via
-`importlib.resources.files("musickit") / "_ui_static"`. The Tauri /
-Electron desktop wrappers point at `desktop/frontend/` directly (the
-legacy production SPA); this build step is what `musickit ui` (the
-standalone web client) serves.
-
-As of v0.22 we ship the cleaned-up React design v2 here. The legacy
-vanilla-JS SPA at `desktop/frontend/` remains in the repo and remains
-what the Tauri/Electron production builds load, so the desktop apps
-are unaffected by changes to the web client.
+`importlib.resources.files("musickit") / "_ui_static"`. The same React
+client also runs inside the Tauri and Electron wrappers, which load
+`desktop/react/index.html` directly from disk — so this script is only
+necessary for the PyPI distribution case.
 
 Wired into `make build` so every wheel ships with the SPA bundled. The
 destination is gitignored — it's a regenerated build artifact, not a

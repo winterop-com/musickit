@@ -3,7 +3,7 @@
 //! The Rust side stays minimal — it registers plugins, runs the Tauri
 //! app, and persists the main window's outer bounds across launches.
 //! The entire UI (login, shell, browse, playback) is owned by
-//! `desktop/frontend/`.
+//! `desktop/react/` — the React + Babel-standalone client.
 //!
 //! Window bounds persistence
 //! -------------------------

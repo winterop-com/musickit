@@ -8,18 +8,18 @@
  * topbar area, ~78px wide.
  *
  * Without compensation, the search box in `.mk-topbar-left` ends up
- * under those buttons. The legacy `desktop/frontend/_app.css` solves
- * this with a `body[data-platform="darwin"] .topbar` rule. We do the
- * same here, in a SEPARATE file so it survives the next time someone
- * drops a new Claude Designer zip on top of `musickit.css` + `src/`.
+ * under those buttons. We solve this with a
+ * `body[data-platform="darwin"] .mk-topbar` rule in a SEPARATE file so
+ * it survives the next time someone drops a new Claude Designer zip
+ * on top of `musickit.css` + `src/`.
  *
- * The body attribute is set by the wrapper's preload (Electron) or by
- * a script tag in index.html that detects `navigator.platform`.
+ * The body attribute is set by a script tag in index.html that
+ * detects `navigator.platform`.
  */
 
 body[data-platform="darwin"] .mk-topbar {
-  /* Push the entire topbar grid right of the traffic lights. The 80px
-   * matches the legacy frontend's value — three buttons + padding. */
+  /* Push the entire topbar grid right of the traffic lights — three
+   * buttons + padding measure ~78px on standard window chrome. */
   padding-left: 80px;
   /* The native title-bar buttons sit inside a 28px-tall strip; the
    * topbar's own 40px height already swallows that, but make the

@@ -1,6 +1,6 @@
 {
   "name": "musickit-desktop-electron",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "description": "Electron sibling of the MusicKit desktop wrapper \u2014 for comparison with the Tauri build.",
   "main": "src/main.js",
   "private": true,
@@ -29,12 +29,12 @@
     },
     "files": [
       "src/**/*",
-      "../frontend/**/*"
+      "../react/**/*"
     ],
     "extraResources": [
       {
-        "from": "../frontend",
-        "to": "frontend"
+        "from": "../react",
+        "to": "react"
       }
     ],
     "mac": {
