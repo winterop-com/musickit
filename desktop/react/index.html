@@ -6,6 +6,23 @@
   <title>MusicKit (design v2)</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="musickit.css" />
+  <!-- Desktop-wrapper overrides — loads AFTER musickit.css so it can
+       override designer-output styles without editing them. Survives
+       the next design-zip drop. -->
+  <link rel="stylesheet" href="desktop-overrides.css" />
+  <script>
+    // Tag the platform on <body> so desktop-overrides.css can apply
+    // macOS-only rules (traffic-light clearance, app-region: drag).
+    // navigator.platform is deprecated but still set in Electron/Tauri
+    // webviews and is the fastest sync way to detect Darwin.
+    document.addEventListener("DOMContentLoaded", () => {
+      const ua = (navigator.userAgent || "").toLowerCase();
+      const plat = (navigator.platform || "").toLowerCase();
+      document.body.dataset.platform =
+        plat.startsWith("mac") || ua.includes("mac os") ? "darwin" :
+        plat.startsWith("win") || ua.includes("windows") ? "win32" : "linux";
+    });
+  </script>
   <!--
     Runtime model: load React UMD + Babel-standalone in the page, then
     drop the designer's JSX files in dependency order. Each file
