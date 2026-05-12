@@ -12,8 +12,12 @@ function LoginView({ onConnect, themeMode }) {
   const submit = (e) => {
     e.preventDefault();
     setErr("");
-    if (!url.trim() || !user.trim()) {
-      setErr("Server URL and username are required.");
+    if (!url.trim() || !user.trim() || !pw) {
+      // Password is part of the Subsonic auth contract — every endpoint
+      // needs either `?u=&p=` (plain) or `?u=&t=&s=` (salted token, which
+      // we always compute from the password). Without it, the request
+      // would 401 and the user would see a less-helpful network error.
+      setErr("Server URL, username, and password are all required.");
       return;
     }
     setBusy(true);
