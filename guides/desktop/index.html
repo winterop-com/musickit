@@ -1252,8 +1252,8 @@ trade-offs you prefer.</p>
 <p>Both wrappers point the embedded webview at any Subsonic-compatible
 server — your own <code>musickit serve</code>, <a href="https://www.navidrome.org/">Navidrome</a>, <a href="https://airsonic.github.io/">Airsonic</a>, whatever.
 They're not just thin chrome around the web UI; the SPA inside
-(<code>desktop/frontend/js/</code>) is a full client: salted-token auth, refresh-
-restore via URL hashes, and a Web Audio FFT visualizer.</p>
+(<code>desktop/react/</code>) is a full client: salted-token auth, refresh-restore
+via URL hashes, and a Web Audio FFT visualizer.</p>
 <p>You log in once with <strong>URL + Username + Password</strong>; the app
 computes the Subsonic salted token and re-uses it across browse / play
 calls.</p>
@@ -1304,20 +1304,19 @@ at a tiny window. To reset to the 1440x900 default, delete that file.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>http://localhost:1420/#a=1234&amp;l=4567&amp;t=8901
 </code></pre></div>
 <p>Reload the window (Cmd-R / F5) and you land back on the same track —
-useful when iterating on <code>desktop/frontend/</code> during development.</p>
+useful when iterating on <code>desktop/react/</code> during development.</p>
 <h2 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">&para;</a></h2>
-<p>Pick a wrapper, then run the matching make target. Both honor a
-shared frontend at <code>desktop/frontend/</code>, so changes to the SPA propagate
-to both.</p>
+<p>Pick a wrapper, then run the matching make target. Both load the same
+SPA from <code>desktop/react/</code>, so changes propagate to both.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>make<span class="w"> </span>desktop-tauri-dev<span class="w">          </span><span class="c1"># Tauri dev shell — hot reload of the SPA</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>make<span class="w"> </span>desktop-tauri-build<span class="w">        </span><span class="c1"># Release Tauri bundle (.dmg + .app)</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>make<span class="w"> </span>desktop-electron-dev<span class="w">       </span><span class="c1"># Electron dev shell</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>make<span class="w"> </span>desktop-electron-build<span class="w">     </span><span class="c1"># Release Electron build</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>make<span class="w"> </span>build<span class="w">                      </span><span class="c1"># Both, plus the Python wheel</span>
 </code></pre></div>
-<p>The make targets sync <code>desktop/frontend/</code> from the canonical web UI
-copies under <code>src/musickit/web/static/</code> before each build, so a single
-edit there updates both wrappers.</p>
+<p>The React frontend at <code>desktop/react/</code> is plain HTML + JSX + CSS loaded
+via Babel-standalone — no build step. Edit any file there and reload
+the wrapper's window to pick up changes.</p>
 <h2 id="trade-offs-vs-the-browser">Trade-offs vs. the browser<a class="headerlink" href="#trade-offs-vs-the-browser" title="Permanent link">&para;</a></h2>
 <p>The browser at <code>http://&lt;host&gt;:4533/web</code> does most of the same things —
 why use the desktop apps? Three reasons:</p>
