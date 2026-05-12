@@ -46,6 +46,33 @@
       const mo = new MutationObserver(tagDrag);
       mo.observe(document.documentElement, { childList: true, subtree: true });
     });
+
+    // Tauri 2 runtime drag handler — `data-tauri-drag-region` alone is
+    // flaky on dynamically-rendered DOM, and `-webkit-app-region: drag`
+    // is ignored by WKWebView. The legacy frontend uses the same
+    // mousedown-delegation pattern; we mirror it here so the design-v2
+    // window can be moved by grabbing the topbar or the fullscreen
+    // header. No-op on Electron (Chromium honours app-region).
+    function getTauriWindow() {
+      const t = window.__TAURI__;
+      if (!t) return null;
+      if (typeof t.window?.getCurrentWindow === "function") return t.window.getCurrentWindow();
+      if (typeof t.webviewWindow?.getCurrentWebviewWindow === "function") {
+        return t.webviewWindow.getCurrentWebviewWindow();
+      }
+      if (typeof t.window?.getCurrent === "function") return t.window.getCurrent();
+      return null;
+    }
+    document.addEventListener("mousedown", (event) => {
+      if (event.buttons !== 1) return;
+      const target = event.target;
+      const dragRegion = target.closest?.(".mk-topbar, .mk-fs-head");
+      if (!dragRegion) return;
+      if (target.closest("input, button, a, [role='button']")) return;
+      const tauriWin = getTauriWindow();
+      if (!tauriWin?.startDragging) return;
+      tauriWin.startDragging().catch((e) => console.warn("startDragging failed:", e));
+    });
   </script>
   <!--
     Runtime model: load React UMD + Babel-standalone in the page, then
