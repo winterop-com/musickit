@@ -1,14 +1,15 @@
 # MusicKit Design v2 (Claude Designer prototype)
 
-In-progress redesign of the MusicKit desktop UI. The source files in
-`src/` are the raw output of Claude Designer — sibling JSX modules
-that share state via `window.MK_*` globals. `index.html` loads them
-in dependency order via Babel-standalone so the prototype runs with
-no build step (same runtime model as the Claude Designer preview).
+The MusicKit desktop UI. The source files in `src/` are the raw output
+of Claude Designer — sibling JSX modules that share state via
+`window.MK_*` globals. `index.html` loads them in dependency order via
+Babel-standalone so the prototype runs with no build step (same
+runtime model as the Claude Designer preview).
 
-This folder is **isolated from the production frontend** at
-`desktop/frontend/`. Iterations on the design can land here without
-touching the working app.
+Wiring to the real Subsonic API lives in the `_`-prefixed files
+(`_api.js`, `_audio.js`, `_md5.js`, `_wiring.jsx`) which survive
+design-zip drops; designer-authored files (`app.jsx`, `chrome.jsx`,
+etc.) get replaced wholesale on each iteration.
 
 ## Layout
 
@@ -52,9 +53,19 @@ the same order as the design preview means every new iteration can
 be dropped in with `cp -r`. When the design stabilises we can swap
 to Vite + TypeScript without touching the JSX source.
 
-## What this is NOT
+## What's wired
 
-- Not connected to a real server yet.
-- Not the production UI — for that, use `make desktop-tauri-dev` or
-  `make desktop-electron-dev`, which load `desktop/frontend/`.
-- Not shipped to PyPI — only the production wrappers are.
+- Real Subsonic auth (`/rest/ping` with salted token)
+- Library load: `getArtists` -> per-artist `getArtist` -> per-album `getAlbum`
+- Track playback via `/rest/stream` driven by an `<audio>` element
+- Star toggle via `/rest/star` / `/rest/unstar`
+- Cover art via `/rest/getCoverArt`
+- Internet radio via `getInternetRadioStations`
+- Session persistence in localStorage; auto-resume on next launch
+
+## Not (yet) wired
+
+- Server-side search (`/rest/search3`) — currently filters the in-memory tree
+- Playlists (`/rest/getPlaylists`)
+- Lyrics fetching (`/rest/getLyrics`)
+- ICY now-playing metadata for radio streams

@@ -64,14 +64,8 @@ def main() -> None:
     json_paths = [
         REPO_ROOT / "desktop" / "tauri" / "src-tauri" / "tauri.conf.json",
         REPO_ROOT / "desktop" / "electron" / "package.json",
-        # Design-v2 wrappers — same bundle metadata story as the
-        # production pair, just installed as separate apps.
-        REPO_ROOT / "desktop" / "tauri-react" / "src-tauri" / "tauri.conf.json",
-        REPO_ROOT / "desktop" / "electron-react" / "package.json",
     ]
     for path in json_paths:
-        if not path.exists():
-            continue
         if update_json_version(path, version):
             targets.append((path, "updated"))
         else:

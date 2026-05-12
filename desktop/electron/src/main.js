@@ -1,5 +1,5 @@
 // Electron main process — opens a single BrowserWindow pointed at the
-// shared `desktop/frontend/index.html`. The renderer page (the SPA) is
+// shared `desktop/react/index.html`. The renderer page (the SPA) is
 // identical to what Tauri loads; the only Electron-specific bits live
 // in this file + `preload.js`.
 //
@@ -120,7 +120,7 @@ function createWindow() {
   mainWindow.on("move", scheduleSave);
   mainWindow.on("close", saveBounds);
 
-  mainWindow.loadFile(path.join(__dirname, "..", "..", "frontend", "index.html"));
+  mainWindow.loadFile(path.join(__dirname, "..", "..", "react", "index.html"));
 }
 
 app.whenReady().then(() => {

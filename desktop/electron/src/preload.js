@@ -1,12 +1,12 @@
 // Preload script — runs before the renderer page loads, with access to
-// Node + Electron APIs. Installs `window.__musickitStore` so the
-// shared picker (`desktop/frontend/picker.js`) gets the same async
-// `.get / .set / .delete / .save` surface the Tauri build provides via
-// `window.__TAURI__.store`.
-//
-// No IPC used because electron-store works synchronously on the
-// renderer side via the `path` argument; we wrap the calls to expose
-// the same async-flavour surface for picker.js's await calls.
+// Node + Electron APIs. Historically exposed a `window.__musickitStore`
+// surface for the legacy vanilla-JS picker; the React frontend at
+// `desktop/react/` uses localStorage directly and doesn't need it, but
+// we keep the bridge in place in case future native features (Now
+// Playing widget, OS notifications) want a backchannel to the main
+// process. Removing it would also mean dropping `electron-store` from
+// package.json — straightforward but separate from the design-v2
+// retirement of the legacy UI.
 
 const { contextBridge } = require("electron");
 const ElectronStore = require("electron-store");

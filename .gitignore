@@ -48,17 +48,6 @@ desktop/electron/node_modules/
 desktop/electron/dist/
 desktop/electron/package-lock.json
 
-# Design-v2 desktop wrapper build artifacts (parallel to the production
-# pair above). Tauri's `Cargo.lock` is intentionally ignored here — the
-# v2 crate is a prototype and we don't want lock-file churn polluting
-# every iteration's PR.
-desktop/tauri-react/src-tauri/target/
-desktop/tauri-react/src-tauri/gen/
-desktop/tauri-react/src-tauri/Cargo.lock
-desktop/electron-react/node_modules/
-desktop/electron-react/dist/
-desktop/electron-react/package-lock.json
-
 # Generated bundle so `musickit ui` can serve the SPA from an installed
 # wheel. `scripts/copy_ui_static.py` mirrors `desktop/frontend/` into
 # here; the canonical source lives in `desktop/frontend/`.

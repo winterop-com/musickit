@@ -18,8 +18,8 @@ trade-offs you prefer.
 Both wrappers point the embedded webview at any Subsonic-compatible
 server — your own `musickit serve`, [Navidrome], [Airsonic], whatever.
 They're not just thin chrome around the web UI; the SPA inside
-(`desktop/frontend/js/`) is a full client: salted-token auth, refresh-
-restore via URL hashes, and a Web Audio FFT visualizer.
+(`desktop/react/`) is a full client: salted-token auth, refresh-restore
+via URL hashes, and a Web Audio FFT visualizer.
 
 You log in once with **URL + Username + Password**; the app
 computes the Subsonic salted token and re-uses it across browse / play
@@ -86,13 +86,12 @@ http://localhost:1420/#a=1234&l=4567&t=8901
 ```
 
 Reload the window (Cmd-R / F5) and you land back on the same track —
-useful when iterating on `desktop/frontend/` during development.
+useful when iterating on `desktop/react/` during development.
 
 ## Building from source
 
-Pick a wrapper, then run the matching make target. Both honor a
-shared frontend at `desktop/frontend/`, so changes to the SPA propagate
-to both.
+Pick a wrapper, then run the matching make target. Both load the same
+SPA from `desktop/react/`, so changes propagate to both.
 
 ```bash
 make desktop-tauri-dev          # Tauri dev shell — hot reload of the SPA
@@ -102,9 +101,9 @@ make desktop-electron-build     # Release Electron build
 make build                      # Both, plus the Python wheel
 ```
 
-The make targets sync `desktop/frontend/` from the canonical web UI
-copies under `src/musickit/web/static/` before each build, so a single
-edit there updates both wrappers.
+The React frontend at `desktop/react/` is plain HTML + JSX + CSS loaded
+via Babel-standalone — no build step. Edit any file there and reload
+the wrapper's window to pick up changes.
 
 ## Trade-offs vs. the browser
 
