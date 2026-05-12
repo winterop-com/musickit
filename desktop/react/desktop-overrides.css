@@ -65,6 +65,102 @@ body[data-platform="darwin"] .mk-topbar input {
   text-overflow: ellipsis;
 }
 
+/* ---------------------------------------------------------------------
+ * Themed tooltips — CSS-only, no JS dependency.
+ *
+ * Add `data-tooltip="Hello"` to any element. The tooltip shows on
+ * hover with a ~0.7s delay (matches Slack / Linear's "I really meant
+ * to hover" feel), positions above the element, fades in, and inherits
+ * the app's palette so it doesn't break theme switching.
+ *
+ * Native `title=` would be one less attribute but the OS draws it with
+ * its own chrome (white bubble on macOS), and the delay is fixed at
+ * whatever the browser ships. This costs ~25 lines of CSS for full
+ * control.
+ * ------------------------------------------------------------------- */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after,
+[data-tooltip]::before {
+  pointer-events: none;
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  transition-delay: 0s;
+  z-index: 1000;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elev2, #24283b);
+  color: var(--text, #c0caf5);
+  border: 1px solid var(--line, #2a2e3f);
+  font-family: var(--mk-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+[data-tooltip]::before {
+  content: "";
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--line, #2a2e3f);
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before,
+[data-tooltip]:focus-visible::after,
+[data-tooltip]:focus-visible::before {
+  opacity: 1;
+  transition-delay: 0.7s;
+}
+/* Optional placement override: data-tooltip-placement="bottom"
+ * flips the pseudo to render below the element instead of above —
+ * useful for things in the top bar where "above" would clip outside
+ * the window chrome. */
+[data-tooltip][data-tooltip-placement="bottom"]::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+[data-tooltip][data-tooltip-placement="bottom"]::before {
+  bottom: auto;
+  top: calc(100% + 3px);
+  border-top: 0;
+  border-bottom: 5px solid var(--line, #2a2e3f);
+}
+
+/* Fullscreen × close button — Slack / Linear pattern: a subtle rounded
+ * square appears behind the icon on hover so the click target reads
+ * visually. The designer's CSS gives it only a colour change, which
+ * makes the icon feel a bit floating. Bumping the click target by
+ * adding internal padding keeps the absolute-positioning math the
+ * same (the parent's `top/right` still anchors the visual top-right
+ * of the box). */
+.mk-fs-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.mk-fs-close:hover {
+  background: var(--row-hover);
+}
+
 /* Fullscreen visualizer header — the artifact's 24px top padding put
  * the cover *just* inside the traffic-light strip on macOS. Bump it
  * down a few px so the cover starts cleanly below them. Don't shift

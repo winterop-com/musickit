@@ -20,7 +20,7 @@ function TopBar({ user, q, setQ, onFocusSearch, onSignOut, searchInputRef }) {
             spellCheck={false}
           />
           <span className="mk-search-kbd">/</span>
-          {q && <button className="mk-search-clear" onClick={() => setQ("")}>×</button>}
+          {q && <button className="mk-search-clear" onClick={() => setQ("")} aria-label="Clear search" data-tooltip="Clear (esc)" data-tooltip-placement="bottom">×</button>}
         </div>
       </div>
       <div className="mk-topbar-center">
@@ -29,7 +29,7 @@ function TopBar({ user, q, setQ, onFocusSearch, onSignOut, searchInputRef }) {
       </div>
       <div className="mk-topbar-right">
         <span className="mk-user">{user}</span>
-        <button className="mk-signout" onClick={onSignOut}>Sign out</button>
+        <button className="mk-signout" onClick={onSignOut} data-tooltip="Sign out and clear session" data-tooltip-placement="bottom">Sign out</button>
       </div>
     </div>
   );
@@ -395,18 +395,18 @@ function NowPlaying({ nowTrack, nowArtist, nowAlbum, nowStation, playing, muted,
           </div>
           </>)}
           <div className="mk-transport">
-            <button className="mk-tbtn" onClick={handlePrev} aria-label="Previous">
+            <button className="mk-tbtn" onClick={handlePrev} aria-label="Previous" data-tooltip="Previous (p)">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 6h2v12H6zM20 6v12L9 12z"/></svg>
             </button>
-            <button className={"mk-tbtn mk-tbtn-play" + (playing ? " playing" : "")} onClick={handlePlayPause} aria-label="Play/pause">
+            <button className={"mk-tbtn mk-tbtn-play" + (playing ? " playing" : "")} onClick={handlePlayPause} aria-label="Play/pause" data-tooltip={playing ? "Pause (space)" : "Play (space)"}>
               {playing
                 ? <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>
                 : <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 5l13 7-13 7z"/></svg>}
             </button>
-            <button className="mk-tbtn" onClick={handleNext} aria-label="Next">
+            <button className="mk-tbtn" onClick={handleNext} aria-label="Next" data-tooltip="Next (n)">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M16 6h2v12h-2zM4 6l11 6-11 6z"/></svg>
             </button>
-            <button className={"mk-tbtn" + (muted ? " muted" : "")} onClick={() => setMuted(!muted)} aria-label="Mute">
+            <button className={"mk-tbtn" + (muted ? " muted" : "")} onClick={() => setMuted(!muted)} aria-label="Mute" data-tooltip={muted ? "Unmute (m)" : "Mute (m)"}>
               {muted
                 ? <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 10v4h4l5 4V6L7 10H3zM16 8l5 5m0-5l-5 5" stroke="currentColor" strokeWidth="2"/></svg>
                 : <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 10v4h4l5 4V6L7 10H3zM16 7c2 2 2 8 0 10M19 4c4 4 4 12 0 16"/></svg>}
@@ -443,7 +443,7 @@ function NowPlaying({ nowTrack, nowArtist, nowAlbum, nowStation, playing, muted,
         <div className="mk-spectrum-pane">
           <div className="mk-pane-label">
             Spectrum
-            <button className="mk-fs-btn" title="Fullscreen visualizer (f)" onClick={() => setFullscreenViz(true)}>
+            <button className="mk-fs-btn" data-tooltip="Fullscreen (f)" aria-label="Fullscreen visualizer" onClick={() => setFullscreenViz(true)}>
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
             </button>
           </div>
@@ -462,7 +462,7 @@ function FullscreenViz({ onClose, vizStyle, running, palette, nowTrack, nowArtis
   const cover = nowAlbum ? makeCover(nowAlbum.cover, nowAlbum.color) : null;
   return (
     <div className="mk-fullscreen-viz">
-      <button className="mk-fs-close" onClick={onClose}>×</button>
+      <button className="mk-fs-close" onClick={onClose} aria-label="Close fullscreen" data-tooltip="Close (esc)" data-tooltip-placement="bottom">×</button>
       <div className="mk-fs-head">
         {cover && <img src={cover} className="mk-fs-cover" alt=""/>}
         <div className="mk-fs-meta">
@@ -474,13 +474,13 @@ function FullscreenViz({ onClose, vizStyle, running, palette, nowTrack, nowArtis
         <window.MK_Visualizer style={vizStyle === "ambient" ? "bars" : vizStyle} running={running} accent={palette.viz} dense />
       </div>
       <div className="mk-fs-controls">
-        <button className="mk-tbtn" onClick={onPrev}><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 6h2v12H6zM20 6v12L9 12z"/></svg></button>
-        <button className={"mk-tbtn mk-tbtn-play" + (playing ? " playing" : "")} onClick={onPlayPause}>
+        <button className="mk-tbtn" onClick={onPrev} aria-label="Previous" data-tooltip="Previous (p)"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 6h2v12H6zM20 6v12L9 12z"/></svg></button>
+        <button className={"mk-tbtn mk-tbtn-play" + (playing ? " playing" : "")} onClick={onPlayPause} aria-label="Play/pause" data-tooltip={playing ? "Pause (space)" : "Play (space)"}>
           {playing
             ? <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>
             : <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 5l13 7-13 7z"/></svg>}
         </button>
-        <button className="mk-tbtn" onClick={onNext}><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M16 6h2v12h-2zM4 6l11 6-11 6z"/></svg></button>
+        <button className="mk-tbtn" onClick={onNext} aria-label="Next" data-tooltip="Next (n)"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M16 6h2v12h-2zM4 6l11 6-11 6z"/></svg></button>
         <span className="mk-fs-time mono">{fmtDur_ch(pos)} / {dur ? fmtDur_ch(dur) : "live"}</span>
       </div>
       <div className="mk-fs-hint mono">esc to exit · f to toggle</div>
