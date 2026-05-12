@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MusicKit (design v2)</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="musickit.css" />
+  <!--
+    Runtime model: load React UMD + Babel-standalone in the page, then
+    drop the designer's JSX files in dependency order. Each file
+    registers its exports on `window.MK_*`; main.jsx pulls MK_App off
+    window and renders it. No build step — matches the Claude Designer
+    preview environment so the design zip can be replaced as-is.
+    A real Vite build can come later without touching these source files.
+  -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <!-- Dependency order: data → covers → visualizer → views → overlays →
+       tweaks-panel → chrome → app → main. Each declares globals the
+       later files read. Keep this list in sync with desktop/react/src/. -->
+  <script type="text/babel" data-presets="react" src="src/data.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/covers.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/visualizer.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/views.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/overlays.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/tweaks-panel.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/chrome.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/app.jsx"></script>
+  <script type="text/babel" data-presets="react" src="main.jsx"></script>
+</body>
+</html>

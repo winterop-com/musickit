@@ -1,4 +1,4 @@
-.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python dist-collect desktop-sync-frontend desktop-sync-version desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build ui-static-sync clean
+.PHONY: help install lint check test coverage docs docs-serve docs-build docs-screenshots build build-python dist-collect desktop-sync-frontend desktop-sync-version desktop-tauri desktop-tauri-dev desktop-tauri-build desktop-electron desktop-electron-dev desktop-electron-build desktop-react-tauri desktop-react-tauri-dev desktop-react-tauri-build desktop-react-electron desktop-react-electron-dev desktop-react-electron-build ui-static-sync clean
 
 UV := $(shell command -v uv 2> /dev/null)
 
@@ -24,6 +24,10 @@ help:
 	@echo "  desktop-electron     Alias for desktop-electron-dev"
 	@echo "  desktop-electron-dev Run the Electron desktop app in dev mode (npm start)"
 	@echo "  desktop-electron-build Build the Electron app .dmg under desktop/electron/dist/"
+	@echo "  desktop-react-tauri-dev    Run the Tauri design-v2 prototype (desktop/react/)"
+	@echo "  desktop-react-tauri-build  Build the Tauri design-v2 .app bundle"
+	@echo "  desktop-react-electron-dev Run the Electron design-v2 prototype (desktop/react/)"
+	@echo "  desktop-react-electron-build Build the Electron design-v2 .dmg under desktop/electron-react/dist/"
 	@echo "  clean        Remove caches and build artifacts"
 
 install:
@@ -178,6 +182,31 @@ desktop-electron-dev: desktop-sync-frontend
 desktop-electron-build: desktop-sync-frontend desktop-sync-version
 	@echo ">>> Electron release build — produces a .dmg under desktop/electron/dist/"
 	@cd desktop/electron && (test -d node_modules || npm install) && npm run build
+
+# Design-v2 wrappers. These run the in-progress Claude Designer React
+# prototype under desktop/react/ as side-by-side apps (separate bundle
+# identifiers, separate product names) so the production wrappers stay
+# untouched. The dev targets need no install steps for the frontend
+# itself — `desktop/react/` is plain HTML + JSX loaded via Babel.
+desktop-react-tauri: desktop-react-tauri-dev
+
+desktop-react-tauri-dev:
+	@echo ">>> Tauri dev (design v2) — opens window pointed at desktop/react/index.html"
+	@cd desktop/tauri-react/src-tauri && cargo tauri dev
+
+desktop-react-tauri-build:
+	@echo ">>> Tauri release build (design v2) — produces a .app under desktop/tauri-react/src-tauri/target/release/bundle/"
+	@cd desktop/tauri-react/src-tauri && cargo tauri build
+
+desktop-react-electron: desktop-react-electron-dev
+
+desktop-react-electron-dev:
+	@echo ">>> Electron dev (design v2) — opens window pointed at desktop/react/index.html"
+	@cd desktop/electron-react && (test -d node_modules || npm install) && npm start
+
+desktop-react-electron-build:
+	@echo ">>> Electron release build (design v2) — produces a .dmg under desktop/electron-react/dist/"
+	@cd desktop/electron-react && (test -d node_modules || npm install) && npm run build
 
 clean:
 	@echo ">>> Cleaning up"

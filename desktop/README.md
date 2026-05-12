@@ -8,6 +8,14 @@ server** (musickit serve, Navidrome, Airsonic, Gonic, …) via the
 because we use the spec's salted-token auth (`token = md5(password +
 salt)`).
 
+In parallel, the **design-v2 prototype** lives at `desktop/react/`
+(the Claude Designer React output) with its own pair of wrappers
+under `tauri-react/` and `electron-react/`. Those are separate apps
+with their own bundle identifiers, so they install side-by-side with
+the production MusicKit app. Run them with `make desktop-react-tauri-dev`
+or `make desktop-react-electron-dev`. The production frontend +
+wrappers below are NOT affected by the redesign work.
+
 ## Layout
 
 ```
