@@ -45,6 +45,26 @@ body[data-platform="darwin"] .mk-topbar input {
   background: var(--row-hover);
 }
 
+/* Sidebar artist rows + album row titles — designer's CSS lets long
+ * names wrap to two lines (e.g. "Rage Against The Machine"), which
+ * breaks the fixed row height and looks crowded. Force single-line +
+ * ellipsis, and insert a small vertical gap between artist rows so
+ * the active highlight has a touch of air around it instead of
+ * touching its neighbours. */
+.mk-artist-row {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  margin: 1px 0;
+}
+.mk-album-name,
+.mk-album-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Fullscreen visualizer header — the artifact's 24px top padding put
  * the cover *just* inside the traffic-light strip on macOS. Bump it
  * down a few px so the cover starts cleanly below them. Don't shift
