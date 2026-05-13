@@ -28,6 +28,47 @@ body[data-platform="darwin"] .mk-topbar {
   -webkit-app-region: drag;
 }
 
+/* Always-on drag strip across the top of the window. The login /
+ * resume shells render no `.mk-topbar`, so without this strip there
+ * is no grabbable region while signed out. Sits above all content,
+ * 32px tall (matches the macOS title-bar height), transparent. The
+ * Tauri runtime drag handler in index.html and Electron's
+ * `-webkit-app-region` both pick it up. */
+.mk-drag-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  z-index: 9999;
+  -webkit-app-region: drag;
+  pointer-events: auto;
+  background: transparent;
+}
+/* Once the app shell mounts, the `.mk-topbar` itself owns the drag
+ * region — hide the strip so it doesn't sit over the search box and
+ * eat clicks. */
+body:has(.mk-topbar) .mk-drag-strip {
+  display: none;
+}
+
+/* Login + resume shells: make the whole empty background draggable
+ * so the window can be moved by grabbing anywhere outside the card.
+ * The mousedown handler in index.html excludes `.mk-login-card` /
+ * `.mk-resume-card`, and Electron's drag region is overridden back
+ * to no-drag on the card itself. */
+.mk-login-shell,
+.mk-resume-shell {
+  -webkit-app-region: drag;
+}
+.mk-login-card,
+.mk-resume-card,
+.mk-login-shell input,
+.mk-login-shell button,
+.mk-login-shell a {
+  -webkit-app-region: no-drag;
+}
+
 /* Restore default cursor / clickability on the interactive children —
  * without this, the search box, sign-out button, etc. inherit the
  * `drag` region and become unclickable. */

@@ -6,7 +6,7 @@
   <!-- Bumped by scripts/sync_desktop_versions.py from pyproject.toml so
        the login screen / About string stays in sync with the released
        Python package. Hand-edit only if you're also editing pyproject. -->
-  <meta name="mk-version" content="0.23.11" />
+  <meta name="mk-version" content="0.23.12" />
   <title>MusicKit (design v2)</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="musickit.css" />
@@ -70,9 +70,15 @@
     document.addEventListener("mousedown", (event) => {
       if (event.buttons !== 1) return;
       const target = event.target;
-      const dragRegion = target.closest?.(".mk-topbar, .mk-fs-head");
+      // Login / resume shells have no `.mk-topbar`, so without explicit
+      // drag regions the window is unmovable while signed out. We treat
+      // the shell wrappers (and the always-on `.mk-drag-strip`) as
+      // drag-by-grab regions too.
+      const dragRegion = target.closest?.(
+        ".mk-topbar, .mk-fs-head, .mk-drag-strip, .mk-login-shell, .mk-resume-shell"
+      );
       if (!dragRegion) return;
-      if (target.closest("input, button, a, [role='button']")) return;
+      if (target.closest("input, button, a, textarea, select, [role='button'], .mk-login-card, .mk-resume-card")) return;
       const tauriWin = getTauriWindow();
       if (!tauriWin?.startDragging) return;
       tauriWin.startDragging().catch((e) => console.warn("startDragging failed:", e));
@@ -96,6 +102,12 @@
   <script src="vendor/babel.min.js"></script>
 </head>
 <body>
+  <!-- Always-on draggable strip across the top of the window. Covers
+       the empty area above the login / resume cards on macOS where
+       the traffic lights sit but the rest is just chrome. Pointer
+       events stay enabled so mousedown reaches the Tauri handler;
+       Electron honours `-webkit-app-region` directly. -->
+  <div class="mk-drag-strip" data-tauri-drag-region></div>
   <div id="root"></div>
   <!-- Wiring layer — plain JS, no JSX. Loads first so MK_md5 /
        MK_API / MK_AUDIO exist before any artifact code runs. The
@@ -103,27 +115,27 @@
        — survives drop-in updates".
        The `?v=` query string is rewritten by scripts/sync_desktop_versions.py
        so every release busts the webview cache. -->
-  <script src="src/_md5.js?v=0.23.11"></script>
-  <script src="src/_api.js?v=0.23.11"></script>
-  <script src="src/_audio.js?v=0.23.11"></script>
+  <script src="src/_md5.js?v=0.23.12"></script>
+  <script src="src/_api.js?v=0.23.12"></script>
+  <script src="src/_audio.js?v=0.23.12"></script>
 
   <!-- Designer artifact. Dependency order: data → covers → visualizer →
        views → overlays → tweaks-panel → chrome → app. Each declares
        globals the later files read. Keep this list in sync with
        desktop/react/src/. -->
-  <script type="text/babel" data-presets="react" src="src/data.jsx?v=0.23.11"></script>
-  <script type="text/babel" data-presets="react" src="src/covers.jsx?v=0.23.11"></script>
-  <script type="text/babel" data-presets="react" src="src/visualizer.jsx?v=0.23.11"></script>
-  <script type="text/babel" data-presets="react" src="src/views.jsx?v=0.23.11"></script>
-  <script type="text/babel" data-presets="react" src="src/overlays.jsx?v=0.23.11"></script>
-  <script type="text/babel" data-presets="react" src="src/tweaks-panel.jsx?v=0.23.11"></script>
-  <script type="text/babel" data-presets="react" src="src/chrome.jsx?v=0.23.11"></script>
-  <script type="text/babel" data-presets="react" src="src/app.jsx?v=0.23.11"></script>
+  <script type="text/babel" data-presets="react" src="src/data.jsx?v=0.23.12"></script>
+  <script type="text/babel" data-presets="react" src="src/covers.jsx?v=0.23.12"></script>
+  <script type="text/babel" data-presets="react" src="src/visualizer.jsx?v=0.23.12"></script>
+  <script type="text/babel" data-presets="react" src="src/views.jsx?v=0.23.12"></script>
+  <script type="text/babel" data-presets="react" src="src/overlays.jsx?v=0.23.12"></script>
+  <script type="text/babel" data-presets="react" src="src/tweaks-panel.jsx?v=0.23.12"></script>
+  <script type="text/babel" data-presets="react" src="src/chrome.jsx?v=0.23.12"></script>
+  <script type="text/babel" data-presets="react" src="src/app.jsx?v=0.23.12"></script>
 
   <!-- Wiring layer (continued) — _wiring.jsx monkey-patches the
        artifact's MK_LoginView / MK_makeCover and registers the
        library-loader before main.jsx renders <App />. -->
-  <script type="text/babel" data-presets="react" src="src/_wiring.jsx?v=0.23.11"></script>
-  <script type="text/babel" data-presets="react" src="main.jsx?v=0.23.11"></script>
+  <script type="text/babel" data-presets="react" src="src/_wiring.jsx?v=0.23.12"></script>
+  <script type="text/babel" data-presets="react" src="main.jsx?v=0.23.12"></script>
 </body>
 </html>
