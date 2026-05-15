@@ -345,8 +345,8 @@ function App() {
           else if (showLyrics) setShowLyrics(false);
           else if (searchOpen) { setSearchOpen(false); setQ(""); }
           break;
-        case "ArrowLeft": setPos((p) => Math.max(0, p - 5)); break;
-        case "ArrowRight": setPos((p) => Math.min(dur, p + 5)); break;
+        case "ArrowLeft": setPos((p) => { const np = Math.max(0, p - 5); window.MK_AUDIO?.seek?.(np); return np; }); break;
+        case "ArrowRight": setPos((p) => { const np = Math.min(dur, p + 5); window.MK_AUDIO?.seek?.(np); return np; }); break;
         case "ArrowUp": setVol((v) => Math.min(1, v + 0.05)); setMuted(false); e.preventDefault(); break;
         case "ArrowDown": setVol((v) => Math.max(0, v - 0.05)); e.preventDefault(); break;
         case "s": setShuffle((s) => !s); break;

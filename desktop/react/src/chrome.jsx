@@ -139,34 +139,36 @@ function TracksPane({ artist, album, playTrack, now, isStarred, toggleStar, load
         <div className="mk-album-header-title">{album.name}</div>
         <div className="mk-album-header-sub">{artist.name} · <span className="mono">{album.year}</span> · {album.trackCount} tracks</div>
       </div>
-      <table className="mk-track-table">
-        <thead>
-          <tr><th className="t-n">#</th><th className="t-title">TITLE</th><th className="t-artist">ARTIST</th><th className="t-time">TIME</th><th className="t-star"></th></tr>
-        </thead>
-        <tbody>
-          {!loaded && [0,1,2,3,4].map((i) => <tr key={i}><td colSpan="5"><div className="mk-skel" style={{height: 16, margin: "4px 0"}}/></td></tr>)}
-          {loaded && album.tracks.map((tr) => {
-            const key = `${artist.id}/${album.id}/${tr.n}`;
-            const isNow = now?.artistId === artist.id && now?.albumId === album.id && now?.trackN === tr.n;
-            return (
-              <tr
-                key={tr.n}
-                className={"mk-track-row" + (isNow ? " now" : "")}
-                onDoubleClick={() => playTrack(artist.id, album.id, tr.n)}
-                onClick={() => playTrack(artist.id, album.id, tr.n)}
-              >
-                <td className="t-n mono">{tr.n}</td>
-                <td className="t-title">{tr.title}</td>
-                <td className="t-artist">{artist.name}</td>
-                <td className="t-time mono">{tr.time}</td>
-                <td className="t-star">
-                  <window.MK_StarBtn on={isStarred(key)} onToggle={() => toggleStar(key)} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="mk-track-scroll">
+        <table className="mk-track-table">
+          <thead>
+            <tr><th className="t-n">#</th><th className="t-title">TITLE</th><th className="t-artist">ARTIST</th><th className="t-time">TIME</th><th className="t-star"></th></tr>
+          </thead>
+          <tbody>
+            {!loaded && [0,1,2,3,4].map((i) => <tr key={i}><td colSpan="5"><div className="mk-skel" style={{height: 16, margin: "4px 0"}}/></td></tr>)}
+            {loaded && album.tracks.map((tr) => {
+              const key = `${artist.id}/${album.id}/${tr.n}`;
+              const isNow = now?.artistId === artist.id && now?.albumId === album.id && now?.trackN === tr.n;
+              return (
+                <tr
+                  key={tr.n}
+                  className={"mk-track-row" + (isNow ? " now" : "")}
+                  onDoubleClick={() => playTrack(artist.id, album.id, tr.n)}
+                  onClick={() => playTrack(artist.id, album.id, tr.n)}
+                >
+                  <td className="t-n mono">{tr.n}</td>
+                  <td className="t-title">{tr.title}</td>
+                  <td className="t-artist">{artist.name}</td>
+                  <td className="t-time mono">{tr.time}</td>
+                  <td className="t-star">
+                    <window.MK_StarBtn on={isStarred(key)} onToggle={() => toggleStar(key)} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -218,20 +220,22 @@ function StarredPane({ starredTracks, playTrack, toggleStar }) {
           <div className="mk-empty-sub">Tap the heart on any track, album, or artist — it syncs everywhere MusicKit is signed in.</div>
         </div>
       ) : (
-        <table className="mk-track-table">
-          <thead><tr><th className="t-n">#</th><th className="t-title">TITLE</th><th className="t-artist">ARTIST</th><th className="t-time">TIME</th><th className="t-star"></th></tr></thead>
-          <tbody>
-            {starredTracks.map((tr, i) => (
-              <tr key={tr.key} className="mk-track-row" onClick={() => playTrack(tr.artistId, tr.albumId, tr.n)}>
-                <td className="t-n mono">{i+1}</td>
-                <td className="t-title">{tr.title}</td>
-                <td className="t-artist">{tr.artistName}</td>
-                <td className="t-time mono">{tr.time}</td>
-                <td className="t-star"><window.MK_StarBtn on={true} onToggle={() => toggleStar(tr.key)} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="mk-track-scroll">
+          <table className="mk-track-table">
+            <thead><tr><th className="t-n">#</th><th className="t-title">TITLE</th><th className="t-artist">ARTIST</th><th className="t-time">TIME</th><th className="t-star"></th></tr></thead>
+            <tbody>
+              {starredTracks.map((tr, i) => (
+                <tr key={tr.key} className="mk-track-row" onClick={() => playTrack(tr.artistId, tr.albumId, tr.n)}>
+                  <td className="t-n mono">{i+1}</td>
+                  <td className="t-title">{tr.title}</td>
+                  <td className="t-artist">{tr.artistName}</td>
+                  <td className="t-time mono">{tr.time}</td>
+                  <td className="t-star"><window.MK_StarBtn on={true} onToggle={() => toggleStar(tr.key)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -430,7 +434,7 @@ function NowPlaying({ nowTrack, nowArtist, nowAlbum, nowStation, playing, muted,
               className="mk-scrub"
               type="range" min="0" max={Math.max(1, dur)} step="1"
               value={Math.min(pos, dur || 0)}
-              onChange={(e) => setPos(parseFloat(e.target.value))}
+              onChange={(e) => { const v = parseFloat(e.target.value); setPos(v); window.MK_AUDIO?.seek?.(v); }}
               disabled={!has || !dur}
               style={{ "--mk-progress": `${dur ? (pos / dur) * 100 : 0}%` }}
             />
