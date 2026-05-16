@@ -65,7 +65,27 @@ jobs:
         run: make test
 
       - name: Build sdist + wheel
-        run: uv build
+        # Goes via `make build-python`, NOT `uv build` directly, because
+        # the Makefile target depends on `ui-static-sync` which copies
+        # `desktop/react/` -> `src/musickit/_ui_static/` so the wheel
+        # ships the SPA that `musickit ui` serves. A raw `uv build`
+        # would publish a wheel where `musickit ui` raises
+        # FileNotFoundError on the installed user's machine.
+        run: make build-python
+
+      - name: Verify wheel bundles the SPA static files
+        # Belt-and-braces: open the built wheel and confirm
+        # `musickit/_ui_static/index.html` is inside. If a future
+        # refactor breaks the copy step, fail the release before
+        # PyPI gets a broken wheel.
+        run: |
+          WHEEL=$(ls dist/musickit-*.whl | head -1)
+          if ! unzip -l "$WHEEL" | grep -q "musickit/_ui_static/index.html"; then
+            echo "::error::Built wheel $WHEEL is missing musickit/_ui_static/index.html"
+            unzip -l "$WHEEL" | head -40
+            exit 1
+          fi
+          echo "Wheel $WHEEL bundles the SPA static files."
 
       - name: Publish to PyPI
         # Uses PyPI Trusted Publishers (OIDC). Configure once in the
